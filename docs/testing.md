@@ -1,7 +1,7 @@
 # 测试
 
 用例在两处：本体在 `devtools/tests/`，各平台适配器随子仓带在 `finshin/adapter/<平台>/tests/`。一份文件对一个主题，命名 `test_<主题>.py`。
-条文见 [coding-style.md](coding-style.md)，静态检查见 [style-checker.md](style-checker.md)，发布前的检查顺序见 [release-workflow.md](release-workflow.md)。
+条文见 [代码规范](coding-style.md)，静态检查见 [规范扫描器](style-checker.md)，发布前的检查顺序见 [发布工作流](release-workflow.md)。
 
 ## 跑法
 

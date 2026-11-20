@@ -2,7 +2,7 @@
 
 这里沉淀实现过程中实测出来的经验：某条约束的真实成因、某个结论是怎么验出来的、哪条路踩过并为什么走不通。
 
-代码见 [coding-style.md](../coding-style.md)，中文写法见 [writing-style.md](../writing-style.md)，发布流程见 [release-workflow.md](../release-workflow.md)，环境搭建见 [development.md](../development.md)。
+代码见 [代码规范](../coding-style.md)，中文写法见 [写作规范](../writing-style.md)，发布流程见 [发布工作流](../release-workflow.md)，环境搭建见 [开发手册](../development.md)。
 
 ## 怎么找
 

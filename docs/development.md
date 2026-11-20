@@ -3,10 +3,10 @@
 面向贡献者与维护者。其余文档各管一段：
 
 - 用户侧安装与更新：根目录 [README.md](../README.md)
-- 发布操作：[release-workflow.md](release-workflow.md)
-- 构建与发布物：[packaging.md](packaging.md)
-- 代码风格：[coding-style.md](coding-style.md)，静态检查：[style-checker.md](style-checker.md)，回归用例：[testing.md](testing.md)，文案与指针：[writing-style.md](writing-style.md)
-- 实测出来的约束与踩坑：[lessons/](lessons/README.md)
+- 发布操作：[发布工作流](release-workflow.md)
+- 构建与发布物：[打包教程](packaging.md)
+- 代码风格：[代码规范](coding-style.md)，静态检查：[规范扫描器](style-checker.md)，回归用例：[测试](testing.md)，文案与指针：[写作规范](writing-style.md)
+- 实测出来的约束与踩坑：[工程经验](lessons/README.md)
 
 ## 环境搭建
 
@@ -102,10 +102,10 @@
 3. 交出的东西改名：`PluginRoute` → `MessageRoute`、`PluginPredicate` → `RouteMatcher`、`PluginBackground` → `BackgroundLoop`、`TaskHandler` → `QueuedAction`、`timings` → `platform_moments`。
    - 时机那几样一并归到 moment 词根：`PlatformTiming` → `PlatformMoment`、`PluginTiming` → `MomentSubscription`、`PluginTimingRun` → `MomentRun`。
    - `PluginSpec` 那只袋子删了。
-4. 动作名带归属：`queued_actions` 交的动作名写成「插件名.动作」，前段不等于自己的插件名整只拒装。内置对话的动作名由 `chat` 改成 `AI.chat`。
+4. 内置对话的动作名由 `chat` 改成 `AI.chat`，动作名归属见「新增插件」节。
 5. 接口包撤掉没人用的形状：`ContentDTO` 的 `file_token` 与 `origin_ref`、`AdapterFieldSpec.default`、`BoundCommand.value_of`、`PrincipalRepository.find_by_key`。用到哪一处改哪一处，没用到不必动。
 6. 把适配器声明从 `adapter.toml` 搬进 `pyproject.toml`，字段写法见「新增平台适配器」节。
-7. 插件独有的库从 `plugin.toml` 的 `deps` 搬到同目录 `pyproject.toml` 的 `[project].dependencies`，清单里再写 `deps` 属未知键、一律忽略。随包插件的库走项目根的 `pyproject.toml`。
+7. 插件独有的库从 `plugin.toml` 的 `deps` 搬到同目录 `pyproject.toml` 的 `[project].dependencies`，清单里再写 `deps` 属未知键、一律忽略。
 
 ## 新增平台适配器
 
@@ -192,14 +192,10 @@
 5. 跑 `python devtools\check_coding_style.py devtools` 自查。
 6. 跑 `python -m pytest devtools/tests/test_style_checker_meta.py`。
 
-## 发布流程
-
-版本号与 CHANGELOG 归段、tag、release、版本页收尾统一见 [release-workflow.md](release-workflow.md)，构建与本地实测见 [packaging.md](packaging.md)。
-
 ## 更新方式
 
 - **"版本变化"按钮**：点开先拉全部 release，用最新一版的 tag 与本机版本比对，有新版先提示一句，再照常打开全版本清单，旧版本照样能翻。比对不当场更新，升级由启动器完成。
-- **开发版**：手动拉取新代码（`git pull` 或下载源码覆盖），依赖有变动时重跑上文环境搭建的 `uv sync --all-packages`。
+- **开发版**：手动拉取新代码（`git pull` 或下载源码覆盖），依赖有变动时重跑「环境搭建」节的 `uv sync --all-packages`。
 - **打包版**：启动器每次拉起主程序前自动比对版本，弹窗确认后完成下载升级，用户配置、数据与日志一律保留。
-  - 启动器本体随升级当场更换，换壳机制见 [packaging.md](packaging.md)。
-  - 各版本走自动升级还是手动整包，见根目录 [README.md](../README.md) 的旧版迁移。
+  - 启动器本体随升级当场更换，换壳机制见 [升级换源码与启动器](packaging.md#升级换源码与启动器)。
+  - 各版本走自动升级还是手动整包，见 [旧版迁移](../README.md#previous)。

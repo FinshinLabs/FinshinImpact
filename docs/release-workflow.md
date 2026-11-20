@@ -23,7 +23,7 @@
 - 一条命令跑齐五步，每步一行读数，任一步红即整体退一。
 - 红的那步下面带最多 30 行原始输出。
 - 只重跑点名的步：`--only` 接步名，可多次，候选 `ruff`／`pyright`／`imports`／`style`／`pytest`。
-- 目标不写死：类型检查与用例两步按挂载现场算，含本体三棵树与各挂载子仓声明的源码与用例目录。
+- 目标不写死：源码与用例各步的目标按挂载现场算，含本体三棵树与各挂载子仓声明的源码与用例目录。
 - 绿的标准：
   - ruff format 与 check 都通过。
   - pyright 0 errors。
@@ -31,7 +31,7 @@
   - 扫描器 0 硬性。
   - pytest 全过。
 - pyright 跑的是开发依赖带的 node：`devtools/pyproject.toml` 声明 `pyright[nodejs]`，`uv sync --all-packages` 之后即齐，不需要另外装 Node.js。
-- 各步判据不在这里重复：扫描器的分节、待核基线与豁免见 [style-checker.md](style-checker.md)，用例口径见 [testing.md](testing.md)，构建与发布物见 [packaging.md](packaging.md)。
+- 各步判据不在这里重复：扫描器的分节、待核基线与豁免见 [规范扫描器](style-checker.md)，用例口径见 [测试](testing.md)，构建与发布物见 [打包教程](packaging.md)。
 
 ## 日常与定稿
 
@@ -52,11 +52,10 @@
 - 子仓版本号以 `pyproject.toml` 的 `[project].version` 为单源，tag、wheel 文件名与本体读到的版本都从它取。
 - wheel 构建见 [子仓构建](packaging.md#子仓构建)。
 - 适配器发版只在子仓，本体的发布链不含适配器版本：
-  - tag 打在子仓那一笔上，名字就是版本号（`v0.1.0`）。
-  - release 附件只放 wheel，不放源码快照，不在用户机器上构建。
+  - release 附件只放 wheel，正文不写下载直链。
   - 下载直链与指纹取 GitHub 记在 wheel 附件上的值。
   - 正文标题行写 `🐳 仓名-v版本号`，其下空一行直接铺条目，不带段名行，条目形状见「Release」节。
-  - 正文不写下载直链，wheel 只以附件在场。
+  - 正文末条写「要求接口包 `finshin-sdk>=X1.Y1.Z1,<X2.Y2.Z2`。」，随版本只换数字，不另加解释句。
   - release 建完即定稿，旧版附件不撤。
   - 在线目录由本体的 Pages 工作流按账号下各仓的声明聚合，与版本页同一份产物一起部署。
   - 子仓单独发版后，目录最长等到本体一次 push 或每日定时重建才反映那一版。
@@ -139,7 +138,7 @@
 ## 构建 zip
 
 - 定稿提交后本地构建，全程只构建这一次。
-- 构建命令、自检与用户路径实测见 [packaging.md](packaging.md)。
+- 构建命令、自检与用户路径实测见 [打包教程](packaging.md)。
 - 测试、上传使用同一次构建的 zip，任一实测环节失败都不许发布。
 
 ## Tag
@@ -175,7 +174,7 @@ git push origin main vX.Y.Z
 - 进仓库 [Releases](https://github.com/FinshinLabs/FinshinImpact/releases)。
 - Draft a new release。
 - 选推送上来的 tag `vX.Y.Z`。
-- 填正文，正文形状见下面两小节。
+- 填正文，正文形状见「首发正文」与「旧版收敛」两节。
 - 选上一版 tag 并点 **Generate release notes**。
 - Publish。
 
@@ -204,8 +203,6 @@ git push origin main vX.Y.Z
 
 ### 保留序列
 
-更新方式见 [更新方式](development.md#更新方式)。
-
 保留规则：
 
 - 正式号（不带 `.devM` 的那两种串，形状见「版本号（semver）」节）各留一条 release，长期保留。
@@ -214,7 +211,7 @@ git push origin main vX.Y.Z
 - 汇总按用户可感知的功能域写，不复述 dev 明细。
 - 纯内部重构、用户无感知的 dev 段不写入汇总。
 - ⚠️ 删的是 release 条目，tag 一律保留。
-- 正式号之间按「旧版收敛」一节撤发布包、留条目，正文只去掉两条下载直链，其余行照留。
+- 正式号之间按「旧版收敛」一节处理。
 
 ### 旧版收敛（不带 zip）
 

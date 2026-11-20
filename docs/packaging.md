@@ -1,7 +1,7 @@
 # 打包教程
 
 所有命令在项目根目录的 PowerShell 中执行。
-环境搭建见 [环境搭建](development.md#环境搭建)，发布顺序见 [release-workflow.md](release-workflow.md)。
+环境搭建见 [环境搭建](development.md#环境搭建)，发布顺序见 [发布工作流](release-workflow.md)。
 
 ## 原理
 
@@ -42,7 +42,6 @@ FinshinImpact\
 
 - 要装的库出自 `pyproject.toml` 的核心依赖。
 - `runtime\.installed` 记依赖清单摘要，清单没变下次跳过安装。
-- 构建只在临时副本里跑，或在仓内跑完即清 `build\`、`*.egg-info`、`dist\`。
 - 启动器装依赖只追加，删库入口见 [新增插件](development.md#新增插件清单驱动流程)。
 
 ### 下载缓存
@@ -71,6 +70,7 @@ python packaging\build.py
 
 - 编译启动器。
 - 白名单组装，排除 `*.egg-info` 等开发残留。
+- 构建只在临时副本里跑，或在仓内跑完即清 `build\`、`*.egg-info`、`dist\`。
 - 包内 `pyproject.toml` 与仓里那份一字一样。
 - 下载嵌入式 `Python` 与 `uv`，只走镜像，zip 逐条目校验，`uv` 另比对官方 sha256，不过会中止。
 - GitHub 加速镜像名单只在项目声明的 `github-mirrors` 键里维护。
@@ -133,8 +133,6 @@ python packaging/gen_catalog.py <输出路径>
    - 确认 `payload\` 的清理结果，见 [按名字找的文件](#按名字找的文件)。
 4. 升级路径按 [旧版迁移](../README.md#previous) 验证。
 5. 测完删掉测试目录。
-
-正式发布见 [release-workflow.md](release-workflow.md)。
 
 ## 报毒
 

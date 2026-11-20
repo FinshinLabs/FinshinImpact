@@ -1,7 +1,6 @@
 # 规范扫描器
 
-扫描器在 `devtools/check_coding_style.py`，按 [coding-style.md](coding-style.md) 与 [写作规范](writing-style.md) 的分节静态检查代码与入库 md。
-只报不改，输出供人工核实。
+扫描器在 `devtools/check_coding_style.py`，按 [代码规范](coding-style.md) 与 [写作规范](writing-style.md) 的分节静态检查代码与入库 md，只报不改，输出供人工核实。
 
 ## 跑法
 
@@ -35,15 +34,12 @@ python devtools\check_coding_style.py --section 注释
   - 预留待接的项照样报，不算新增。
 - 提交与发布的扫描范围、通过标准见 [五项闸门](release-workflow.md#五项闸门提交与发布前跑齐)。
 - 子仓检查范围见 [子仓供件](release-workflow.md#子仓供件)。
-- 测试目录的跳过机制见「测试目录豁免」节，其余用例放宽项见 [testing.md](testing.md)。
-- 措辞类（背景解释、变更叙述、自评句）静态查不出，禁词清单与 grep 兜底见 [coding-style.md](coding-style.md)。
+- 测试目录的跳过机制见「测试目录豁免」节。
+- 措辞类（背景解释、变更叙述、自评句）静态查不出，禁词清单与 grep 兜底见 [Docstring](coding-style.md#docstring) 的「措辞」段。
 
 ## 待核豁免清单
 
-审过并决定不改的待核登记在 `devtools/style_waivers.toml`，随仓库走，扫到同一条即静音，末尾补一行「已豁免 N 条」。
-
-一条由 `section`、`path`、`reason` 组成，可选 `match` 收口到消息里的关键字。
-匹配只看分节、文件与消息子串，不写行号。
+审过并决定不改的待核登记在 `devtools/style_waivers.toml`，随仓库走，扫到同一条即静音，末尾补一行「已豁免 N 条」，一条由 `section`、`path`、`reason` 组成，可选 `match` 收口到消息里的关键字，匹配只看分节、文件与消息子串，不写行号。
 
 罩什么：
 
@@ -65,8 +61,7 @@ python devtools\check_coding_style.py --section 注释
 
 ## 分节与检查文件
 
-一个分节一个主模块，摆在 `devtools/_style_checks/`。
-细则太多就再拆委托模块（`_s5b`／`_s5c`／`_s6b`），由主模块调用，不单独登记。
+一个分节一个主模块，摆在 `devtools/_style_checks/`。细则太多就再拆委托模块（`_s5b`／`_s5c`／`_s6b`），由主模块调用，不单独登记。`_waivers.py` 不属于任何分节，只负责读清单与按清单静音。
 
 - 文件骨架：`_s1_skeleton.py`
 - 拆分粒度：`_s2_split.py`
@@ -83,9 +78,9 @@ python devtools\check_coding_style.py --section 注释
 - 文档写法：`_s11_docs.py`
 - 按钮样式：`_s12_buttons.py`
 
-`_waivers.py` 不属于任何分节，只负责读清单与按清单静音。
+地址的家的清单在 `_s6c_link_home.py` 里按路径片段写死，家外裸写按硬性报。
 
-「分层职责」不由本扫描器检查，判据见 [分层职责](coding-style.md#分层职责)，检查命令见 [release-workflow.md](release-workflow.md)。
+「分层职责」不由本扫描器检查，判据见 [分层职责](coding-style.md#分层职责)，检查命令见 [五项闸门](release-workflow.md#五项闸门提交与发布前跑齐)。
 
 ## 工具树直连内部实现
 
@@ -127,4 +122,4 @@ python devtools\check_coding_style.py --section 注释
 ## 测试目录豁免
 
 名为 `tests` 的目录整体跳过（`_common.py` 的 `_EXCLUDE_DIRS`），点名扫它也 0 条。
-用例侧的其余口径见 [testing.md](testing.md)。
+其余用例放宽项见 [用例放宽的部分](testing.md#用例放宽的部分)。
