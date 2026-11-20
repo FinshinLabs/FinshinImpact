@@ -126,6 +126,8 @@ def _build_launcher() -> Path:
             "PyInstaller",
             "--noconfirm",
             "--clean",
+            "--exclude-module",
+            "system",  # 别把 system 打进 exe，运行时用包根那份源码
             "--onedir",
             "--noconsole",
             "--name",
