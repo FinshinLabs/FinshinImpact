@@ -190,8 +190,8 @@ git push origin main vX.Y.Z
 ```
 🐳 FinshinImpact-vX.Y.Z
 
-- 国内加速：https://gh-proxy.com/https://github.com/FinshinLabs/FinshinImpact/releases/download/vX.Y.Z/FinshinImpact-vX.Y.Z.zip
-- 官方直连：https://github.com/FinshinLabs/FinshinImpact/releases/download/vX.Y.Z/FinshinImpact-vX.Y.Z.zip
+- 国内加速1：https://gh-proxy.com/https://github.com/FinshinLabs/FinshinImpact/releases/download/vX.Y.Z/FinshinImpact-vX.Y.Z.zip
+- 国内加速2：https://ghproxy.net/https://github.com/FinshinLabs/FinshinImpact/releases/download/vX.Y.Z/FinshinImpact-vX.Y.Z.zip
 
 变化
 - 条目一（用户视角，2~5 条，从 CHANGELOG 该版本段提炼）。

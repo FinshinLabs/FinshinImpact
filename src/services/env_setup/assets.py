@@ -1,7 +1,7 @@
 """非 pip 资源安装
 
 - 资源通过模块子命令安装，声明按模块名与资源名两段拼命令参数
-- 镜像下载失败时清除环境变量回退官方源
+- 内核资源只走配置镜像，失败计入清单
 - 落盘探活走 dry-run 取权威安装目录逐个复核
 """
 
@@ -70,10 +70,6 @@ def install_assets(
             continue
         env = os.environ.copy()
         env["PLAYWRIGHT_DOWNLOAD_HOST"] = PLAYWRIGHT_CDN
-        if run_process(argv, on_line, env=env) == 0:
-            continue
-        emit(on_line, PluginMessage.CDN_FALLBACK)
-        del env["PLAYWRIGHT_DOWNLOAD_HOST"]
         if run_process(argv, on_line, env=env) != 0:
             failed.append(asset)
     return failed

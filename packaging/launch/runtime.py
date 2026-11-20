@@ -179,7 +179,7 @@ def _uv_with_index_retry(
         str(cache),
     ]
 
-    # uv 索引按序重试：国内多源轮询，最后官方源兜底
+    # uv 索引按序轮询国内镜像
     index_urls = list(require_setting(root, _SETTING_INDEX))
     for i, index in enumerate(index_urls):
         if i:

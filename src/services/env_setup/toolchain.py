@@ -27,13 +27,13 @@ _VENV_DIRS = (".venv", "venv", "env")
 _UV_NAMES = {"bin": _UV_TOOL_NAME, "Scripts": _UV_EXE_NAME}
 
 
-# uv 索引按序重试：国内多源轮询，最后官方源兜底
+# uv 索引按序轮询国内镜像
 UV_INDEX_URLS = tuple(tool_setting("uv-index-urls"))
 
-# 内核下载走配置镜像，失败清变量回退官方源
+# 内核下载只走配置镜像
 PLAYWRIGHT_CDN = str(tool_setting("playwright-cdn"))
 
-# GitHub 发行件下载按序轮询配置镜像，官方地址兜底
+# GitHub 发行件下载按序轮询配置镜像
 GITHUB_MIRRORS = tuple(tool_setting("github-mirrors"))
 
 UV_CACHE_DIR = RUNTIME_DIR / str(tool_setting("uv-cache-dir"))

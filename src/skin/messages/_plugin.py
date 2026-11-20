@@ -78,9 +78,6 @@ class PluginMessage:
     # 用：ui._guide._progress 任务异常中止行
     TASK_FAIL = "任务异常中止，详情见运行日志"
 
-    # 用：services.env_setup.assets 内核镜像回退行
-    CDN_FALLBACK = "npmmirror 不可用，已回退官方源重试，上方报错无需处理"
-
     # 用：services.env_setup.assets 资源声明非法行
     ASSET_BAD = "资源声明非法，应为「模块名 资源名」两段：{asset}"
 

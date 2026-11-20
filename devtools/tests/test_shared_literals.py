@@ -141,7 +141,7 @@ class TestEndpoints(unittest.TestCase):
         )
 
     def test_sdk_release_url_is_built_from_constants(self) -> None:
-        """接口包地址由常量拼出，官方直链排在镜像序列末尾"""
+        """接口包地址由常量拼出，取件序列逐条拼镜像前缀"""
         version = pack_spec.sdk_version()
         wheel = f"finshin_sdk-{version}-py3-none-any.whl"
         official = (
@@ -152,7 +152,7 @@ class TestEndpoints(unittest.TestCase):
         mirrors = pack_spec.release_mirrors()
         self.assertEqual(
             links.mirror_sources(official, mirrors),
-            [*(mirror + official for mirror in mirrors), official],
+            [mirror + official for mirror in mirrors],
         )
 
 

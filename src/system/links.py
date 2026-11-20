@@ -25,5 +25,5 @@ HTTPS_SCHEME = "https://"
 
 
 def mirror_sources(url: str, mirrors: Sequence[str]) -> list[str]:
-    """把官方地址配成镜像在前、官方直链兜底的序列"""
-    return [f"{mirror}{url}" for mirror in mirrors] + [url]
+    """把官方地址按镜像前缀拼成取件序列"""
+    return [f"{mirror}{url}" for mirror in mirrors]

@@ -1,7 +1,7 @@
 """在线目录取件的单元测试
 
 - 落盘件按目录里的指纹逐样核，不符即删掉半截件
-- 镜像按序优先、官方直链兜底
+- 镜像按序轮询，坏源换下一个
 - 同名同指纹的本地件在场即不重取
 - 核过指纹的件把指纹记进同目录一份索引，索引记过的件能直接拼成可装目标
 - 每个源的坏法各记一句，合进一条点名到发行件的说明
@@ -28,9 +28,10 @@ _OFFICIAL = (
     f"https://example.invalid/FinshinAdapterTG/releases/download/v9.9.9/{_WHEEL}"
 )
 _MIRROR = "https://gh-proxy.com/"
+_MIRROR2 = "https://ghproxy.net/"
 _BODIES = b"wheel bytes for tests"
 _SHA = hashlib.sha256(_BODIES).hexdigest()
-_MIRRORS = (_MIRROR,)
+_MIRRORS = (_MIRROR, _MIRROR2)
 
 
 def _row(url: str = _OFFICIAL, sha256: str = _SHA) -> ReleaseRow:
@@ -83,8 +84,8 @@ class TestDownloadRelease(unittest.IsolatedAsyncioTestCase):
         self.assertIn("落盘指纹与目录不符", outcome.note)
         self.assertEqual(list(self.target_dir.iterdir()), [])
 
-    async def test_mirrors_before_official(self) -> None:
-        """镜像排在官方地址前面"""
+    async def test_first_mirror_used(self) -> None:
+        """首个取件地址由首发镜像拼出"""
         fetch = AsyncMock(return_value=_BODIES)
         with patch.object(rel_mod.GitClient, "get_file", fetch):
             await rel_mod.download_release(_row(), self.target_dir, _MIRRORS)
@@ -108,7 +109,7 @@ class TestDownloadRelease(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(outcome.path)
         self.assertIn("finshin-adapter-tg", outcome.note)
         self.assertIn(_MIRROR + _OFFICIAL, outcome.note)
-        self.assertIn(_OFFICIAL, outcome.note)
+        self.assertIn(_MIRROR2 + _OFFICIAL, outcome.note)
         self.assertEqual(fetch.await_count, 2)
 
     async def test_local_wheel_reused(self) -> None:

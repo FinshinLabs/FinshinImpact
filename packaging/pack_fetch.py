@@ -18,7 +18,6 @@ _EMBED_URLS = (
     f"https://registry.npmmirror.com/-/binary/{_EMBED_URL_SUFFIX}",
     f"https://mirrors.huaweicloud.com/{_EMBED_URL_SUFFIX}",
     f"https://npmmirror.com/mirrors/{_EMBED_URL_SUFFIX}",
-    f"https://www.python.org/ftp/{_EMBED_URL_SUFFIX}",
 )
 
 # uv 随包下发给启动器装依赖，取用方在启动器的 payload 解包
