@@ -2,9 +2,10 @@
 
 - 产物身份名、发布地址与 Windows 协议值的常量表
 - 版本页、发布说明、接口包附件指纹与依赖清单的读取入口
+- 包根 src 接入导入路径的入口
 """
 
-import hashlib
+import sys
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -114,6 +115,17 @@ CREATE_NO_WINDOW = 0x08000000  # 后台命令不弹控制台窗口
 
 # 外部可能注入的代理环境变量名，拉起主程序前从子进程环境剔除
 PROXY_ENV_VARS = ("HTTP_PROXY", "HTTPS_PROXY")
+
+
+def attach_source_path(root: Path) -> None:
+    """把包根 src 接到导入路径
+
+    - 启动器是冻结 exe，首启时本体源码还没接上
+    - 重复调用无副作用
+    """
+    source = str(root / "src")
+    if source not in sys.path:
+        sys.path.insert(0, source)
 
 
 def _pyproject_data(root: Path) -> dict:
@@ -236,19 +248,3 @@ def remote_sdk_digest(version: str) -> str:
             return value.lower()
 
     return ""
-
-
-def file_digest(path: Path) -> str:
-    """算文件字节指纹，读不出交出空串
-
-    - 打包边界内不引本体模块，同名件在 system/digest.py
-    """
-    try:
-        return bytes_digest(path.read_bytes())
-    except OSError:
-        return ""
-
-
-def bytes_digest(payload: bytes) -> str:
-    """算一段字节的指纹"""
-    return hashlib.sha256(payload).hexdigest()

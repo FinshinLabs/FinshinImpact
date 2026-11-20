@@ -25,7 +25,7 @@ from pack_spec import (
     SDK_RELEASE_URL,
     STAGE,
     PackLayout,
-    bytes_digest,
+    attach_source_path,
     local_version,
     release_mirrors,
     remote_sdk_digest,
@@ -76,9 +76,17 @@ def _require_icon() -> bytes:
 
 
 def _launcher_sources() -> list[Path]:
-    """列出编译进启动器的全部源文件"""
+    """列出编译进启动器的全部源文件
+
+    - 入口、共享规格、取数通道、解包与 launch 域
+    """
     pkg = ROOT / "packaging"
-    paths = [pkg / PackLayout.LAUNCHER_SCRIPT, pkg / PackLayout.PACK_SPEC_SCRIPT]
+    paths = [
+        pkg / PackLayout.LAUNCHER_SCRIPT,
+        pkg / PackLayout.PACK_SPEC_SCRIPT,
+        pkg / "net_channel.py",
+        pkg / "unpack.py",
+    ]
     paths.extend(sorted((pkg / "launch").glob("*.py")))
     return paths
 
@@ -89,6 +97,8 @@ def _launcher_fingerprint() -> str:
     - 源码与图标一并计入，只换图标也会重编译
     - 入口、共享规格与 launch 域全部计入，域代码变更同样重编译
     """
+    from system.digest import bytes_digest
+
     # 编译动作与产物来源变更绑定
     blob = b"".join(
         f"=={p.name}==\n".encode() + p.read_bytes() for p in _launcher_sources()
@@ -195,18 +205,18 @@ def _check_sdk_pin() -> None:
 
     - 走镜像取一次附件，核 release 自报的 sha256，不符即中止并点名版本
     """
+    from system.links import mirror_sources
+
     version = sdk_version(ROOT)
     digest = remote_sdk_digest(version)
     if not digest:
         raise SystemExit(f"取不到接口包 v{version} 的附件指纹，检查 GitHub release")
     name = sdk_wheel_name(version)
-    urls = net_channel.mirror_sources(
-        SDK_RELEASE_URL.format(ver=version), release_mirrors()
-    )
+    urls = mirror_sources(SDK_RELEASE_URL.format(ver=version), release_mirrors())
     print(f"核验接口包 v{version}…")
     with tempfile.TemporaryDirectory(prefix="finshin-sdk-") as tmp:
         try:
-            pack_fetch.download_verified(urls, Path(tmp) / name, digest)
+            net_channel.download_verified(urls, Path(tmp) / name, digest)
         except RuntimeError as e:
             raise SystemExit(f"接口包 v{version} 核验失败：{e}") from e
 
@@ -249,6 +259,7 @@ def _assemble(launcher_dir: Path) -> Path:
 
 def main() -> None:
     """解析参数并执行构建流程"""
+    attach_source_path(ROOT)
     parser = argparse.ArgumentParser(description="发布构建")
     parser.add_argument("--check", action="store_true", help="发布前自检")
     parser.add_argument(

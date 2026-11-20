@@ -4,8 +4,10 @@
 - 每条通道按同一节奏发到上限为止，换通道即换一次机会
 - 取 JSON、取字节、探长度坏光交出空值，落盘下载坏光交出原因
 - 落盘件写坏不留 .part
+- 多源下载逐源换发，核验不过换下一源，全坏删件上抛
 """
 
+import hashlib
 import sys
 import unittest
 import urllib.error
@@ -14,7 +16,9 @@ from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "packaging"))
+_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(_ROOT / "packaging"))
+sys.path.insert(0, str(_ROOT / "src"))
 
 import net_channel  # noqa: E402
 
@@ -178,7 +182,7 @@ class TestDownloadTo(unittest.TestCase):
         """取到即只留正式名，半截件不剩"""
         opener = _FakeOpener([_ok(b"payload")])
 
-        net_channel.download_to("https://x", [opener], self.target, _TIMEOUT)
+        net_channel._download_to("https://x", [opener], self.target, _TIMEOUT)
 
         self.assertEqual(self.target.read_bytes(), b"payload")
         self.assertEqual(list(self.target.parent.glob("*.part")), [])
@@ -189,8 +193,69 @@ class TestDownloadTo(unittest.TestCase):
         opener = _FakeOpener(broken)
 
         with self.assertRaises(RuntimeError) as ctx:
-            net_channel.download_to("https://x", [opener], self.target, _TIMEOUT)
+            net_channel._download_to("https://x", [opener], self.target, _TIMEOUT)
         self.assertIn("OSError: 断了", str(ctx.exception))
+        self.assertFalse(self.target.exists())
+
+
+class TestDownloadVerified(unittest.TestCase):
+    """多源下载与核验"""
+
+    def setUp(self) -> None:
+        self.holder = TemporaryDirectory()
+        self.addCleanup(self.holder.cleanup)
+        self.target = Path(self.holder.name) / "pkg.whl"
+
+    def _serving(self, bodies: dict[str, bytes]) -> Any:
+        """按地址给正文的假下载，未列出的地址即当这个源坏了"""
+
+        def fake(url: str, _openers: Any, target: Path, _timeout: float) -> None:
+            if url not in bodies:
+                raise RuntimeError("断")
+            target.write_bytes(bodies[url])
+
+        return fake
+
+    def test_next_source_wins_after_failure(self) -> None:
+        """前一个源坏了，后一个源取到的件就位"""
+        calls: list[str] = []
+        fake = self._serving({"https://good/x": b"payload"})
+
+        def record(url: str, openers: Any, target: Path, timeout: float) -> None:
+            calls.append(url)
+            fake(url, openers, target, timeout)
+
+        with patch.object(net_channel, "_download_to", record):
+            net_channel.download_verified(
+                ["https://bad/x", "https://good/x"], self.target
+            )
+
+        self.assertEqual(self.target.read_bytes(), b"payload")
+        self.assertEqual(calls, ["https://bad/x", "https://good/x"])
+
+    def test_sha_mismatch_switches_source(self) -> None:
+        """指纹不符的件不算数，换下一源"""
+        payload = b"right"
+        sha256 = hashlib.sha256(payload).hexdigest()
+        fake = self._serving({"https://bad/x": b"wrong", "https://good/x": payload})
+
+        with patch.object(net_channel, "_download_to", fake):
+            net_channel.download_verified(
+                ["https://bad/x", "https://good/x"], self.target, sha256
+            )
+
+        self.assertEqual(self.target.read_bytes(), payload)
+
+    def test_all_sources_failed_removes_target(self) -> None:
+        """全源失败即删掉目标件并上抛"""
+        self.target.write_bytes(b"stale")
+
+        with patch.object(net_channel, "_download_to", self._serving({})):
+            with self.assertRaises(RuntimeError):
+                net_channel.download_verified(
+                    ["https://a/x", "https://b/x"], self.target
+                )
+
         self.assertFalse(self.target.exists())
 
 

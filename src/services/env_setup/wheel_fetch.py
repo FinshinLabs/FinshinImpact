@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from exceptions import NetworkError
 from skin.messages import CatalogMessage
 from system.digest import file_digest
+from system.links import mirror_sources
 from utils.network import GitClient
 
 from ..adapter_catalog import ReleaseRow
@@ -128,14 +129,6 @@ def local_release(distribution: str, name: str, target_dir: Path) -> ReleaseRow 
     )
 
 
-def _sources(url: str, mirrors: Sequence[str]) -> list[str]:
-    """排出取件源
-
-    - 镜像按序优先，官方直链兜底
-    """
-    return [f"{mirror}{url}" for mirror in mirrors] + [url]
-
-
 def is_cached(row: ReleaseRow, target_dir: Path) -> bool:
     """目录行对应的那份件已在盘上且指纹对得上"""
     name = file_name_of(row.url)
@@ -197,7 +190,7 @@ async def download_release(
 
     steps: list[str] = []
     part = target.with_name(target.name + _PART_SUFFIX)
-    for source in _sources(row.url, mirrors):
+    for source in mirror_sources(row.url, mirrors):
         try:
             body = await GitClient.get_file(source, _TIMEOUT_DOWNLOAD)
         except NetworkError:

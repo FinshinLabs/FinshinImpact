@@ -18,19 +18,19 @@ def file_digest(path: Path) -> str:
     - 读不出交出空串
     """
     try:
-        return _bytes_digest(path.read_bytes())
+        return bytes_digest(path.read_bytes())
     except OSError:
         return ""
 
 
-def _bytes_digest(payload: bytes) -> str:
+def bytes_digest(payload: bytes) -> str:
     """算一段字节的指纹"""
     return hashlib.sha256(payload).hexdigest()
 
 
 def text_digest(text: str) -> str:
     """算一段文本的指纹"""
-    return _bytes_digest(text.encode("utf-8"))
+    return bytes_digest(text.encode("utf-8"))
 
 
 def lines_digest(lines: Sequence[str]) -> str:

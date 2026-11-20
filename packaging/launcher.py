@@ -14,7 +14,12 @@ from pathlib import Path
 
 from launch import console, dialogs, runtime, shell, update
 from launch.instancelock import bootstrap_taken
-from pack_spec import AUMID_ANCHOR_VAR, PROXY_ENV_VARS, PackLayout
+from pack_spec import (
+    AUMID_ANCHOR_VAR,
+    PROXY_ENV_VARS,
+    PackLayout,
+    attach_source_path,
+)
 
 
 def _already_running() -> bool:
@@ -67,6 +72,7 @@ def main() -> None:
     if _already_running():
         sys.exit(0)
     root = _root_dir()
+    attach_source_path(root)
     shell.apply_shell_update(root)
     runtime.ensure_runtime(root)
     update.check_update(root)

@@ -107,6 +107,8 @@ def _apply_update(root: Path, version: str) -> bool:
     - 下载新版并覆盖源码，用户资产保留
     - 启动器有变化则暂存包根，升级收尾时换入
     """
+    from system.links import mirror_sources
+
     stage = root / "_update"
     try:
         # 下载：逐个镜像源，zip 校验通过才继续
@@ -114,7 +116,7 @@ def _apply_update(root: Path, version: str) -> bool:
         shutil.rmtree(stage, ignore_errors=True)
         stage.mkdir(parents=True)
         zip_url = RELEASE_ZIP_URL.format(ver=version)
-        urls = net_channel.mirror_sources(zip_url, release_mirrors())
+        urls = mirror_sources(zip_url, release_mirrors())
         _fetch_zip(urls, stage / PackLayout.STAGE_ZIP)
         unpack_all(stage / PackLayout.STAGE_ZIP, stage)
 

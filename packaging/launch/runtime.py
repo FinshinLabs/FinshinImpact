@@ -16,7 +16,6 @@ from pack_spec import (
     SDK_RELEASE_URL,
     PackLayout,
     dependencies,
-    file_digest,
     release_mirrors,
     remote_sdk_digest,
     require_setting,
@@ -33,7 +32,6 @@ _SETTING_INDEX = "uv-index-urls"
 _SETTING_CACHE = "uv-cache-dir"
 _WHEEL_SUFFIX = ".whl"
 _WHEEL_GLOB = f"*{_WHEEL_SUFFIX}"
-_SDK_TIMEOUT = 60.0  # 接口包下载超时 60 秒
 
 # 运行环境里已装件的落点与命名形态
 _SITE_PACKAGES = Path("Lib") / "site-packages"
@@ -200,9 +198,12 @@ def _fetch_sdk(root: Path, version: str, digest: str) -> str:
     """把钉死的接口包取到包根 `_sdk`，交出核过的指纹
 
     - 盘上有同指纹的件就复用
-    - 逐源下载并核指纹，不符删件换下一源
+    - 逐源下载并核指纹，不符换下一源
     - 指纹取不到或全源坏时提示恢复网络后续装
     """
+    from system.digest import file_digest
+    from system.links import mirror_sources
+
     name = sdk_wheel_name(version)
     target = root / PackLayout.SDK_WHEEL_DIR / name
     if digest and target.is_file() and file_digest(target) == digest:
@@ -215,26 +216,15 @@ def _fetch_sdk(root: Path, version: str, digest: str) -> str:
     shutil.rmtree(root / PackLayout.SDK_WHEEL_DIR, ignore_errors=True)
     target.parent.mkdir(parents=True, exist_ok=True)
     print(f"下载接口包 {name}")
-    urls = net_channel.mirror_sources(
-        SDK_RELEASE_URL.format(ver=version), release_mirrors(root)
-    )
-    for url in urls:
-        print(f"下载 {url}")
-        try:
-            net_channel.download_to(url, net_channel.openers(), target, _SDK_TIMEOUT)
-        except RuntimeError as e:
-            print(f"该源失败（{e}），换下一个源")
-            continue
-        got = file_digest(target)
-        if got == digest:
-            print(f"接口包指纹核验通过（{got[:12]}）")
-            return digest
-        print(f"接口包指纹不符（{got[:12]}），删件换下一源")
-        target.unlink(missing_ok=True)
-
-    dialogs.fail_exit(
-        "接口包下载失败，请查看进度窗口末尾输出\n恢复网络后重新双击即可续装"
-    )
+    urls = mirror_sources(SDK_RELEASE_URL.format(ver=version), release_mirrors(root))
+    try:
+        net_channel.download_verified(urls, target, digest)
+    except RuntimeError:
+        dialogs.fail_exit(
+            "接口包下载失败，请查看进度窗口末尾输出\n恢复网络后重新双击即可续装"
+        )
+    print(f"接口包指纹核验通过（{digest[:12]}）")
+    return digest
 
 
 def ensure_runtime(root: Path) -> None:

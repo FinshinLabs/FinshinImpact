@@ -7,6 +7,7 @@
 - 注释点名「两处同值」的串逐条比对，改了另一侧没改这侧即红
 """
 
+import ast
 import sys
 import unittest
 from pathlib import Path
@@ -20,10 +21,10 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
+import build  # noqa: E402
 import gen_catalog  # noqa: E402
 import gen_release  # noqa: E402
 import instancelock as launch_instancelock  # noqa: E402
-import net_channel  # noqa: E402
 import pack_spec  # noqa: E402
 
 from services import adapter_catalog as catalog_mod  # noqa: E402
@@ -150,7 +151,7 @@ class TestEndpoints(unittest.TestCase):
         self.assertEqual(pack_spec.SDK_RELEASE_URL.format(ver=version), official)
         mirrors = pack_spec.release_mirrors()
         self.assertEqual(
-            net_channel.mirror_sources(official, mirrors),
+            links.mirror_sources(official, mirrors),
             [*(mirror + official for mirror in mirrors), official],
         )
 
@@ -190,6 +191,33 @@ class TestNaming(unittest.TestCase):
     def test_icon_name_matches_build(self) -> None:
         """图标文件名本体与构建侧同值"""
         self.assertEqual(app_identity.APP_ICON_PATH.name, pack_spec.PackLayout.ICON)
+
+
+class TestLauncherBuild(unittest.TestCase):
+    """编译进启动器的源文件名录"""
+
+    def test_root_imports_are_fingerprinted(self) -> None:
+        """启动器顶层引的打包根模块全部计入重编译判据"""
+        listed = {path.resolve() for path in build._launcher_sources()}
+        for name in _launcher_root_imports():
+            path = (ROOT / "packaging" / f"{name}.py").resolve()
+            self.assertTrue(path.is_file(), name)
+            self.assertIn(path, listed, name)
+
+
+def _launcher_root_imports() -> set[str]:
+    """启动器与 launch 域顶层引的打包根模块名"""
+    pkg = ROOT / "packaging"
+    files = [pkg / "launcher.py", *(pkg / "launch").glob("*.py")]
+    names: set[str] = set()
+    for path in files:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                names.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                names.add(node.module)
+    return {name for name in names if (pkg / f"{name}.py").is_file()}
 
 
 def _read_uv_sources() -> set[str]:

@@ -4,11 +4,10 @@
 - zip 条目校验，uv 包加 sha256 比对，坏包自动换源
 """
 
-import zipfile
 from pathlib import Path
 
 import net_channel
-from pack_spec import CACHE, DOWNLOAD_HOST, file_digest, release_mirrors
+from pack_spec import CACHE, DOWNLOAD_HOST, release_mirrors
 from unpack import zip_entries_ok
 
 # 构建原料下载源
@@ -28,13 +27,17 @@ _UV_URL_SUFFIX = (
     f"astral-sh/uv/releases/download/{_UV_VERSION}/uv-x86_64-pc-windows-msvc.zip"
 )
 _UV_OFFICIAL_URL = f"{DOWNLOAD_HOST}/{_UV_URL_SUFFIX}"
-_UV_URLS = tuple(net_channel.mirror_sources(_UV_OFFICIAL_URL, release_mirrors()))
 _UV_CACHE_NAME = f"uv-{_UV_VERSION}.zip"
 
 # 官方发布页校验值，升 _UV_VERSION 必须同步换值
 _UV_SHA256 = "75d05de6762778c31ee183398de7dd15093fad0ed90b1f236d8205ea5ec00c90"
 
-_DOWNLOAD_TIMEOUT = 120.0  # 构建原料下载超时 120 秒（2 分钟）
+
+def _uv_urls() -> list[str]:
+    """uv 安装包的多源取件地址"""
+    from system.links import mirror_sources
+
+    return mirror_sources(_UV_OFFICIAL_URL, release_mirrors())
 
 
 def fetch_embed() -> Path:
@@ -44,39 +47,7 @@ def fetch_embed() -> Path:
 
 def fetch_uv() -> Path:
     """取用 uv 安装包原料"""
-    return _fetch_to_cache(list(_UV_URLS), _UV_CACHE_NAME, sha256=_UV_SHA256)
-
-
-def _download(url: str, target: Path) -> None:
-    """从一个地址取到指定路径
-
-    - 先写 .part 再改正式名，坏件不落正式名
-    """
-    print(f"下载 {url}")
-    net_channel.download_to(url, net_channel.openers(), target, _DOWNLOAD_TIMEOUT)
-
-
-def download_verified(urls: list[str], target: Path, sha256: str = "") -> None:
-    """构建原料多源下载
-
-    - zip 验条目，带哈希的再比对 sha256，任一不过即该源失败换下一源
-    """
-    last_error: Exception | None = None
-    for url in urls:
-        try:
-            _download(url, target)
-            if not zip_entries_ok(target):
-                raise zipfile.BadZipFile("zip 条目校验失败")
-            if sha256:
-                digest = file_digest(target)
-                if digest != sha256:
-                    raise ValueError(f"sha256 不符：{digest}")
-            return
-        except Exception as e:
-            last_error = e
-            print(f"该源失败（{e}），尝试下一个")
-    target.unlink(missing_ok=True)
-    raise RuntimeError(f"全部下载源均失败，中止构建：{last_error}")
+    return _fetch_to_cache(_uv_urls(), _UV_CACHE_NAME, sha256=_UV_SHA256)
 
 
 def _fetch_to_cache(urls: list[str], name: str, *, sha256: str = "") -> Path:
@@ -90,5 +61,5 @@ def _fetch_to_cache(urls: list[str], name: str, *, sha256: str = "") -> Path:
     if cached.exists():
         print(f"命中缓存 {name}")
         return cached
-    download_verified(urls, cached, sha256)
+    net_channel.download_verified(urls, cached, sha256, verify=zip_entries_ok)
     return cached

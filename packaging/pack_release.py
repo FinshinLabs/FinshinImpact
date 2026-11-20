@@ -13,7 +13,6 @@ from pack_spec import (
     HDR_CONTENT_LENGTH,
     RELEASE_ZIP_URL,
     ROOT,
-    file_digest,
     local_version,
     release_mirrors,
     remote_version,
@@ -27,6 +26,9 @@ def check_release() -> None:
 
     - 版本号、远端 tag、本地包指纹、在线版本页、发布包各源可达
     """
+    from system.digest import file_digest
+    from system.links import mirror_sources
+
     version = local_version(ROOT)
     tag_hit = subprocess.run(
         ["git", "ls-remote", "--tags", "origin", f"v{version}"],
@@ -48,9 +50,8 @@ def check_release() -> None:
         ("在线版本页", remote_version() or "读取失败"),
     ]
     zip_url = RELEASE_ZIP_URL.format(ver=version)
-    checks.append(("发布包官方直连", _asset_probe(zip_url, local_size)))
-    for mirror in release_mirrors():
-        checks.append((f"发布包 {mirror}", _asset_probe(mirror + zip_url, local_size)))
+    for url in mirror_sources(zip_url, release_mirrors()):
+        checks.append((url, _asset_probe(url, local_size)))
     for name, detail in checks:
         print(f"[自检] {name}: {detail}")
 

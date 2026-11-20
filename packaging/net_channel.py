@@ -1,8 +1,8 @@
 """启动器与构建侧取数通道
 
 - 通道清单给到忽略环境代理的干净直连
-- 镜像地址按前缀拼出，官方直链排在末尾兜底
 - 取 JSON、取字节、探长度三种交出内容或空值，落盘下载一种交出末次异常
+- 多源下载逐源换发，核验不过即换下一源
 - 每条通道按同一节奏最多发三次，含首发
 """
 
@@ -22,6 +22,9 @@ Opener = urllib.request.OpenerDirector  # 取数通道类型，供调用方标�
 _RETRY_DELAY = 1.0  # 重发前的等待秒数
 _MAX_ATTEMPTS = 3  # 含首发在内最多发三次
 
+# 单只件的下载超时，构建原料与接口包共用
+_DOWNLOAD_TIMEOUT = 120.0
+
 # 落盘件的中转名后缀，写完才改成正式名
 _PART_SUFFIX = ".part"
 
@@ -35,11 +38,6 @@ def _clean_opener() -> Opener:
 def openers() -> list[Opener]:
     """排出干净直连的取数通道清单"""
     return [_clean_opener()]
-
-
-def mirror_sources(url: str, mirrors: Sequence[str]) -> list[str]:
-    """把官方地址配成镜像在前、官方直链兜底的序列"""
-    return [f"{mirror}{url}" for mirror in mirrors] + [url]
 
 
 def fetch_json(
@@ -75,7 +73,7 @@ def probe_size(
     return int(size or 0), note
 
 
-def download_to(
+def _download_to(
     url: str, opener_list: Sequence[Opener], target: Path, timeout: float
 ) -> None:
     """按通道把一份内容流式写到指定路径
@@ -88,6 +86,37 @@ def download_to(
     ]
     if note:
         raise RuntimeError(f"取不到 {url}：{note}")
+
+
+def download_verified(
+    urls: Sequence[str],
+    target: Path,
+    sha256: str = "",
+    verify: Callable[[Path], bool] | None = None,
+) -> None:
+    """逐源下载并核验落盘件
+
+    - 逐源打印地址，该源坏了换下一个
+    - 校验回调不过或指纹不符都算该源失败
+    - 全源失败删掉目标件并抛出末次原因
+    """
+    from system.digest import file_digest
+
+    last_error: Exception | None = None
+    for url in urls:
+        print(f"下载 {url}")
+        try:
+            _download_to(url, openers(), target, _DOWNLOAD_TIMEOUT)
+            if verify is not None and not verify(target):
+                raise ValueError("校验未通过")
+            if sha256 and file_digest(target) != sha256:
+                raise ValueError(f"sha256 不符：{file_digest(target)}")
+            return
+        except Exception as e:
+            last_error = e
+            print(f"该源失败（{e}），换下一个源")
+    target.unlink(missing_ok=True)
+    raise RuntimeError(f"全部下载源均失败：{last_error}")
 
 
 def _take(
