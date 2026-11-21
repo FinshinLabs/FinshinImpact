@@ -33,7 +33,7 @@
    - 这几只方法都可以不写，不写即没有那一类能力，交出的清单按交出的顺序生效。
    - `message_routes` 交按顺序判定的路由清单，谓词只吃归一后的处理上下文，装配时由平台侧编成引擎对象。
    - `background_loops` 交常驻循环，元素为无参协程函数，随 Bot 服务起停：轮询开始即拉起，停服即取消。跑中途抛出即静默收摊，那行日志要等停服收拢时才落，循环本身不重跑。
-   - `queued_actions` 交可排队的动作，动作名写成「插件名.动作」，前段不等于自己的插件名整只拒装。
+   - `queued_actions` 交可排队的动作，动作名写成 `插件名.动作`，前段不等于自己的插件名整只拒装。
    - `platform_moments` 交平台机会的订阅清单，元素写成 `MomentSubscription(时机, 协程)`，同一时机交多条即按交出的顺序跑。
    - 要交的那几样与处理上下文都取自接口包：`BasePlugin`、`MessageRoute`、`QueuedAction`、`MomentSubscription`、`HandlerContext`。
    - 要跨插件共用的守卫、谓词、话术放 `src/bundled/_shared/`。
@@ -102,15 +102,15 @@
 3. 交出的东西改名：`PluginRoute` → `MessageRoute`、`PluginPredicate` → `RouteMatcher`、`PluginBackground` → `BackgroundLoop`、`TaskHandler` → `QueuedAction`、`timings` → `platform_moments`。
    - 时机那几样一并归到 moment 词根：`PlatformTiming` → `PlatformMoment`、`PluginTiming` → `MomentSubscription`、`PluginTimingRun` → `MomentRun`。
    - `PluginSpec` 那只袋子删了。
-4. 内置对话的动作名由 `chat` 改成 `AI.chat`，动作名归属见「新增插件」节。
+4. 内置对话的动作名由 `chat` 改成 `AI.chat`，动作名归属见 [新增插件（清单驱动流程）](#新增插件清单驱动流程)。
 5. 接口包撤掉没人用的形状：`ContentDTO` 的 `file_token` 与 `origin_ref`、`AdapterFieldSpec.default`、`BoundCommand.value_of`、`PrincipalRepository.find_by_key`。用到哪一处改哪一处，没用到不必动。
-6. 把适配器声明从 `adapter.toml` 搬进 `pyproject.toml`，字段写法见「新增平台适配器」节。
+6. 把适配器声明从 `adapter.toml` 搬进 `pyproject.toml`，字段写法见 [新增平台适配器](#新增平台适配器)。
 7. 插件独有的库从 `plugin.toml` 的 `deps` 搬到同目录 `pyproject.toml` 的 `[project].dependencies`，清单里再写 `deps` 属未知键、一律忽略。
 
 ## 新增平台适配器
 
 1. 命名与发现按一套词表走，加平台不改本体代码：
-   - 本体代码里平台码只有一处来源：`Platform` 枚举里的 `tg`、`qq`。
+   - 本体代码里平台码只有一处来源：`Platform` 枚举，新增平台只改枚举。
    - 装载根下的目录名用平台码，`finshin/adapter/<平台码>/`，与声明里的 `platform` 同值。
    - 分发名 `finshin-adapter-tg`，可导入的包名是同一串把连字符换成下划线，两处都由子仓根的 `pyproject.toml` 派生。
    - 仓名以 `Finshin` 起头接词根，适配器族是 `FinshinAdapter` 加平台码大写。
@@ -130,7 +130,7 @@
    - 适配器可从面板联网安装，源码开发见 [挂载子仓](#挂载子仓)。
    - 同名同职责的模块平铺在包里，平台独有的机制放包里的 `features/`。
    - 开发说明见那只适配器仓自己的 README。
-   - 入口由 `[project.entry-points."finshin.adapters"]` 那一段交出：键写平台标识，值写「入口模块:parts」，冒号后那个名字由本体规定。声明缺件、字段非法或入口点不点名本平台的适配器整份不进表。
+   - 入口由 `[project.entry-points."finshin.adapters"]` 那一段交出：键写平台标识，值写 `入口模块:parts`，冒号后那个名字由本体规定。声明缺件、字段非法或入口点不点名本平台的适配器整份不进表。
    - `[project].dependencies` 里 pin 的引擎库随那只 wheel 装进环境时一起带上，依赖同步删库时被保留。
    - 该不该装只看在线版本比本机版本新不新，相等与更旧都不动。
    - 逐行还能从版本清单里挑一版装，挑更旧那版即回退，走的还是同一条 `--find-links` 装法。
@@ -163,13 +163,10 @@
 开发只在克隆出来的仓库里做。发布物是给用户用的绿色目录，里面没有工具配置、没有用例树、也没有 `.git`，拿它当开发环境只会发现形状缺一片。
 
 - 挂载点有两处：平台适配器是 `finshin/adapter/<平台码>`，接口包是 `finshin/sdk`。
+- 分发名与导入名由各自声明的 `[project].name` 派生，连字符换下划线。
+- 适配器仓 [`FinshinAdapterTG`](https://github.com/FinshinLabs/FinshinAdapterTG)，接口包仓 [`FinshinSDK`](https://github.com/FinshinLabs/FinshinSDK)。
 - 适配器那棵留下空壳目录时，装载侧读不到声明会跳过。
 - 接口包那棵缺位时，本体 import 失败。
-
-| 仓名 | 分发名 | 导入名 | 挂载点 |
-| :--- | :--- | :--- | :--- |
-| `FinshinSDK` | `finshin-sdk` | `finshin_sdk` | `finshin/sdk` |
-| `FinshinAdapterTG` | `finshin-adapter-tg` | `finshin_adapter_tg` | `finshin/adapter/tg` |
 
 1. 挂载：`git clone <子仓地址> <挂载点>`。
 2. 日常改动：在挂载点目录里改、提交，推送跑 `git -C <挂载点> push origin main`，只推子仓自己那一笔，主仓这边没有要提的东西。
@@ -195,7 +192,7 @@
 ## 更新方式
 
 - **"版本变化"按钮**：点开先拉全部 release，用最新一版的 tag 与本机版本比对，有新版先提示一句，再照常打开全版本清单，旧版本照样能翻。比对不当场更新，升级由启动器完成。
-- **开发版**：手动拉取新代码（`git pull` 或下载源码覆盖），依赖有变动时重跑「环境搭建」节的 `uv sync --all-packages`。
+- **开发版**：手动拉取新代码（`git pull` 或下载源码覆盖），依赖有变动时重跑 [环境搭建](#环境搭建) 的 `uv sync --all-packages`。
 - **打包版**：启动器每次拉起主程序前自动比对版本，弹窗确认后完成下载升级，用户配置、数据与日志一律保留。
   - 启动器本体随升级当场更换，换壳机制见 [升级换源码与启动器](packaging.md#升级换源码与启动器)。
-  - 各版本走自动升级还是手动整包，见 [旧版迁移](../README.md#previous)。
+  - 各版本走自动升级还是手动整包，见 [旧版迁移](../README.md#旧版迁移)。

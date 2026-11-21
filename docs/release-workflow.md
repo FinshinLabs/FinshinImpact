@@ -39,7 +39,7 @@
 - 本地攒着不 push，半成品不入库。
 - 未 push 期间随便整历史，已 push 的笔日常不改写：
   - 改动按行折回它原来那笔。
-  - 同主题并笔、reword 修措辞，不留「先写后改」的碎笔，CHANGELOG 条目跟着它那条行为改动的笔一起交。
+  - 同主题并笔、reword 修措辞，不留"先写后改"的碎笔，CHANGELOG 条目跟着它那条行为改动的笔一起交。
   - 整完必验 `git diff 整备前位置 HEAD` 为空，内容零变化才算整对。
 - 历史整备期允许一次全量重写，条件四条：release 附件与 zip 不动、全部 tag 删旧重打并钉 tagger 日期、镜像仓重灌、`git diff 重写前位置 HEAD` 为空。
 - push、tag 只在发布日动。
@@ -54,12 +54,12 @@
 - 适配器发版只在子仓，本体的发布链不含适配器版本：
   - release 附件只放 wheel，正文不写下载直链。
   - 下载直链与指纹取 GitHub 记在 wheel 附件上的值。
-  - 正文标题行写 `🐳 仓名-v版本号`，其下空一行直接铺条目，不带段名行，条目形状见「Release」节。
-  - 正文末条写「要求接口包 `finshin-sdk>=X1.Y1.Z1,<X2.Y2.Z2`。」，随版本只换数字，不另加解释句。
+  - 正文标题行写 `🐳 仓名-v版本号`，其下空一行直接铺条目，不带段名行，条目形状见 [Release](#release)。
+  - 正文末条写"要求接口包 `finshin-sdk>=X1.Y1.Z1,<X2.Y2.Z2`。"，随版本只换数字，不另加解释句。
   - release 建完即定稿，旧版附件不撤。
   - 在线目录由本体的 Pages 工作流按账号下各仓的声明聚合，与版本页同一份产物一起部署。
   - 子仓单独发版后，目录最长等到本体一次 push 或每日定时重建才反映那一版。
-- 「工作区干净」这条判据算本体与每只子仓，只看本体那棵不算数。
+- "工作区干净"这条判据算本体与每只子仓，只看本体那棵不算数。
 
 ## CHANGELOG
 
@@ -85,8 +85,8 @@
 
 - 只写关键条目，琐碎改动一笔带过或不写，加了又删的功能不留任何痕迹，增与删的条目一起清。
 - 用户视角写行为，不写实现细节。
-- 内部重构写对维护的影响，如「界面控件收敛到公共件，改样式一处生效」。
-- 改动类型与 CHANGELOG 归段见「Commit」节。
+- 内部重构写对维护的影响，如"界面控件收敛到公共件，改样式一处生效"。
+- 改动类型与 CHANGELOG 归段见 [Commit](#commit)。
 
 ### 条目与措辞
 
@@ -126,9 +126,9 @@
 - fix 与 change 的分界：有没有一条已写下的期望被违反，违反了是 fix，没违反只是改主意是 change。
 - remove 与 change 的分界：做完用户少一样能用的东西或少一个产物是 remove。
 - perf 与 change 的分界：观感与功能的变化都归 change，perf 只指耗时、内存与体积。
-- breaking 只在主体是「用户必须动手」时才用，既新增又要动手的笔按新增定 type。
-- 版本号档不由 type 决定，见「版本号（semver）」节。
-- 版本段写法见「CHANGELOG」节。
+- breaking 只在主体是"用户必须动手"时才用，既新增又要动手的笔按新增定 type。
+- 版本号档不由 type 决定，见 [版本号（semver）](#版本号semver)。
+- 版本段写法见 [CHANGELOG](#changelog)。
 - 行尾句号口径见 [标点](writing-style.md#标点)。
 - scope 用模块域小写，取它改的那一块的名字。
 - `docs`、`style`、`test`、`build` 可省 scope，其余必带。
@@ -174,7 +174,7 @@ git push origin main vX.Y.Z
 - 进仓库 [Releases](https://github.com/FinshinLabs/FinshinImpact/releases)。
 - Draft a new release。
 - 选推送上来的 tag `vX.Y.Z`。
-- 填正文，正文形状见「首发正文」与「旧版收敛」两节。
+- 填正文，正文形状见 [首发正文](#首发正文发布日带-zip) 与 [旧版收敛](#旧版收敛不带-zip) 两节。
 - 选上一版 tag 并点 **Generate release notes**。
 - Publish。
 
@@ -205,13 +205,13 @@ git push origin main vX.Y.Z
 
 保留规则：
 
-- 正式号（不带 `.devM` 的那两种串，形状见「版本号（semver）」节）各留一条 release，长期保留。
+- 正式号（不带 `.devM` 的那两种串，形状见 [版本号（semver）](#版本号semver)）各留一条 release，长期保留。
 - dev 段的 release 只在预发布期挂着供当时下载。
 - 正式号发出时把该正式号下各 dev 的变化汇总进正式号那一条，再删掉 dev 的 release 条目。
 - 汇总按用户可感知的功能域写，不复述 dev 明细。
 - 纯内部重构、用户无感知的 dev 段不写入汇总。
 - ⚠️ 删的是 release 条目，tag 一律保留。
-- 正式号之间按「旧版收敛」一节处理。
+- 正式号之间按 [旧版收敛](#旧版收敛不带-zip) 处理。
 
 ### 旧版收敛（不带 zip）
 
@@ -242,5 +242,5 @@ git push origin main vX.Y.Z
 Release 发布完成不等于升级链生效：在线版本页是启动器检查更新的唯一来源。
 
 - 主仓 workflow 随 push `main` 部署版本页与在线目录，无需手动覆盖推送。
-- 闭环判据：跑 `python packaging\build.py --check`，「在线版本页」那一行显示新版本号。
+- 闭环判据：跑 `python packaging\build.py --check`，"在线版本页"那一行显示新版本号。
 - Pages 部署有延迟，读数未变稍后重跑。

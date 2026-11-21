@@ -1,7 +1,7 @@
 # 打包教程
 
 所有命令在项目根目录的 PowerShell 中执行。
-环境搭建见 [环境搭建](development.md#环境搭建)，发布顺序见 [发布工作流](release-workflow.md)。
+环境搭建见 [环境搭建](development.md#环境搭建)，发布顺序见 [发布工作流](release-workflow.md#总流程发布日按序执行)。
 
 ## 原理
 
@@ -131,7 +131,7 @@ python packaging/gen_catalog.py <输出路径>
    - 按 [环境搭建](development.md#环境搭建) 创建实例，完成向导后验证收发消息。
    - 再开一次，确认依赖未变时跳过安装。
    - 确认 `payload\` 的清理结果，见 [按名字找的文件](#按名字找的文件)。
-4. 升级路径按 [旧版迁移](../README.md#previous) 验证。
+4. 升级路径按 [旧版迁移](../README.md#旧版迁移) 验证。
 5. 测完删掉测试目录。
 
 ## 报毒

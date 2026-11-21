@@ -21,7 +21,7 @@ python devtools\check_coding_style.py --section 注释
 - 命令行给了路径就只扫那几个，没给即默认扫 `src`。
 - 入库 md 恒随装载，不受命令行路径影响，细则只吃对口载体。
   - 名单是仓库根 `README.md` 与 `CHANGELOG.md`，加 `docs/` 与 `assets/` 下的 md，`docs/design/` 工作底稿除外。
-  - `CHANGELOG.md` 只进「日志与文案」细则，其余 md 只进「文档写法」细则。
+  - `CHANGELOG.md` 只进 [日志与文案](coding-style.md#日志与文案) 细则，其余 md 只进 [文档写法](coding-style.md#文档写法) 细则。
 - 子仓的 py 文件按挂载现场点名进扫描，闸门那条命令自动带上，手动跑就把目录写上。
 - 本机没挂上那只子仓就没得扫。
   - 包名按各仓项目声明里的 setuptools 改名表算，主仓不写第二份子仓名字。
@@ -34,12 +34,12 @@ python devtools\check_coding_style.py --section 注释
   - 预留待接的项照样报，不算新增。
 - 提交与发布的扫描范围、通过标准见 [五项闸门](release-workflow.md#五项闸门提交与发布前跑齐)。
 - 子仓检查范围见 [子仓供件](release-workflow.md#子仓供件)。
-- 测试目录的跳过机制见「测试目录豁免」节。
-- 措辞类（背景解释、变更叙述、自评句）静态查不出，禁词清单与 grep 兜底见 [Docstring](coding-style.md#docstring) 的「措辞」段。
+- 测试目录的跳过机制见 [测试目录豁免](#测试目录豁免)。
+- 措辞类（背景解释、变更叙述、自评句）静态查不出，禁词清单与 grep 兜底见 [Docstring](coding-style.md#docstring) 的"措辞"段。
 
 ## 待核豁免清单
 
-审过并决定不改的待核登记在 `devtools/style_waivers.toml`，随仓库走，扫到同一条即静音，末尾补一行「已豁免 N 条」，一条由 `section`、`path`、`reason` 组成，可选 `match` 收口到消息里的关键字，匹配只看分节、文件与消息子串，不写行号。
+审过并决定不改的待核登记在 `devtools/style_waivers.toml`，随仓库走，扫到同一条即静音，末尾补一行"已豁免 N 条"，一条由 `section`、`path`、`reason` 组成，可选 `match` 收口到消息里的关键字，匹配只看分节、文件与消息子串，不写行号。
 
 罩什么：
 
@@ -54,7 +54,7 @@ python devtools\check_coding_style.py --section 注释
 
 什么时候算失效：
 
-- 条目不再命中即转一条硬性「失效豁免」报出。
+- 条目不再命中即转一条硬性"失效豁免"报出。
 - 本轮没装载的路径不作数，只扫本体时指向子仓的条目不算失效。
 - 只扫单个分节也不作数，其余分节的条目本来就没进这一轮。
 - `--hard-only` 只裁输出，豁免命中与失效一律按全量待核算。
@@ -80,7 +80,7 @@ python devtools\check_coding_style.py --section 注释
 
 地址的家的清单在 `_s6c_link_home.py` 里按路径片段写死，家外裸写按硬性报。
 
-「分层职责」不由本扫描器检查，判据见 [分层职责](coding-style.md#分层职责)，检查命令见 [五项闸门](release-workflow.md#五项闸门提交与发布前跑齐)。
+分层职责不由本扫描器检查，判据见 [分层职责](coding-style.md#分层职责)，检查命令见 [五项闸门](release-workflow.md#五项闸门提交与发布前跑齐)。
 
 ## 工具树直连内部实现
 
@@ -91,7 +91,7 @@ python devtools\check_coding_style.py --section 注释
 
 ## 符号私有性查哪些名字
 
-「对外」判据见 [命名与门面导出](coding-style.md#命名与门面导出)。
+"对外"判据见 [命名与门面导出](coding-style.md#命名与门面导出)。
 
 检查范围：
 

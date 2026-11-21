@@ -1,7 +1,7 @@
 # 测试
 
 用例在两处：本体在 `devtools/tests/`，各平台适配器随子仓带在 `finshin/adapter/<平台>/tests/`。一份文件对一个主题，命名 `test_<主题>.py`。
-条文见 [代码规范](coding-style.md)，静态检查见 [规范扫描器](style-checker.md)，发布前的检查顺序见 [发布工作流](release-workflow.md)。
+条文见 [代码规范](coding-style.md)，静态检查见 [规范扫描器](style-checker.md)，发布前的检查顺序见 [发布工作流](release-workflow.md#五项闸门提交与发布前跑齐)。
 
 ## 跑法
 
@@ -31,7 +31,7 @@ python -m pytest devtools/tests/test_grant_access.py -v
 
 ## 加用例的判据
 
-- 改 `src` 行为就配一条回归，写得出一句「这条红了说明什么」才动手。
+- 改 `src` 行为就配一条回归，写得出一句"这条红了说明什么"才动手。
 - 测私有函数可以，别为了好测把内部符号提升进门面。
 - 同一分支的多种入参用 `subTest` 铺在一个用例里，别为每档复制一遍断言。
 - `test_style_checker_meta.py` 查的是扫描器自己。
