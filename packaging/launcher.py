@@ -4,6 +4,7 @@
 - 启动时按包内清理清单卸载已删依赖的旧残留
 - 启动前比对在线版本页，确认后整包升级并保留用户资产
 - 升级后拉起新版启动器，新版取得引导锁后旧进程退出
+- 拉起主程序前按形状给 instances 下每份配置跑随包迁移脚本
 - 弹窗、控制台、运行环境、升级、换壳按域拆入 launch 子包
 """
 
@@ -45,6 +46,22 @@ def _root_dir() -> Path:
     return Path(sys.executable).resolve().parent
 
 
+def _migrate_instances(root: Path) -> None:
+    """扫 instances 下每份实例配置，交给迁移执行器
+
+    - 有迁移或失败说明才开控制台，等待由主流程统一收口
+    """
+    from system.migrations import run_all
+
+    lines: list[str] = []
+    run_all(root / "instances", report=lines.append)
+    if not lines:
+        return
+    console.open_console()
+    for line in lines:
+        print(line)
+
+
 def _launch(root: Path) -> None:
     """以无窗口解释器拉起主程序入口脚本
 
@@ -66,7 +83,7 @@ def _launch(root: Path) -> None:
 def main() -> None:
     """启动主流程
 
-    - 依次：选择窗占用检查、换壳、装环境、检查升级、拉起主程序、回收进度窗口
+    - 依次：选择窗占用检查、换壳、装环境、迁移旧配置、检查升级、拉起主程序、回收进度窗口
     - 回收窗口后补删旧壳备份，旧壳退场即删，删不掉留到下次启动
     """
     if _already_running():
@@ -75,6 +92,9 @@ def main() -> None:
     attach_source_path(root)
     shell.apply_shell_update(root)
     runtime.ensure_runtime(root)
+    _migrate_instances(root)
+    if console.is_open():
+        console.hold_console("以上为启动前的处理结果，按回车继续…")
     update.check_update(root)
     _launch(root)
     console.close_console()

@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import zipfile
 from pathlib import Path
+from typing import NoReturn
 
 import net_channel
 from pack_spec import (
@@ -37,6 +38,12 @@ _WHEEL_GLOB = f"*{_WHEEL_SUFFIX}"
 _SITE_PACKAGES = Path("Lib") / "site-packages"
 _DIST_INFO_GLOB = "*.dist-info"
 _DIST_INFO_SUFFIX = ".dist-info"
+
+
+def _fail_install(text: str) -> NoReturn:
+    """失败详情留在控制台，看完再弹提示退出"""
+    console.hold_console()
+    dialogs.fail_exit(text)
 
 
 def _seed_wheels(root: Path) -> list[Path]:
@@ -210,7 +217,7 @@ def _fetch_sdk(root: Path, version: str, digest: str) -> str:
         print(f"接口包 {name} 已在，跳过下载")
         return digest
     if not digest:
-        dialogs.fail_exit("取不到接口包附件的指纹\n恢复网络后重新双击即可续装")
+        _fail_install("取不到接口包附件的指纹\n恢复网络后重新双击即可续装")
 
     # 旧件留着会和新件一起喂给 uv，同包两版装不进同一个环境
     shutil.rmtree(root / PackLayout.SDK_WHEEL_DIR, ignore_errors=True)
@@ -220,7 +227,7 @@ def _fetch_sdk(root: Path, version: str, digest: str) -> str:
     try:
         net_channel.download_verified(urls, target, digest)
     except RuntimeError:
-        dialogs.fail_exit(
+        _fail_install(
             "接口包下载失败，请查看进度窗口末尾输出\n恢复网络后重新双击即可续装"
         )
     print(f"接口包指纹核验通过（{digest[:12]}）")
@@ -234,6 +241,7 @@ def ensure_runtime(root: Path) -> None:
     - 只追加安装，删掉的库由引导层同步环境收口
     - 装包缓存不在此清，留到引导层同步落定后收口
     - 接口包装成功即从包根删掉，装失败留着下次续装命中
+    - 安装详情留在控制台，等待由启动主流程统一收口
     """
     runtime = root / PackLayout.RUNTIME_DIR
 
@@ -254,8 +262,6 @@ def ensure_runtime(root: Path) -> None:
         and sdk_ok
     ):
         return
-    fresh = not (runtime / PackLayout.PYTHON_EXE).exists()
-    dialogs.info("首次运行需要安装运行环境" if fresh else "升级后补装变动依赖")
     console.open_console()
     try:
         print("[1/4] 获取接口包…")
@@ -271,16 +277,16 @@ def ensure_runtime(root: Path) -> None:
         print("[4/4] 准备安装器 uv 并装依赖（下方为 uv 实时输出）…")
         uv = _place_uv(root, runtime)
         _uv_with_index_retry(root, uv, runtime / PackLayout.PYTHON_EXE, deps, cache)
-        print("环境安装完成，即将启动主程序")
+        print("环境安装完成")
     except subprocess.CalledProcessError:
         # 失败不删缓存，续装直接命中省下载
-        dialogs.fail_exit(
+        _fail_install(
             "依赖安装失败，请查看进度窗口末尾输出\n恢复网络后重新双击即可续装"
         )
     except FileNotFoundError as e:
-        dialogs.fail_exit(f"安装文件缺失：{e}\n发布包可能损坏，请重新下载")
+        _fail_install(f"安装文件缺失：{e}\n发布包可能损坏，请重新下载")
     except zipfile.BadZipFile:
-        dialogs.fail_exit(
+        _fail_install(
             "内嵌运行环境包损坏（发布包不完整）\n请到 Releases 页重新下载最新发布包"
         )
 

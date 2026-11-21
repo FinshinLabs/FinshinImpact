@@ -17,7 +17,7 @@ from system.instance_lock import (
     release_bootstrap_lock,
 )
 from system.native_dialog import describe, show_error
-from system.profile_env import get_profile, set_profile
+from system.profile_env import get_profile, profile_dir, set_profile
 
 # 主程序 GUI 装配链，分步导入时逐模块各泵一轮
 _GUI_MODULES = ("ui._windows", "ui._bridge")
@@ -44,6 +44,16 @@ class _SlotResult(IntEnum):
     PICKER_BUSY = 3
 
 
+def _migrate_config(code: str) -> None:
+    """按形状升级这一份实例配置
+
+    - 启动器已扫过全部实例，此处兜住源码直跑
+    """
+    from system.migrations import run_instance
+
+    run_instance(profile_dir(code))
+
+
 def _acquire_slot() -> _SlotResult:
     """取得本实例的启动资格
 
@@ -57,6 +67,7 @@ def _acquire_slot() -> _SlotResult:
         # 预设身份：不弹选窗，无需引导锁，结算与抢实例锁前完成
         from ui import settle_runtime
 
+        _migrate_config(profile)
         settle_runtime(profile)
         return _SlotResult.RUN if acquire_instance_lock() else _SlotResult.CONFLICT
 
@@ -73,6 +84,7 @@ def _acquire_slot() -> _SlotResult:
 
         # 身份码落环境变量后路径常量才按实例冻结，须早于任何 utils 导入
         set_profile(code)
+        _migrate_config(code)
 
         # 插件目录与实例状态指纹不符即弹面板，取消视为放弃本次启动
         from services.env_setup.deps_manifest import panel_needed

@@ -19,9 +19,10 @@ FinshinImpact\
 ├── src\                代码文件
 ```
 
-启动器首启：解压嵌入式 Python → 放开 site-packages → 落位随包 uv → 装依赖 → 拉起主程序。
+启动器首启：解压嵌入式 Python → 放开 site-packages → 落位随包 uv → 装依赖 → 升级 `instances\` 下旧配置 → 拉起主程序。
 
 - 插件依赖与浏览器内核由引导层在启动前按需安装，不在首装链路。
+- 旧配置迁移按形状判定，写回前留 `config.toml.bak`（已有则不覆盖），单份失败只跳过。
 - 更新入口与触发方式见 [更新方式](development.md#更新方式)。
 
 ### 升级换源码与启动器

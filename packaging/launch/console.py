@@ -26,6 +26,11 @@ def open_console() -> None:
     _console_open = True
 
 
+def is_open() -> bool:
+    """控制台是否已分配"""
+    return _console_open
+
+
 def close_console() -> None:
     """回收控制台窗口
 
