@@ -145,7 +145,7 @@ class _ProfilePickerDialog(BaseDialog):
 
         - 建成后刷新列表并选中新实例
         """
-        dialog = NewProfileDialog()
+        dialog = NewProfileDialog(self)
         if dialog.exec() and dialog.code:
             self._reload()
             self._select_code(dialog.code)
@@ -158,7 +158,7 @@ class _ProfilePickerDialog(BaseDialog):
         code, remark = self._selected()
         if not code:
             return
-        dialog = EditProfileDialog(code, remark)
+        dialog = EditProfileDialog(code, remark, self)
         if dialog.exec() and dialog.code:
             self._reload()
             self._select_code(dialog.code)

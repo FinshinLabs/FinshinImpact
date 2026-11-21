@@ -1,15 +1,14 @@
 """实例仓储
 
 - 扫描身份文件夹枚举已有实例
-- 从令牌推导身份码并落盘新实例
+- 收身份码把凭证串与备注名落盘
 """
 
-import re
 import shutil
 import time
 from typing import Any
 
-from finshin_sdk.domain import Platform, make_profile_code, platform_of_profile
+from finshin_sdk.domain import platform_of_profile
 from system.atomic_write import write_bytes_atomic
 from system.profile_env import (
     ASSET_PERSONA_EXAMPLE_NAME,
@@ -24,9 +23,6 @@ from system.profile_env import (
     write_profile_data,
 )
 
-# Telegram token 结构 bot_id:secret，bot_id 即机器人数字 ID，重生成 token 不变
-_TG_TOKEN_PATTERN = re.compile(r"(\d+):[A-Za-z0-9_-]+")
-
 # 引导期身份码未定，路径常量所在的通用包一导入即按空身份码冻结，故模板路径就地拼
 _PERSONA_TEMPLATE = ASSETS_DIR / ASSET_PERSONA_EXAMPLE_NAME
 
@@ -38,26 +34,6 @@ _REMARK_KEY = "remark"
 
 # 最近使用时间（创建或启动）在自描述文件里的键名，选窗列表按它降序置顶
 _LAST_USED_KEY = "last_used"
-
-
-def code_for_token(platform: Platform, token: str) -> str:
-    """按平台从凭证推导身份码
-
-    - Telegram 取机器人数字标识，结构非法返回空串
-    """
-    match platform:
-        case Platform.TELEGRAM:
-            return _code_for_telegram(token)
-        case Platform.QQ:
-            raise NotImplementedError("QQ 端身份码待适配器落地")
-        case _:
-            raise ValueError(f"未知平台 {platform!r}")
-
-
-def _code_for_telegram(token: str) -> str:
-    """Telegram 身份码推导"""
-    match = _TG_TOKEN_PATTERN.fullmatch(token.strip())
-    return make_profile_code(Platform.TELEGRAM, match.group(1)) if match else ""
 
 
 def list_profiles() -> list[tuple[str, str]]:
@@ -108,11 +84,11 @@ def remark_of(code: str) -> str:
     return _remark_of(read_profile_data(code))
 
 
-def create_profile(code: str, token: str, remark: str) -> None:
+def create_profile(code: str, credential: str, remark: str) -> None:
     """新建实例文件夹
 
     - 只建目录、人设与自描述文件
-    - 令牌与备注名写进自描述文件
+    - 凭证串与备注名写进自描述文件
     - 创建即计入最近使用，新实例在选窗置顶
     """
     target = profile_dir(code)
@@ -126,21 +102,21 @@ def create_profile(code: str, token: str, remark: str) -> None:
     write_profile_data(
         code,
         {
-            TOKEN_KEY: token.strip(),
+            TOKEN_KEY: credential.strip(),
             _REMARK_KEY: remark.strip(),
             _LAST_USED_KEY: time.time(),
         },
     )
 
 
-def update_profile(code: str, token: str, remark: str) -> None:
+def update_profile(code: str, credential: str, remark: str) -> None:
     """就地改写已有实例
 
-    - 只覆盖自描述文件的令牌与备注名，目录与配置原样保留
+    - 只覆盖自描述文件的凭证串与备注名，目录与配置原样保留
     - 合并改写，保留最近使用时间等既有字段
     """
     data = read_profile_data(code)
-    data[TOKEN_KEY] = token.strip()
+    data[TOKEN_KEY] = credential.strip()
     data[_REMARK_KEY] = remark.strip()
     write_profile_data(code, data)
 

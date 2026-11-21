@@ -35,28 +35,23 @@ class PickerMessage:
     BTN_OK = "确定"
 
     # 用：ui._guide._form 新建与编辑共用的表单
-    FORM_TOKEN_LABEL = "Bot Token"
-    FORM_TOKEN_HINT = "从 @BotFather 获取，形如 123456:ABCDEF"
-    FORM_TOKEN_INVALID = "Token 格式不正确\n应形如 123456:ABCDEF"
     FORM_REMARK_LABEL = "备注名（可选）"
+    FORM_CREDENTIAL_MISSING = (
+        "取不到该平台的凭证说明\n先打开平台组件确认适配器装好，再重新打开本窗"
+    )
     FORM_SAVE_FAIL = "实例信息没能保存\n文件可能正被占用，请关闭占用它的程序后重试"
 
     # 用：ui._guide._form 新建窗
     NEW_TITLE = "新建机器人"
     NEW_PLATFORM_LABEL = "平台"
+    NEW_PLATFORM_PLACEHOLDER = "请选择平台"
+    NEW_NEED_PLATFORM = "请先选择平台"
 
     # 用：ui._guide._form 平台下拉项的显示名，按平台码取，没登记的显平台码
     PLATFORM_NAMES = {"tg": "Telegram", "qq": "QQ"}
-    NEW_NEED_ADAPTER = (
-        "本机还没有可用的平台\n先打开平台组件装一个适配器，再回来填 Token"
-    )
+    NEW_NEED_ADAPTER = "本机还没有可用的平台\n先打开平台组件装一个适配器，再回来选平台"
 
     # 用：ui._guide._form 编辑窗
     EDIT_TITLE = "编辑机器人"
     EDIT_PLATFORM_UNKNOWN = "该实例的平台无法识别\n可能不是本程序创建的实例"
-    EDIT_TOKEN_CHANGED = (
-        "Token 已换成另一个机器人\n"
-        "身份码 {old} → {new}\n"
-        "实例资产按身份码隔离\n"
-        "无法就地改名，请新建实例"
-    )
+    EDIT_CODE_FIXED = "身份码不能变"

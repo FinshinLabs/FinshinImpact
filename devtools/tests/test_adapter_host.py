@@ -38,7 +38,12 @@ from exceptions import (  # noqa: E402
     AdapterNotInstalledError,
     AdapterOutOfDateError,
 )
-from finshin_sdk import AdapterParts, BaseAdapter, PlatformAssembly  # noqa: E402
+from finshin_sdk import (  # noqa: E402
+    AdapterParts,
+    BaseAdapter,
+    CredentialSpec,
+    PlatformAssembly,
+)
 from finshin_sdk.domain import ADAPTER_DECLARATION_FILE, Platform  # noqa: E402
 from finshin_sdk.dto import AdapterManifestDTO, PluginManifestDTO  # noqa: E402
 from services import adapter_manifest as manifest_mod  # noqa: E402
@@ -47,7 +52,7 @@ from ui import gui_bridge  # noqa: E402
 _PARTS_KEYS = ("assemble", "plan_for", "engine_preload")
 
 # 交出整套件的假入口件源码，形状照接口包那份 AdapterParts
-_FOUR_PARTS = """from finshin_sdk import AdapterParts
+_PARTS_SOURCE = """from finshin_sdk import AdapterParts, CredentialSpec
 
 
 def parts():
@@ -57,6 +62,12 @@ def parts():
         assemble=lambda token, proxy: None,
         plan_for=lambda values, token, system_proxy: None,
         engine_preload=lambda: None,
+        credential=CredentialSpec(
+            label="假凭证",
+            desc="假提示",
+            invalid="假非法提示",
+            identity=lambda text: text,
+        ),
     )
 """
 
@@ -287,12 +298,13 @@ class TestAdapterHost(unittest.TestCase):
         )
 
     def test_listed_platform_returns_parts(self) -> None:
-        """有清单的平台取到整套件，三个可调用件都调得动"""
-        self._take(_FOUR_PARTS)
+        """有清单的平台取到整套件，三个可调用件都调得动，凭证声明同场交出"""
+        self._take(_PARTS_SOURCE)
         parts = parts_mod.parts_for(Platform.TELEGRAM)
         self.assertIsInstance(parts, AdapterParts)
         for key in _PARTS_KEYS:
             self.assertTrue(callable(getattr(parts, key)), key)
+        self.assertEqual(parts.credential.label, "假凭证")
 
     def test_unlisted_platform_raises_missing(self) -> None:
         """没清单的平台抛缺件异常并带上平台标识"""
@@ -620,6 +632,12 @@ class TestAdapterHost(unittest.TestCase):
             assemble=lambda token, proxy: adapter,
             plan_for=None,  # type: ignore[arg-type]
             engine_preload=None,  # type: ignore[arg-type]
+            credential=CredentialSpec(
+                label="假凭证",
+                desc="假提示",
+                invalid="假非法提示",
+                identity=lambda text: text,
+            ),
         )
         seen: dict[str, object] = {}
         row = PluginManifestDTO(
