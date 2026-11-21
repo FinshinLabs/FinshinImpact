@@ -20,16 +20,15 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from config_plan import fake_adapter_parts  # noqa: E402
+from config_plan import adapter_sections, fake_adapter_parts  # noqa: E402
 
 from bot._managers._config_sources import config_sources  # noqa: E402
 from bundled.AI.config import CONFIG_SOURCE  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
-    SECTIONS_BY_PLATFORM,
     ConfigKey,
+    ConfigPath,
     ConfigSection,
     FieldSpec,
-    Platform,
     SectionSpec,
 )
 from utils._config_manager import _ConfigManager  # noqa: E402
@@ -41,7 +40,6 @@ from utils.config.sources import ConfigSource, SourceKind, assemble  # noqa: E40
 
 _PROXY_VALUE = "http://127.0.0.1:7890"
 
-_TG = SECTIONS_BY_PLATFORM[Platform.TELEGRAM]  # 接口包交出的段，按平台顺序
 _AI = CONFIG_SOURCE.sections  # 插件自己交出的段
 
 
@@ -86,13 +84,13 @@ class TestDottedSectionRoundtrip(unittest.TestCase):
                 section="adapter.tg.proxy",
                 group="adapter.tg",
                 group_title="Telegram",
-                section_id=ConfigSection.PROXY,
-                fields=[FieldSchema(ConfigKey.PROXY, "代理", "", "", str)],
+                section_id="proxy",
+                fields=[FieldSchema("proxy", "代理", "", "", str)],
             )
         ]
         mgr.load({"adapter.tg.proxy": {"proxy": _PROXY_VALUE}})
 
-        item = ConfigKey.PROXY.path("adapter.tg", ConfigSection.PROXY)
+        item = ConfigPath(source="adapter.tg", section="proxy", key="proxy")
         self.assertEqual(mgr.get(item, str), _PROXY_VALUE)
 
     def test_notes_subtable_stays_out_of_memory(self) -> None:
@@ -232,7 +230,7 @@ class TestSourceAssembly(unittest.TestCase):
     def test_same_identity_rejects_the_later_source(self) -> None:
         """同一身份码被两份认领时后交的那份整份不进，并点名一句"""
         first = ConfigSource(SourceKind.PLUGIN, "AI", "先交的来源", _AI)
-        later = ConfigSource(SourceKind.PLUGIN, "AI", "后交的来源", _TG)
+        later = ConfigSource(SourceKind.PLUGIN, "AI", "后交的来源", adapter_sections())
         path = _temp_file()
         with (
             patch("utils.config.CONFIG_FILE", path),
@@ -286,12 +284,12 @@ class TestSourceAssembly(unittest.TestCase):
     def test_same_section_name_from_two_sources_both_kept(self) -> None:
         """两家来源各带同名段时两段都在、互不覆盖"""
         plugin_proxy = SectionSpec(
-            section=ConfigSection.PROXY,
+            section="proxy",
             title="代理",
             fields=(
                 FieldSpec(
-                    section=ConfigSection.PROXY,
-                    key=ConfigKey.PROXY,
+                    section="proxy",
+                    key="proxy",
                     value_type=str,
                     default="http://2.2.2.2:1080",
                     label="代理",
@@ -299,7 +297,9 @@ class TestSourceAssembly(unittest.TestCase):
                 ),
             ),
         )
-        telegram = ConfigSource(SourceKind.ADAPTER, "tg", "Telegram", _TG)
+        telegram = ConfigSource(
+            SourceKind.ADAPTER, "tg", "Telegram", adapter_sections()
+        )
         plugin = ConfigSource(SourceKind.PLUGIN, "AI", "AI 设置", (plugin_proxy,))
         path = _temp_file()
         with patch("utils.config.CONFIG_FILE", path):

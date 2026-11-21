@@ -6,7 +6,6 @@
 """
 
 from finshin_sdk.domain import (
-    SECTIONS_BY_PLATFORM,
     ConfigKey,
     ConfigSection,
     FieldSpec,
@@ -62,11 +61,12 @@ def config_sources() -> tuple[ConfigSource, ...]:
 
 def _adapter_source() -> ConfigSource:
     """本平台适配器交出的来源"""
+    parts = parts_for(PLATFORM)
     return ConfigSource(
         kind=SourceKind.ADAPTER,
         code=str(PLATFORM),
-        title=parts_for(PLATFORM).title,
-        sections=SECTIONS_BY_PLATFORM[PLATFORM],
+        title=parts.title,
+        sections=parts.sections,
     )
 
 

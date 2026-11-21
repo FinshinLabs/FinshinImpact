@@ -44,18 +44,19 @@ from finshin_sdk.dto import AdapterManifestDTO, PluginManifestDTO  # noqa: E402
 from services import adapter_manifest as manifest_mod  # noqa: E402
 from ui import gui_bridge  # noqa: E402
 
-_PARTS_KEYS = ("assemble", "channel_probe", "engine_preload")
+_PARTS_KEYS = ("assemble", "plan_for", "engine_preload")
 
-# 交出四件的假入口件源码，形状照接口包那份 AdapterParts
+# 交出整套件的假入口件源码，形状照接口包那份 AdapterParts
 _FOUR_PARTS = """from finshin_sdk import AdapterParts
 
 
 def parts():
     return AdapterParts(
         title="Fake 平台",
+        sections=(),
         assemble=lambda token, proxy: None,
-        channel_probe=lambda token, proxy: None,
-        engine_preload=lambda token, proxy: None,
+        plan_for=lambda values, token, system_proxy: None,
+        engine_preload=lambda: None,
     )
 """
 
@@ -286,7 +287,7 @@ class TestAdapterHost(unittest.TestCase):
         )
 
     def test_listed_platform_returns_parts(self) -> None:
-        """有清单的平台取到四件，能调的那三件都调得动"""
+        """有清单的平台取到整套件，三个可调用件都调得动"""
         self._take(_FOUR_PARTS)
         parts = parts_mod.parts_for(Platform.TELEGRAM)
         self.assertIsInstance(parts, AdapterParts)
@@ -460,7 +461,7 @@ class TestAdapterHost(unittest.TestCase):
         with patch.object(parts_mod, "load_adapter_manifests", lambda: {}):
             importlib.reload(settings_mod)
             with self.assertRaises(AdapterMissingError):
-                settings_mod._channel_probe()
+                settings_mod.parts_for(settings_mod.PLATFORM)
 
     def test_startup_refusal_pops_the_notice(self) -> None:
         """启动取件被拒时那句人话上屏，关掉后开面板
@@ -615,8 +616,9 @@ class TestAdapterHost(unittest.TestCase):
         adapter = _FakeAdapter()
         parts = AdapterParts(
             title="Fake 平台",
+            sections=(),
             assemble=lambda token, proxy: adapter,
-            channel_probe=None,  # type: ignore[arg-type]
+            plan_for=None,  # type: ignore[arg-type]
             engine_preload=None,  # type: ignore[arg-type]
         )
         seen: dict[str, object] = {}

@@ -43,7 +43,8 @@ from finshin_sdk.domain import (  # noqa: E402
 )
 from skin.messages import DialogMessage  # noqa: E402
 from ui import gui_bridge  # noqa: E402
-from utils.network import PROXY_ITEM  # noqa: E402
+
+PROXY_ITEM = ConfigPath(source="adapter.tg", section="proxy", key="proxy")
 
 
 async def _say(principal: object, text: str) -> None:

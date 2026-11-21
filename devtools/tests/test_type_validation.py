@@ -23,9 +23,10 @@ from finshin_sdk.domain import (  # noqa: E402
     ConfigPath,
     ConfigSection,
     FieldSpec,
+    Platform,
     SectionSpec,
 )
-from skin.messages import ConfigMessage  # noqa: E402
+from skin.messages import CheckMessage, ConfigMessage  # noqa: E402
 from utils._config_manager import _ConfigManager  # noqa: E402
 from utils.check import local_row  # noqa: E402
 from utils.config._validator import validate_types  # noqa: E402
@@ -301,6 +302,7 @@ class TestLocalRow(unittest.TestCase):
         }
         frame, _ = local_row(_schema(), data)
         self.assertEqual(frame["id"], RowId.LOCAL)
+        self.assertEqual(frame["title"], CheckMessage.ROW_LOCAL)
         self.assertEqual(frame["status"], RowStatus.FAIL)
         self.assertIn("1", frame["detail"])
 
@@ -310,6 +312,7 @@ class TestLocalRow(unittest.TestCase):
             _MODEL_SECTION: {"temperature": 0.5, "api_key": "gpt", "triggers": ["a"]}
         }
         frame, errors = local_row(_schema(), data)
+        self.assertEqual(frame["title"], CheckMessage.ROW_LOCAL)
         self.assertEqual(frame["status"], RowStatus.OK)
         self.assertEqual(errors, {})
 
@@ -349,7 +352,7 @@ class TestRequiredKeysReconcile(unittest.TestCase):
 class TestPlatformSchema(unittest.TestCase):
     """回归点
 
-    - QQ 表无 proxy 段
+    - 面板段表照适配器入口件交出的段来
     - 装配写出的初值文本能被读回
     """
 
@@ -360,7 +363,6 @@ class TestPlatformSchema(unittest.TestCase):
         from config_plan import fake_adapter_parts
 
         from bot._managers._config_sources import config_sources
-        from finshin_sdk.domain import SECTIONS_BY_PLATFORM, Platform
         from utils.config._schema import build_schema
         from utils.config.sources import assemble
 
@@ -376,9 +378,8 @@ class TestPlatformSchema(unittest.TestCase):
                 )
                 section = replace(source, title="页签标题", fields=(field,))
                 with (
-                    patch.dict(SECTIONS_BY_PLATFORM, {Platform.QQ: (section,)}),
                     patch("bot._managers._config_sources.PLATFORM", Platform.QQ),
-                    fake_adapter_parts("大类标题"),
+                    fake_adapter_parts("大类标题", (section,)),
                 ):
                     tab = build_schema(assemble(config_sources()).sections)[0]
                 self.assertEqual(tab.title, "页签标题")
@@ -402,24 +403,25 @@ class TestPlatformSchema(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     _build_field(field)
 
-    def test_qq_table_has_no_proxy(self) -> None:
-        """QQ 平台拼出的段表不含代理段"""
+    def test_sections_come_from_entry(self) -> None:
+        """面板段表只认入口件交出的那几份"""
         from unittest.mock import patch
 
         from config_plan import fake_adapter_parts
 
         from bot._managers._config_sources import config_sources
-        from finshin_sdk.domain import Platform
         from utils.config._schema import build_schema
         from utils.config.sources import assemble
 
+        only = _declared_section()
         with (
             patch("bot._managers._config_sources.PLATFORM", Platform.QQ),
-            fake_adapter_parts(),
+            fake_adapter_parts(sections=(only,)),
         ):
             plan = assemble(config_sources())
         sections = {tab.section for tab in build_schema(plan.sections)}
-        self.assertNotIn("adapter.tg.proxy", sections)
+        self.assertIn("adapter.qq.chore", sections)
+        self.assertNotIn("adapter.qq.proxy", sections)
 
     def test_rendered_config_roundtrips(self) -> None:
         """装配写出的初值文件能被读回，段名带来源前缀"""

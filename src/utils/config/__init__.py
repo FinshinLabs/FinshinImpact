@@ -19,6 +19,7 @@ from .sources import (
     assemble,
     current_plan,
     section_name,
+    source_values,
     use_plan,
 )
 
@@ -28,6 +29,7 @@ __all__ = [
     "ConfigSource",
     "SourceKind",
     "section_name",
+    "source_values",
     # 数据读写
     "get_schema",
     "load_config",

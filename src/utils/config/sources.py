@@ -9,15 +9,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from finshin_sdk.domain import (
-    ConfigKey,
-    ConfigSection,
-    FieldSpec,
-    SectionSpec,
-)
+from finshin_sdk.domain import FieldSpec, SectionSpec
 
 from ..logger import get_logger
-from .models import AppConfigData, NotesBySection
+from .models import AppConfigData, NotesBySection, TabData
 
 _logger = get_logger("Config")
 
@@ -136,12 +131,27 @@ def current_plan() -> ConfigPlan | None:
     return _PLAN
 
 
-def section_name(source: str, section: ConfigSection) -> str:
+def section_name(source: str, section: str) -> str:
     """来源身份码与段名拼成盘上段名
 
     - 装配写法只此一处，取值与写回共用
     """
     return f"{source}.{section}"
+
+
+def source_values(
+    source: str,
+    sections: Sequence[SectionSpec],
+    data: AppConfigData,
+) -> dict[str, TabData]:
+    """按来源取各段的当前值
+
+    - 键为交出者声明的段名，只取它自己那几段
+    """
+    return {
+        sec.section: data.get(section_name(source, sec.section)) or {}
+        for sec in sections
+    }
 
 
 def _identity(source: ConfigSource) -> str:
@@ -162,7 +172,7 @@ def _unique_fields(identity: str, spec: SectionSpec) -> SectionSpec:
     - 后出现的那项点名拒收
     """
     kept: list[FieldSpec] = []
-    seen: set[ConfigKey] = set()
+    seen: set[str] = set()
     for field in spec.fields:
         if field.key in seen:
             _logger.error(

@@ -35,7 +35,7 @@ class BotManager:
         # 配置应用器持有生效通道与指纹，其读取函数供引擎与校验注入子管理器
         self._applier = ConfigApplier(self)
         self._service_manager = ServiceManager(self._applier.get_config_func)
-        self._settings_manager = SettingsManager(self._applier.get_raw_config_func)
+        self._settings_manager = SettingsManager(self._applier.get_token_func)
         self._signals = SignalHandler(self)
 
     @error_guard("Bot 启动", catch_all=True)

@@ -94,9 +94,9 @@ class TestErrorGuard(unittest.TestCase):
         - 键是配置项身份，悬浮文案取异常那句
         """
         from exceptions import ConfigAttrError
-        from finshin_sdk.domain import ConfigKey, ConfigSection
+        from finshin_sdk.domain import ConfigPath
 
-        item = ConfigKey.PROXY_MODE.path("adapter.tg", ConfigSection.PROXY)
+        item = ConfigPath(source="adapter.tg", section="proxy", key="proxy_mode")
 
         @error_guard("测试")
         def boom() -> None:

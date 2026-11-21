@@ -1,6 +1,6 @@
 """网络诊断轮测试
 
-- 按代理模式只测选定路线，缺席通道在首帧整表给结论
+- 按检查计划只测排定的路线，缺席通道在首帧整表给结论
 - 任一通道可达给通过结论且不带断链标记
 - 全部通道失败给不通结论并标记断链
 - 首轮全挂预热后重跑一轮，两轮都全挂才定性
@@ -10,7 +10,6 @@ import sys
 import unittest
 from collections.abc import Callable
 from contextlib import contextmanager
-from functools import partial
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,12 +19,23 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import ProxyMode  # noqa: E402
-from finshin_sdk.exceptions import ProxyConnectionRefusedError  # noqa: E402
+from adapter_presence import adapter_present  # noqa: E402
+
+from finshin_sdk import ProbeResult  # noqa: E402
 from skin.messages import CheckMessage  # noqa: E402
 from utils.check import _diagnose as diagnose_mod  # noqa: E402
 from utils.check import _verify as verify_mod  # noqa: E402
-from utils.network import PROXY_ITEM, FrameKey, RowId, RowStatus  # noqa: E402
+from utils.network import FrameKey, RowId, RowStatus  # noqa: E402
+
+_ADAPTER_LOADED = adapter_present()
+
+
+def _plan_mod():
+    """取已装适配器的检查计划件，未装载即跳过"""
+    from finshin_adapter_tg import _plan
+
+    return _plan
+
 
 _CFG = "http://127.0.0.1:7897"
 _SYS = "http://127.0.0.1:7890"
@@ -33,6 +43,7 @@ _SYS = "http://127.0.0.1:7890"
 
 @contextmanager
 def _stubbed_round(
+    mode: str,
     cfg: str,
     passes: Callable[[str], bool],
     sys_proxy: str | None = None,
@@ -42,29 +53,37 @@ def _stubbed_round(
 
     - passes 按代理地址裁决该通道是否可出网
     - max_probes 限死总探测次数，超出即断言失败
-    - 交出的 flow 已把假探针与假预热句注进诊断编排
     """
     frames: list[dict] = []
     seen: list[str] = []
+    plan_mod = _plan_mod()
 
-    async def fake(token: str, proxy: str) -> tuple[str | None, dict[str, str]]:
+    async def fake(token: str, proxy: str, budget: float) -> ProbeResult:
         seen.append(proxy)
         if max_probes is not None and len(seen) > max_probes:
             raise AssertionError("探测次数超出预期")
         if passes(proxy):
-            return proxy, {}
-        return None, {PROXY_ITEM: ProxyConnectionRefusedError(proxy=proxy)}
+            return ProbeResult(accepted=True, effective=proxy)
+        return ProbeResult(
+            accepted=False,
+            field_errors={plan_mod.PROXY_ITEM: "连不上"},
+        )
 
-    flow = partial(
-        diagnose_mod.diagnose_flow,
-        channel_probe=fake,
-        engine_preload=lambda: None,
-    )
+    values = {"proxy": {"proxy_mode": mode, "proxy": cfg}}
     with (
-        patch.object(diagnose_mod, "detect_system_proxy", lambda: sys_proxy),
+        patch.object(plan_mod, "run_channel", fake),
         patch.object(verify_mod, "_RETRY_WARMUP", 0.0),
     ):
-        yield frames, seen, flow
+        plan = plan_mod.build_connection_plan(values, "123:abc", sys_proxy)
+        yield frames, seen, plan
+
+
+async def _run(frames: list[dict], plan: object) -> None:
+    await diagnose_mod.diagnose_flow(
+        plan,
+        frames.append,
+        engine_preload=lambda: None,  # type: ignore[arg-type]
+    )
 
 
 def _advice(frames: list[dict]) -> dict:
@@ -78,6 +97,7 @@ def _opening_rows(frames: list[dict]) -> dict[str, dict]:
     return {r["id"]: r for r in table[FrameKey.ROWS]}
 
 
+@unittest.skipUnless(_ADAPTER_LOADED, "适配层未装载，诊断用例跳过")
 class TestDiagnoseFlow(unittest.IsolatedAsyncioTestCase):
     """通道阶梯的收尾结论"""
 
@@ -86,8 +106,8 @@ class TestDiagnoseFlow(unittest.IsolatedAsyncioTestCase):
 
         - 两轮都全挂才给结论，结论行报未找到可用通道并带断链标记
         """
-        with _stubbed_round(_CFG, lambda p: False) as (frames, seen, flow):
-            await flow(_CFG, "123:abc", ProxyMode.AUTO, frames.append)
+        with _stubbed_round("auto", _CFG, lambda p: False) as (frames, seen, plan):
+            await _run(frames, plan)
 
         advice = _advice(frames)
         self.assertEqual(advice["status"], RowStatus.FAIL)
@@ -100,8 +120,12 @@ class TestDiagnoseFlow(unittest.IsolatedAsyncioTestCase):
 
         - 结论行转绿且不发断链标记
         """
-        with _stubbed_round(_CFG, lambda p: p == _CFG) as (frames, _seen, flow):
-            await flow(_CFG, "123:abc", ProxyMode.AUTO, frames.append)
+        with _stubbed_round("auto", _CFG, lambda p: p == _CFG) as (
+            frames,
+            _seen,
+            plan,
+        ):
+            await _run(frames, plan)
 
         advice = _advice(frames)
         self.assertEqual(advice["status"], RowStatus.OK)
@@ -113,12 +137,12 @@ class TestDiagnoseFlow(unittest.IsolatedAsyncioTestCase):
         - 首帧把配置行标为未配置
         - 缺席行不发探测，直连两轮各探一次
         """
-        with _stubbed_round("", lambda p: False) as (frames, seen, flow):
-            await flow("", "123:abc", ProxyMode.AUTO, frames.append)
+        with _stubbed_round("auto", "", lambda p: False) as (frames, seen, plan):
+            await _run(frames, plan)
 
         rows = _opening_rows(frames)
-        self.assertEqual(rows[RowId.CFG]["status"], RowStatus.FAIL)
-        self.assertIn("未配置", rows[RowId.CFG]["detail"])
+        self.assertEqual(rows["cfg"]["status"], RowStatus.FAIL)
+        self.assertIn("未配置", rows["cfg"]["detail"])
         self.assertEqual(seen, ["", ""], "缺席的代理项不该发探测")
 
     async def test_retry_head_replays_whole_table(self) -> None:
@@ -126,43 +150,42 @@ class TestDiagnoseFlow(unittest.IsolatedAsyncioTestCase):
 
         - 第二张整表带重测头部提示
         """
-        with _stubbed_round(_CFG, lambda p: False) as (frames, _seen, flow):
-            await flow(_CFG, "123:abc", ProxyMode.AUTO, frames.append)
+        with _stubbed_round("auto", _CFG, lambda p: False) as (frames, _seen, plan):
+            await _run(frames, plan)
 
         tables = [f for f in frames if FrameKey.ROWS in f]
         self.assertEqual(len(tables), 2)
         self.assertEqual(tables[1].get(FrameKey.HEAD), CheckMessage.RETRY_HEAD)
 
 
+@unittest.skipUnless(_ADAPTER_LOADED, "适配层未装载，诊断档位用例跳过")
 class TestDiagnoseHonoursMode(unittest.IsolatedAsyncioTestCase):
-    """诊断轮认代理模式，与校验轮同走一张路线表"""
+    """诊断轮认检查计划，只测排定的路线"""
 
     async def test_sys_mode_probes_only_system_route(self) -> None:
         """仅系统代理档不探配置与直连
 
         - 整表裁成系统代理行与结论行两行
         """
-        with _stubbed_round(_CFG, lambda p: False, sys_proxy=_SYS, max_probes=4) as (
-            frames,
-            seen,
-            flow,
-        ):
-            await flow(_CFG, "123:abc", ProxyMode.SYS, frames.append)
+        with _stubbed_round(
+            "sys", _CFG, lambda p: False, sys_proxy=_SYS, max_probes=4
+        ) as (frames, seen, plan):
+            await _run(frames, plan)
 
         self.assertEqual(seen, [_SYS, _SYS], "只该反复探系统代理一路")
-        self.assertEqual(set(_opening_rows(frames)), {RowId.SYS, RowId.ADVICE})
+        self.assertEqual(set(_opening_rows(frames)), {"sys", RowId.ADVICE})
 
     async def test_direct_mode_ignores_configured_proxy(self) -> None:
         """仅直连档带着代理地址也只探直连"""
-        with _stubbed_round(_CFG, lambda p: not p, max_probes=2) as (
+        with _stubbed_round("direct", _CFG, lambda p: not p, max_probes=2) as (
             frames,
             seen,
-            flow,
+            plan,
         ):
-            await flow(_CFG, "123:abc", ProxyMode.DIRECT, frames.append)
+            await _run(frames, plan)
 
         self.assertEqual(seen, [""], "配置代理那一档不该被探")
-        self.assertEqual(set(_opening_rows(frames)), {RowId.DIRECT, RowId.ADVICE})
+        self.assertEqual(set(_opening_rows(frames)), {"direct", RowId.ADVICE})
         self.assertEqual(_advice(frames)["status"], RowStatus.OK)
 
     async def test_cfg_mode_absent_settles_without_probe(self) -> None:
@@ -170,23 +193,23 @@ class TestDiagnoseHonoursMode(unittest.IsolatedAsyncioTestCase):
 
         - 首帧给缺席结论，一个探测包都不发
         """
-        with _stubbed_round("", lambda p: True) as (frames, seen, flow):
-            await flow("", "123:abc", ProxyMode.CFG, frames.append)
+        with _stubbed_round("cfg", "", lambda p: True) as (frames, seen, plan):
+            await _run(frames, plan)
 
         self.assertEqual(seen, [], "缺席的选路不该发探测")
         rows = _opening_rows(frames)
-        self.assertEqual(rows[RowId.CFG]["status"], RowStatus.FAIL)
-        self.assertIn("代理项为空", rows[RowId.CFG]["detail"])
+        self.assertEqual(rows["cfg"]["status"], RowStatus.FAIL)
+        self.assertIn("代理项为空", rows["cfg"]["detail"])
 
     async def test_sys_mode_absent_marks_system_row(self) -> None:
         """仅系统代理档没开系统代理时红在系统行"""
-        with _stubbed_round(_CFG, lambda p: True) as (frames, seen, flow):
-            await flow(_CFG, "123:abc", ProxyMode.SYS, frames.append)
+        with _stubbed_round("sys", _CFG, lambda p: True) as (frames, seen, plan):
+            await _run(frames, plan)
 
         self.assertEqual(seen, [])
         rows = _opening_rows(frames)
-        self.assertEqual(rows[RowId.SYS]["status"], RowStatus.FAIL)
-        self.assertIn("系统代理未开启", rows[RowId.SYS]["detail"])
+        self.assertEqual(rows["sys"]["status"], RowStatus.FAIL)
+        self.assertIn("系统代理未开启", rows["sys"]["detail"])
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@
 
 from dataclasses import dataclass, field
 
-from finshin_sdk.domain import ConfigKey, ConfigPath, ConfigSection, ConfigValue
+from finshin_sdk.domain import ConfigPath, ConfigValue, FieldCondition
 
 # 一个标签页的键值表，键为配置键名
 TabData = dict[str, ConfigValue]
@@ -18,7 +18,7 @@ AppConfigData = dict[str, TabData]
 FieldErrors = dict[ConfigPath | str, str]
 
 # 单段说明子表，键名与该段下的值键同名
-SectionNotes = dict[ConfigKey, str]
+SectionNotes = dict[str, str]
 
 # 段名到说明子表，装配器每次按交出模板覆盖
 NotesBySection = dict[str, SectionNotes]
@@ -41,12 +41,13 @@ def is_blank(value: object) -> bool:
 class FieldSchema:
     """单个配置项的 UI 属性
 
-    - key 为配置键枚举
+    - key 为交出者写的键名
     - options 非空即枚举字段，每项为「值 文案」对
     - bounds 为闭区间，仅 float 字段生效
+    - 显隐条件全部命中才显示，空元组即恒显
     """
 
-    key: ConfigKey
+    key: str
     label: str
     desc: str
     default: ConfigValue
@@ -54,6 +55,7 @@ class FieldSchema:
     options: tuple[tuple[str, str], ...] = ()
     required: bool = False
     bounds: tuple[float, float] | None = None
+    visible_when: tuple[FieldCondition, ...] = ()
 
 
 @dataclass
@@ -67,7 +69,7 @@ class TabSchema:
     section: str  # 带来源前缀的点分段名，改名波及面板按段判定处
     group: str  # 左侧大类标识，值为来源身份串
     group_title: str  # 大类标题，随来源声明交出
-    section_id: ConfigSection  # 本页字段所属枚举段名
+    section_id: str  # 本页字段所属段名
     fields: list[FieldSchema] = field(default_factory=list)
 
     def path_of(self, field: FieldSchema) -> ConfigPath:

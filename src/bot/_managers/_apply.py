@@ -14,7 +14,6 @@ from utils import config_manager
 from utils.config import FieldErrors
 from utils.init_files import save_persona_text
 from utils.network import link_report
-from utils.paths import PLATFORM
 from utils.persona import applied_persona_text, load_persona_cache, save_applied_persona
 
 from ..error_guard import error_guard
@@ -33,7 +32,7 @@ class ConfigApplier:
         self.skip_reload = False
 
         # 最近一次生效并重启过引擎的参数指纹：一致则跳过重启防闪断
-        self._last_applied: tuple[str, str] | None = None
+        self._last_applied: tuple[str, str | None] | None = None
 
         # 三级解析出的生效通道，引擎与指纹均以此为准
         self._resolved_proxy: str | None = None
@@ -203,22 +202,17 @@ class ConfigApplier:
         # 面板改不了凭证，拦在配置向导里出不去，故报错即致命
         return FieldKey.TOKEN in errors
 
-    def get_config_func(self) -> tuple[str, str]:
+    def get_config_func(self) -> tuple[str, str | None]:
         """读取 Token 与生效 Proxy
 
-        - 校验通过后返回生效通道，未校验时返回配置原值
+        - 校验通过后返回生效通道，未校验时交 None 由适配器按直连起步
         """
-        token, cfg = self.get_raw_config_func()
-        if self._resolved_proxy is not None:
-            return token, self._resolved_proxy
-        return token, cfg
+        return self.get_token_func(), self._resolved_proxy
 
     @staticmethod
-    def get_raw_config_func() -> tuple[str, str]:
-        """读取校验专用的凭证与代理原值
+    def get_token_func() -> str:
+        """读取校验用的凭证
 
         - 凭证从实例自描述文件读
         """
-        return read_token(get_profile()), config_manager.get(
-            ConfigKey.PROXY.path(f"adapter.{PLATFORM}", ConfigSection.PROXY), str
-        ).strip()
+        return read_token(get_profile())

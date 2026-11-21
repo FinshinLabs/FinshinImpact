@@ -8,17 +8,12 @@ class CheckMessage:
     - 轮专属文案按 VERIFY_ / ADVICE_ 前缀分组
     """
 
-    # 用：utils/network/_probe.py 与 utils/check/_diagnose.py 两轮的表行名（界面与生成器共用）
-    ROW_CFG = "配置代理通道"
-    ROW_SYS = "系统代理通道"
-    ROW_DIRECT = "直连通道"
+    # 用：两轮表格的表尾行名
     ROW_LOCAL = "本地配置"
     ROW_ADVICE = "检查结论"
 
-    # 用：两轮表格与日志的统一称谓，代理类一律带地址
+    # 用：链路状态里的直连称谓
     VIA_DIRECT = "直连"
-    VIA_CFG = "配置代理 {proxy}"
-    VIA_SYSTEM = "系统代理 {proxy}"
 
     # 用：未被单独探测的通道行绿色带过（前级已通/定案陪跑）
     SKIP = "跳过（前级已连通）"
@@ -40,24 +35,6 @@ class CheckMessage:
     # 用：ui/_dialogs/_table.py 进行中行独立计时后缀（已测秒/预算秒）
     COUNTDOWN = "检测中 {n}/{budget}s"
 
-    # 用：配置代理行——代理项留空
-    CFG_EMPTY = "未配置（可填 http://127.0.0.1:端口）"
-
-    # 用：系统代理行——不可用收口句（未开启或地址解析不出）
-    SYS_UNAVAILABLE = "无可用系统代理（未开启或地址不可解析）"
-
-    # 用：系统代理行——与配置代理同端口，被去重不重复探测
-    SYS_DEDUP = "跳过（与配置代理同端口）"
-
-    # 用：单路模式选配置代理但代理项留空
-    MODE_CFG_ABSENT = "代理项为空，本模式只测该项，请先填写代理地址"
-
-    # 用：单路模式选系统代理但无可用地址
-    MODE_SYS_ABSENT = "系统代理未开启或地址不可解析，请先开启系统代理"
-
-    # 用：全链不通
-    DIAG_ADVICE_NONE = "未找到可用通道：启动代理软件后重试，或开启 TUN"
-
     # 用：本地配置行——类型校验全过
     VERIFY_LOCAL_OK = "全部通过"
 
@@ -67,25 +44,10 @@ class CheckMessage:
     # 用：结论行失败汇总——表格走 HTML 渲染，多行明细会被吞，只留一句计数
     VERIFY_ADVICE_FAIL = "{n} 项配置异常"
 
-    # 用：三通道全挂的聚合句
-    ALL_FAIL = "配置代理 / 系统代理 / 直连均无法连通"
-
-    # 用：代理不通时字段标红的尾句，指向用户自查代理软件
-    PROXY_GUIDE = "请到代理软件里确认监听端口与地址后重试"
-
-    # 用：配置值坏但被后续通道救活的提醒句
-    STALE = "配置代理 {raw!r} 不可用，本次改用{via}，请自行修正"
-
-    # 用：Token 结构本地校验失败句
-    TOKEN_BAD_FORMAT = "Token 格式错误（应为 数字:密钥）"
-
     # 用：bot/_managers token 探测失败的致命弹窗，确认后退出重开选窗编辑
     TOKEN_FATAL = (
         "Token 无效，无法启动\n请退出后重新打开程序\n在选择窗编辑该实例更换 Token"
     )
-
-    # 用：单通道探测超时的错误句（用户面不带秒数，秒数只进 debug 日志）
-    TIMEOUT = "验证超时，请稍后重试"
 
     # 用：校验发起（reason 为 启动/保存/复验），debug 级，出窗即已说明在校验
     VERIFY_START = "正在校验配置（{reason}）"
@@ -101,17 +63,11 @@ class CheckMessage:
     # 用：bot/_managers/_settings.py 与 utils/check/_diagnose.py 首轮全不通后的重测提示
     RETRY_HEAD = "首轮全部不通，正在自动重测一轮"
 
-    # 用：单通道探测用时（debug 级，面板不展示）
-    COST = "通道 {via} 探测耗时 {cost:.1f}s"
-
     # 用：bot/_main.py 主窗就绪时的启动用时反馈（面板可见，等待有回音）
     READY_COST = "主程序就绪耗时 {cost:.1f}s"
 
     # 用：联网轮收尾的整轮用时（面板可见，免测轮一个包没发不记用时）
     ROUND_COST = "连通校验耗时 {cost:.1f}s"
-
-    # 用：校验通过的日志句
-    PASS = "连通校验通过：生效通道 {via}"
 
     # 用：字段级失败的日志句
     FAIL = "校验失败：{fields}"

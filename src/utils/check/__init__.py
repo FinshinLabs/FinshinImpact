@@ -5,14 +5,13 @@
 """
 
 from ._diagnose import bind_diagnose, diagnose_flow
-from ._verify import ChannelOutcome, local_row, run_probe_round
+from ._verify import local_row, run_probe_round
 from ._version import ReleaseNote, check_latest, release_history
 
 __all__ = [
     # 并行调度核心
     "run_probe_round",
     "local_row",
-    "ChannelOutcome",
     # 诊断编排
     "bind_diagnose",
     "diagnose_flow",

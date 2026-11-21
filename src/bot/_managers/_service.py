@@ -35,7 +35,7 @@ class ServiceManager(BaseManager):
 
     def __init__(
         self,
-        get_config_func: Callable[[], tuple[str, str]],
+        get_config_func: Callable[[], tuple[str, str | None]],
     ) -> None:
         super().__init__()
         self._get_config = get_config_func

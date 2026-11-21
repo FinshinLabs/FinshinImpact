@@ -40,6 +40,7 @@ def _build_field(spec: FieldSpec) -> FieldSchema:
         options=_build_options(spec),
         required=spec.required,
         bounds=spec.bounds,
+        visible_when=spec.visible_when,
     )
 
 

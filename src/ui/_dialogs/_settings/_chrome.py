@@ -25,7 +25,6 @@ from finshin_sdk.domain import ConfigKey, ConfigPath
 from skin.theme import GLOBAL, SETTINGS_DIALOG, ButtonStyle, ObjectName
 from utils.config import AppSchema, FieldErrors
 from utils.config.models import TabSchema
-from utils.network import uses_configured_proxy
 
 from ..._primitives import (
     ButtonBar,
@@ -77,7 +76,6 @@ class ChromeBuilder:
         self._pages = QStackedWidget()
         self.save_btn: QPushButton | None = None
         self.save_text: str = ""
-        self.proxy_row: QWidget | None = None
 
     def build(
         self, schema: AppSchema, is_setup: bool, error_sections: set[str]
@@ -186,41 +184,53 @@ class ChromeBuilder:
             rows[tab_schema.path_of(field)] = row
             main_layout.addWidget(row)
         self._mount_persona_row(tab_schema, main_layout)
-        self._mount_proxy_mode_lock(tab_schema, rows)
+        self._mount_field_visibility(tab_schema, rows)
         main_layout.addStretch()
         scroll = make_scroller(container)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setAutoFillBackground(False)
         return scroll
 
-    def _mount_proxy_mode_lock(
+    def _mount_field_visibility(
         self, tab: TabSchema, rows: dict[ConfigPath, QWidget]
     ) -> None:
-        """代理项随模式显隐
+        """字段按同段其他字段的取值显隐
 
-        - 仅系统代理与仅直连两档用不到代理项，整行隐藏
-        - 标题、输入框与恢复钮同消，值保留在控件里切回即现
-        - 本页缺代理项或模式项即不接线
+        - 条件全部命中才显示整行，值保留在控件里切回即现
+        - 依赖的控件不是下拉即不接线
         """
-        by_key = {field.key: field for field in tab.fields}
-        mode_field = by_key.get(ConfigKey.PROXY_MODE)
-        proxy_field = by_key.get(ConfigKey.PROXY)
-        if mode_field is None or proxy_field is None:
-            return
-        mode_combo = self._fields.inputs.get(tab.path_of(mode_field))
-        proxy_row = rows.get(tab.path_of(proxy_field))
-        if not isinstance(mode_combo, QComboBox) or proxy_row is None:
-            return
-        self.proxy_row = proxy_row
+        controllers = {cond.key for field in tab.fields for cond in field.visible_when}
+        for key in controllers:
+            controller = next((f for f in tab.fields if f.key == key), None)
+            if controller is None:
+                continue
+            combo = self._fields.inputs.get(tab.path_of(controller))
+            if not isinstance(combo, QComboBox):
+                continue
 
-        def sync(mode_value: object) -> None:
-            proxy_row.setVisible(uses_configured_proxy(str(mode_value)))
+            def sync(_index: int = -1) -> None:
+                current = {
+                    field.key: self._fields.value_of(tab.path_of(field), field)
+                    for field in tab.fields
+                }
+                for field in tab.fields:
+                    if not field.visible_when:
+                        continue
+                    row = rows.get(tab.path_of(field))
+                    if row is None:
+                        continue
+                    row.setVisible(
+                        all(
+                            str(current.get(cond.key)) in cond.values
+                            for cond in field.visible_when
+                        )
+                    )
 
-            # 切换即重估全部恢复钮，否则按钮显隐停在开窗时的旧值
-            self._fields.refresh_resets()
+                # 切换即重估全部恢复钮，否则按钮显隐停在开窗时的旧值
+                self._fields.refresh_resets()
 
-        mode_combo.currentIndexChanged.connect(lambda: sync(mode_combo.currentData()))
-        sync(mode_combo.currentData())
+            combo.currentIndexChanged.connect(sync)
+            sync()
 
     def _mount_persona_row(self, tab: TabSchema, layout: QVBoxLayout) -> None:
         """人设入口行挂载

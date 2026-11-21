@@ -11,13 +11,10 @@ from typing import Any
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import QDialog, QWidget
 
-from finshin_sdk.domain import ConfigKey, ConfigPath, ConfigSection, ProxyMode
 from skin.messages import CheckMessage
 from system.profile_env import get_profile, read_token
-from utils import config_manager, get_logger
-from utils.config import section_name
-from utils.network import FrameKey, RowId, RowStatus, fault_row_of, probe_skeleton
-from utils.paths import PLATFORM
+from utils import get_logger
+from utils.network import FrameKey, RowId, RowStatus, probe_skeleton
 
 from ..._bridge import gui_bridge
 from ..._dialogs import Round, current_check_window, open_check_window
@@ -26,9 +23,9 @@ from ._base import BaseController
 _logger = get_logger("GUI.Diagnose")
 _orphans: set["_DiagnoseWorker"] = set()  # 关窗放行的线程暂养于此，finished 后自弃
 
-# 一轮诊断收配置代理、token 与代理模式，逐帧回调，按停止判定中止
+# 一轮诊断收 token，逐帧回调，按停止判定中止
 DiagnoseFlow = Callable[
-    [str, str, str, Callable[[dict], None] | None, Callable[[], bool] | None],
+    [str, Callable[[dict], None] | None, Callable[[], bool] | None],
     Coroutine[Any, Any, None],
 ]
 
@@ -43,16 +40,12 @@ class _DiagnoseWorker(QThread):
 
     def __init__(
         self,
-        configured_proxy: str,
         token: str,
-        mode: str,
         flow: DiagnoseFlow,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._proxy = configured_proxy
         self._token = token
-        self._mode = mode
         self._flow = flow
 
     def run(self) -> None:
@@ -64,9 +57,7 @@ class _DiagnoseWorker(QThread):
         try:
             asyncio.run(
                 self._flow(
-                    self._proxy,
                     self._token,
-                    self._mode,
                     self.row_update.emit,
                     self.isInterruptionRequested,
                 )
@@ -95,9 +86,6 @@ class DiagnoseController(BaseController):
         # 启动校验结论闩锁：未出结论前拒点诊断防误判半新配置
         self._startup_settled: bool = False
 
-        # 代理不通时该标红哪一行，随最近一轮读的档位刷新
-        self._red_key: ConfigPath = fault_row_of(ProxyMode.AUTO)
-
         # 当前在跑的诊断线程集合：finished 前禁止被 GC
         self._workers: set[_DiagnoseWorker] = set()
 
@@ -115,7 +103,7 @@ class DiagnoseController(BaseController):
         """开一轮诊断
 
         - 启动校验未结束或其他轮次进行中时记日志返回
-        - 路线与红点行都按当前代理模式定
+        - 路线与红点由适配器的检查计划定
         """
         if not self._startup_settled:
             self.logger.info(CheckMessage.STARTUP_BUSY)
@@ -126,31 +114,22 @@ class DiagnoseController(BaseController):
             self.logger.info(CheckMessage.BUSY)
             return
 
-        proxy = (
-            config_manager.get_all().get(
-                section_name(f"adapter.{PLATFORM}", ConfigSection.PROXY)
-            )
-            or {}
-        )
-        configured = str(proxy.get(ConfigKey.PROXY) or "")
-        mode = str(proxy.get(ConfigKey.PROXY_MODE, ProxyMode.AUTO)).strip()
         token = read_token(get_profile())
 
-        # 窗出现即证据，面板不重复灌，开局整表由公共核心算好随线程首帧发出
+        # 窗出现即证据，面板不重复灌，开局整表由检查计划随线程首帧发出
         self.logger.debug("打开网络诊断")
-        self._red_key = fault_row_of(mode)
         win = open_check_window(self.gui)
         win.begin_round(Round.DIAGNOSE, True, probe_skeleton(), self._on_round_closed)
-        self._run(configured, token, mode, win)
+        self._run(token, win)
 
-    def _run(self, configured: str, token: str, mode: str, win: QWidget) -> None:
+    def _run(self, token: str, win: QWidget) -> None:
         """启动诊断线程
 
         - 后台跑一轮诊断，帧转发进窗口
         """
         if any(w.isRunning() for w in self._workers):
             return
-        worker = _DiagnoseWorker(configured, token, mode, self._flow, parent=win)
+        worker = _DiagnoseWorker(token, self._flow, parent=win)
         worker.row_update.connect(lambda f: self._on_frame(f))
         worker.finished.connect(lambda w=worker: self._workers.discard(w))
         self._workers.add(worker)
@@ -166,12 +145,14 @@ class DiagnoseController(BaseController):
         if win is None or win.round != Round.DIAGNOSE:
             return
         win.apply(frame)
+        broken = frame.get(FrameKey.BROKEN)
         if (
             frame.get("id") == RowId.ADVICE
             and frame.get("status") != RowStatus.CHECKING
-            and frame.get(FrameKey.BROKEN)
+            and isinstance(broken, dict)
+            and broken
         ):
-            gui_bridge.request_force_setup.emit({self._red_key: frame["detail"]})
+            gui_bridge.request_force_setup.emit(broken)
 
     def _on_round_closed(self, result: int) -> None:
         """窗口关闭回调

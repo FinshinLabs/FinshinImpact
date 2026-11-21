@@ -14,22 +14,11 @@ _SYMBOL_MODULES = {
     "LinkStatus": "._link",
     "link_report": "._link",
     "detect_system_proxy": "._proxy",
-    "PROXY_ITEM": "._probe",
-    "NETWORK_ROWS": "._probe",
-    "Channel": "._probe",
     "FrameKey": "._probe",
     "RowId": "._probe",
     "RowStatus": "._probe",
-    "plan_channels": "._probe",
-    "probe_budget": "._probe",
+    "opening_rows": "._probe",
     "probe_skeleton": "._probe",
-    "single_row_of": "._probe",
-    "sys_deduped": "._probe",
-    "uses_configured_proxy": "._probe",
-    "uses_system_proxy": "._probe",
-    "fault_row_of": "._probe",
-    "via_label": "._probe",
-    "verify_plan": "._probe",
     "verify_skeleton": "._probe",
 }
 
@@ -43,23 +32,12 @@ __all__ = [
     # 系统代理
     "detect_system_proxy",
     # 通道与协议键
-    "PROXY_ITEM",
-    "NETWORK_ROWS",
-    "Channel",
     "FrameKey",
     "RowId",
     "RowStatus",
-    # 探测规划
-    "plan_channels",
-    "probe_budget",
+    # 整表铺送
+    "opening_rows",
     "probe_skeleton",
-    "single_row_of",
-    "sys_deduped",
-    "uses_configured_proxy",
-    "uses_system_proxy",
-    "fault_row_of",
-    "via_label",
-    "verify_plan",
     "verify_skeleton",
 ]
 
@@ -68,23 +46,12 @@ if TYPE_CHECKING:
     from ._github import GitClient
     from ._link import LinkStatus, link_report
     from ._probe import (
-        NETWORK_ROWS,
-        PROXY_ITEM,
-        Channel,
         FrameKey,
         RowId,
         RowStatus,
-        fault_row_of,
-        plan_channels,
-        probe_budget,
+        opening_rows,
         probe_skeleton,
-        single_row_of,
-        sys_deduped,
-        uses_configured_proxy,
-        uses_system_proxy,
-        verify_plan,
         verify_skeleton,
-        via_label,
     )
     from ._proxy import detect_system_proxy
 
