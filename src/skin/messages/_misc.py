@@ -33,10 +33,7 @@ class MiscMessage:
     BTN_SHUTDOWN = "关闭机器人"
 
     # 用：bootstrap 单实例冲突弹窗
-    ALREADY_RUNNING = (
-        "机器人已在运行，请勿重复启动\n"
-        f"请先关闭已开的窗口，或使用「{ENTRY_DIAGNOSE}」查看状态"
-    )
+    ALREADY_RUNNING = "机器人已在运行，请勿重复启动"
 
     # 用：ui/_dialogs 人设对账判不出未改动时的一键覆盖弹窗正文
     PERSONA_OUTDATED = (
