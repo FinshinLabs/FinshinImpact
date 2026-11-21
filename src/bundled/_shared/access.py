@@ -10,7 +10,7 @@ from typing import ParamSpec, cast
 
 from bot.error_guard import error_guard
 from finshin_sdk import HandlerContext
-from finshin_sdk.domain import CommandRole, ConfigKey, ConfigSection, PluginMark
+from finshin_sdk.domain import CommandRole, ConfigKey, PluginMark
 from finshin_sdk.dto import PrincipalDTO
 from utils import config_manager, get_logger
 
@@ -29,9 +29,7 @@ def _owner_id() -> str:
 
     - 主人配置值去空白后交出
     """
-    return config_manager.get(
-        ConfigKey.OWNER.path("plugin.AI", ConfigSection.CHORE), str
-    ).strip()
+    return config_manager.get(ConfigKey.OWNER.path("plugin.AI", "chore"), str).strip()
 
 
 async def role_of(principal: PrincipalDTO) -> CommandRole:

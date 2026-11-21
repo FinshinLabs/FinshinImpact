@@ -1,13 +1,14 @@
 """配置管理器
 
 - 配置加载与连通性双重校验
+- 保存轮加跑插件自己交的探测计划
 - 字段级错误文案供向导标红
 """
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
-from finshin_sdk import ConnectionPlan
+from finshin_sdk import ConnectionPlan, PlanVerdict
 from finshin_sdk.domain import ConfigPath
 from skin.messages import CheckMessage
 from ui import gui_bridge
@@ -27,13 +28,13 @@ from utils.network import (
     RowStatus,
     detect_system_proxy,
     link_report,
-    opening_rows,
 )
 from utils.paths import PLATFORM
 
 from .._adapter_host import parts_for
 from ._base import BaseManager
-from ._config_sources import config_sources
+from ._config_sources import config_sources, enabled_plugin_declarations
+from ._probe_frame import pending_rows, settled_rows, skipped_plan
 
 
 def _label_of(schema: AppSchema, item: ConfigPath | str) -> str:
@@ -71,17 +72,21 @@ class SettingsManager(BaseManager):
         # 上次验证时的计划输入，变化判定基准
         self._net_key: object = None
 
+        # 插件探测的免测基准：上次复用键与上轮是否通过
+        self._plugin_keys: dict[str, object] = {}
+        self._plugin_ok: set[str] = set()
+
     async def _execute(self) -> None:
         """加载配置进内存"""
         ensure_config(config_sources())
         config_manager.load(load_config())
 
-    async def verify_connectivity(self) -> bool:
+    async def verify_connectivity(self, from_candidate: bool = False) -> bool:
         """按字段变化分流的连通校验
 
         - 网络参数全未变、上轮连通通过且引擎不在断连周期时只跑本地校验
-        - 通过则记录生效通道与连通结论
-        - 计划与文案由适配器给，本体只跑通用调度
+        - 保存轮再跑插件交的探测，启动轮一律不跑
+        - 先跑平台那轮再跑插件那轮，行并进同一张表
         """
         t0 = time.monotonic()
         schema = get_schema()
@@ -90,34 +95,152 @@ class SettingsManager(BaseManager):
             f"adapter.{PLATFORM}", parts.sections, config_manager.get_all()
         )
         plan = parts.plan_for(values, self._get_token(), detect_system_proxy())
+        local_frame, type_errors = local_row(schema, config_manager.get_all())
+        rounds = self._plugin_rounds(type_errors) if from_candidate else ()
+        runnable = tuple((name, item) for name, item in rounds if item.channels)
 
         # 免测只认连通结论：计划输入一变旧结论就不作数，引擎正断线时更得重探
         down = link_report.snapshot().down
-        if plan.reuse_key == self._net_key and self.link_verified and not down:
+        free = plan.reuse_key == self._net_key and self.link_verified and not down
+        if free and not runnable:
             return self._local_round(schema)
-        self._net_key = plan.reuse_key
+        if not free:
+            self._net_key = plan.reuse_key
+            self.link_verified = False
 
-        # 起联网重探前先清旧结论：探测中途异常不该留下过时的连通账
-        self.link_verified = False
-        type_errors = self._emit_opening(plan, schema)
-        outcome = await run_probe_round(
-            plan.channels,
-            gui_bridge.verify_progress.emit,
-            lambda: self._emit_opening(plan, schema, head=CheckMessage.RETRY_HEAD),
+        plans: list[ConnectionPlan] = [item for _, item in rounds]
+        if not free:
+            plans.insert(0, plan)
+        self._emit_frame(plans, local_frame)
+
+        verdict = PlanVerdict()
+        settled: dict[str, tuple[str, str]] = {}
+        if not free:
+            outcome = await run_probe_round(
+                plan.channels,
+                gui_bridge.verify_progress.emit,
+                lambda: self._emit_frame(
+                    plans, local_frame, head=CheckMessage.RETRY_HEAD
+                ),
+            )
+            verdict = plan.finish(outcome)
+            resolved = outcome.accepted.effective if outcome.accepted else None
+            self.resolved_proxy = resolved
+            self.link_verified = resolved is not None
+            settled = settled_rows(plan, outcome)
+            self._log_verdict(verdict)
+
+        plugin_errors = await self._run_plugin_rounds(
+            runnable, plans, local_frame, settled
         )
-        verdict = plan.finish(outcome)
-        resolved = outcome.accepted.effective if outcome.accepted else None
-        self.resolved_proxy = resolved
+        self.last_errors = {**verdict.field_errors, **plugin_errors, **type_errors}
+        self.logger.info(CheckMessage.ROUND_COST.format(cost=time.monotonic() - t0))
+        return self._emit_advice(schema)
+
+    async def _run_plugin_rounds(
+        self,
+        runnable: Sequence[tuple[str, ConnectionPlan]],
+        plans: list[ConnectionPlan],
+        local_frame: dict,
+        settled: dict[str, tuple[str, str]],
+    ) -> FieldErrors:
+        """逐个跑插件交的探测并记下结论"""
+        plugin_errors: FieldErrors = {}
+        for name, item in runnable:
+            outcome = await run_probe_round(
+                item.channels,
+                gui_bridge.verify_progress.emit,
+                lambda: self._emit_frame(
+                    plans,
+                    local_frame,
+                    head=CheckMessage.RETRY_HEAD,
+                    settled={**settled},
+                ),
+            )
+            plugin_verdict = item.finish(outcome)
+            plugin_errors.update(plugin_verdict.field_errors)
+            self._log_verdict(plugin_verdict)
+            self._plugin_keys[name] = item.reuse_key
+            if outcome.accepted is not None:
+                self._plugin_ok.add(name)
+            else:
+                self._plugin_ok.discard(name)
+            settled.update(settled_rows(item, outcome))
+        return plugin_errors
+
+    def _plugin_rounds(
+        self, type_errors: FieldErrors
+    ) -> tuple[tuple[str, ConnectionPlan], ...]:
+        """按保存轮候选值装配插件探测计划
+
+        - 本地已有类型错、不交计划或计划为空的来源都不探测
+        - 值没变且上轮通过的直接给绿灯行，不再发请求
+        """
+        rounds: list[tuple[str, ConnectionPlan]] = []
+        for name, declared in enabled_plugin_declarations():
+            if declared.probe is None:
+                continue
+            source = f"plugin.{name}"
+            if any(
+                isinstance(item, ConfigPath) and item.source == source
+                for item in type_errors
+            ):
+                continue
+            try:
+                plan = declared.probe()
+            except Exception as e:
+                self.logger.send_error(f"插件 {name} 探测计划造不出来", e)
+                continue
+            if plan is None:
+                continue
+            if (
+                plan.reuse_key == self._plugin_keys.get(name)
+                and name in self._plugin_ok
+            ):
+                plan = skipped_plan(plan)
+            rounds.append((name, plan))
+        return tuple(rounds)
+
+    def _emit_frame(
+        self,
+        plans: Sequence[ConnectionPlan],
+        local_frame: dict,
+        *,
+        head: str = "",
+        settled: dict[str, tuple[str, str]] | None = None,
+    ) -> None:
+        """发送首帧进度整表
+
+        - 本地校验结果随首帧先行显示，不等网络探测
+        - settled 里的行按已有终态上屏，供后续探针重发整表清场
+        """
+        rows: list[dict] = []
+        for plan in plans:
+            rows.extend(pending_rows(plan))
+        for item in rows:
+            if settled and item["id"] in settled:
+                item["status"], item["detail"] = settled[item["id"]]
+        rows.append(local_frame)
+        rows.append(
+            {
+                "id": RowId.ADVICE,
+                "title": CheckMessage.ROW_ADVICE,
+                "status": RowStatus.PENDING,
+                "detail": "",
+            }
+        )
+        frame: dict = {FrameKey.ROWS: rows}
+        if head:
+            frame[FrameKey.HEAD] = head
+            self.logger.debug(head)
+        gui_bridge.verify_progress.emit(frame)
+
+    def _log_verdict(self, verdict: PlanVerdict) -> None:
+        """把裁决里的日志句写进日志"""
         if verdict.notice:
             self.logger.info(verdict.notice)
         if verdict.warning:
             self.logger.error(verdict.warning)
-
-        # 连通判据独立记：探到可用通道才算通，本地类型错不参与
-        self.link_verified = resolved is not None
-        self.last_errors = {**verdict.field_errors, **type_errors}
-        self.logger.info(CheckMessage.ROUND_COST.format(cost=time.monotonic() - t0))
-        return self._emit_advice(schema)
 
     def _local_round(self, schema: AppSchema) -> bool:
         """只跑本地校验的免测轮
@@ -129,23 +252,6 @@ class SettingsManager(BaseManager):
         self.last_errors = type_errors
         self.logger.info(CheckMessage.LOCAL_ONLY)
         return self._emit_advice(schema)
-
-    def _emit_opening(
-        self, plan: ConnectionPlan, schema: AppSchema, *, head: str = ""
-    ) -> FieldErrors:
-        """发送首帧进度整表
-
-        - 本地校验结果随首帧先行显示，不等网络探测
-        - head 非空即重发整表清场，已定案的红行不吃单行帧
-        - 返回本地类型错误供后续结论合并
-        """
-        local_frame, type_errors = local_row(schema, config_manager.get_all())
-        frame: dict = {FrameKey.ROWS: opening_rows(plan, local_frame)}
-        if head:
-            frame[FrameKey.HEAD] = head
-            self.logger.debug(head)
-        gui_bridge.verify_progress.emit(frame)
-        return type_errors
 
     def _emit_advice(self, schema: AppSchema) -> bool:
         """发送结论帧

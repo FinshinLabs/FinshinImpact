@@ -25,9 +25,7 @@ from config_plan import adapter_sections, fake_adapter_parts  # noqa: E402
 from bot._managers._config_sources import config_sources  # noqa: E402
 from bundled.AI.config import CONFIG_SOURCE  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
-    ConfigKey,
     ConfigPath,
-    ConfigSection,
     FieldSpec,
     SectionSpec,
 )
@@ -248,20 +246,20 @@ class TestSourceAssembly(unittest.TestCase):
     def test_duplicate_key_in_one_section_is_refused_and_named(self) -> None:
         """同一来源同一段里键重复时只留先出现的一项，日志点名来源、段与键"""
         section = SectionSpec(
-            section=ConfigSection.MODEL,
+            section="model",
             title="模型",
             fields=(
                 FieldSpec(
-                    section=ConfigSection.MODEL,
-                    key=ConfigKey.API_KEY,
+                    section="model",
+                    key="api_key",
                     value_type=str,
                     default="sk-先",
                     label="API Key",
                     desc="",
                 ),
                 FieldSpec(
-                    section=ConfigSection.MODEL,
-                    key=ConfigKey.API_KEY,
+                    section="model",
+                    key="api_key",
                     value_type=str,
                     default="sk-后",
                     label="API Key",

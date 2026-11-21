@@ -6,7 +6,15 @@
 
 from skin.messages import ConfigMessage
 
-from .models import AppConfigData, AppSchema, FieldErrors, is_blank
+from .models import (
+    AppConfigData,
+    AppSchema,
+    FieldErrors,
+    FieldSchema,
+    TabData,
+    TabSchema,
+    is_blank,
+)
 
 # 值类型 → 校验规则说明
 _TYPE_NAMES = {
@@ -19,7 +27,8 @@ _TYPE_NAMES = {
 def validate_types(schema: AppSchema, data: AppConfigData) -> FieldErrors:
     """按 schema 校验各字段类型与数值区间
 
-    - 必填键缺键或留空报必填文案
+    - 显隐条件不命中的字段不校验
+    - 必填键缺键且默认值为空才报必填文案
     - 非必填键缺失静默放行，由运行期回退默认值
     """
     errors: FieldErrors = {}
@@ -27,8 +36,10 @@ def validate_types(schema: AppSchema, data: AppConfigData) -> FieldErrors:
     for tab in schema:
         section_data = data.get(tab.section, {})
         for fld in tab.fields:
+            if not _visible(tab, fld, section_data):
+                continue
             if fld.key not in section_data:
-                if fld.required:
+                if fld.required and is_blank(fld.default):
                     errors[tab.path_of(fld)] = ConfigMessage.REQUIRED_MARK
                 continue
 
@@ -57,6 +68,21 @@ def validate_types(schema: AppSchema, data: AppConfigData) -> FieldErrors:
                     errors[tab.path_of(fld)] = f"取值应在 {lo:g}~{hi:g}，当前 {value!r}"
 
     return errors
+
+
+def _visible(tab: TabSchema, fld: FieldSchema, section_data: TabData) -> bool:
+    """字段的显隐条件是否命中
+
+    - 条件键缺值即用该键的默认值判定
+    """
+    if not fld.visible_when:
+        return True
+    defaults = {item.key: item.default for item in tab.fields}
+    for cond in fld.visible_when:
+        value = section_data.get(cond.key, defaults.get(cond.key))
+        if value is None or str(value) not in cond.values:
+            return False
+    return True
 
 
 def _match(value: object, expected: type) -> bool:

@@ -126,7 +126,7 @@ class FieldBuilder:
     ) -> tuple[ConfigValue, ConfigValue, bool]:
         """取上屏值与恢复目标
 
-        - 必填项空态上屏且不挂恢复按钮
+        - 必填项缺键且默认值非空时按默认值上屏，留空才空态
         - 非必填项恢复目标是默认值
         """
         # 禁默认值假值冒充用户配置，用户不改即用默认值
@@ -143,6 +143,8 @@ class FieldBuilder:
             )
             return current_value, restore_target, False
 
+        if not present and not is_blank(field.default):
+            return field.default, None, True
         if not present or is_blank(current_value):
             current_value = _BLANK_BY_TYPE.get(type(field.default), "")
         return current_value, None, True

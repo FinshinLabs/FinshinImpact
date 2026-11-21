@@ -6,7 +6,7 @@
 from typing import TYPE_CHECKING
 
 from finshin_sdk import PlatformMoment
-from finshin_sdk.domain import ConfigKey, ConfigSection, FieldKey
+from finshin_sdk.domain import ConfigKey, FieldKey
 from skin.messages import CheckMessage, DialogMessage
 from system.profile_env import get_profile, read_token
 from ui import gui_bridge
@@ -59,7 +59,7 @@ class ConfigApplier:
         self.skip_reload = False
         if not from_candidate:
             await host._settings_manager.execute()
-        if not await host._settings_manager.verify_connectivity():
+        if not await host._settings_manager.verify_connectivity(from_candidate):
             await self._settle_failure(from_candidate)
             return
 
@@ -137,9 +137,7 @@ class ConfigApplier:
 
         - 由主人 id 与生效正文两项构成
         """
-        owner = config_manager.get(
-            ConfigKey.OWNER.path("plugin.AI", ConfigSection.CHORE), str
-        )
+        owner = config_manager.get(ConfigKey.OWNER.path("plugin.AI", "chore"), str)
         return (owner.strip(), applied_persona_text())
 
     async def commit_persona(self, text: str, source: str) -> None:

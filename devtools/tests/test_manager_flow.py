@@ -97,7 +97,7 @@ class ManagerFlowTestBase(unittest.IsolatedAsyncioTestCase):
         self.verify_calls = 0
         self.service_starts = {"n": 0}
 
-        async def _fake_verify() -> bool:
+        async def _fake_verify(from_candidate: bool = False) -> bool:
             self.verify_calls += 1
             ok = self.verify_results.pop(0) if self.verify_results else True
             if not ok:
@@ -274,7 +274,7 @@ class TestApplyConfig(ManagerFlowTestBase):
         """
         gate = asyncio.Event()
 
-        async def _slow_verify() -> bool:
+        async def _slow_verify(from_candidate: bool = False) -> bool:
             await gate.wait()
             return True
 
@@ -310,7 +310,7 @@ class TestProxyFaultVoidsLinkCycle(ManagerFlowTestBase):
         def _reset(reason: str) -> None:
             reasons.append(reason)
 
-        async def _fail_verify() -> bool:
+        async def _fail_verify(from_candidate: bool = False) -> bool:
             sm.last_errors = {PROXY_ITEM: "代理不通"}
             sm.link_verified = link_verified
             return False
@@ -416,7 +416,7 @@ class TestTokenFatal(ManagerFlowTestBase):
         try:
             sm = self.manager._settings_manager
 
-            async def _token_fail() -> bool:
+            async def _token_fail(from_candidate: bool = False) -> bool:
                 sm.last_errors = {FieldKey.TOKEN: "Token 无效"}
                 return False
 
@@ -439,7 +439,7 @@ class TestTokenFatal(ManagerFlowTestBase):
         try:
             sm = self.manager._settings_manager
 
-            async def _proxy_fail() -> bool:
+            async def _proxy_fail(from_candidate: bool = False) -> bool:
                 sm.last_errors = {
                     PROXY_ITEM: "代理不通",
                     FieldKey.TOKEN: "暂未检测",

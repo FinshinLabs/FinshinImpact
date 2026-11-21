@@ -19,9 +19,8 @@ from system.profile_env import set_profile  # noqa: E402
 set_profile("tg.000000")
 
 from finshin_sdk.domain import (  # noqa: E402
-    ConfigKey,
     ConfigPath,
-    ConfigSection,
+    FieldCondition,
     FieldSpec,
     Platform,
     SectionSpec,
@@ -37,16 +36,25 @@ from utils.config.models import (  # noqa: E402
 )
 from utils.network import RowId, RowStatus  # noqa: E402
 
+_MODEL = "model"
+_CHORE = "chore"
+_TEMPERATURE = "temperature"
+_API_KEY = "api_key"
+_TRIGGERS = "triggers"
+_OWNER = "owner"
+_CONTEXT_K = "context_k"
+_CONTEXT_CUSTOM_K = "context_custom_k"
+
 
 def _declared_section() -> SectionSpec:
     """构造只含一只文本字段的段声明，供改写字段文案的用例取底"""
     return SectionSpec(
-        section=ConfigSection.CHORE,
+        section=_CHORE,
         title="段标题",
         fields=(
             FieldSpec(
-                section=ConfigSection.CHORE,
-                key=ConfigKey.OWNER,
+                section=_CHORE,
+                key=_OWNER,
                 value_type=str,
                 default="",
                 label="",
@@ -61,9 +69,9 @@ _MODEL_SECTION = "plugin.AI.model"
 _CHORE_SECTION = "plugin.AI.chore"
 
 
-def _item(key: ConfigKey, section: ConfigSection = ConfigSection.MODEL) -> ConfigPath:
+def _item(key: str, section: str = _MODEL) -> ConfigPath:
     """本组用例的配置项身份"""
-    return key.path(_GROUP, section)
+    return ConfigPath(source=_GROUP, section=section, key=key)
 
 
 def _schema() -> list[TabSchema]:
@@ -74,11 +82,11 @@ def _schema() -> list[TabSchema]:
             section=_MODEL_SECTION,
             group=_GROUP,
             group_title="AI 设置",
-            section_id=ConfigSection.MODEL,
+            section_id=_MODEL,
             fields=[
-                FieldSchema(ConfigKey.TEMPERATURE, "温度", "", 0.7, float),
-                FieldSchema(ConfigKey.API_KEY, "模型", "", "gpt", str),
-                FieldSchema(ConfigKey.TRIGGERS, "标签", "", ["a"], list),
+                FieldSchema(_TEMPERATURE, "温度", "", 0.7, float),
+                FieldSchema(_API_KEY, "模型", "", "gpt", str),
+                FieldSchema(_TRIGGERS, "标签", "", ["a"], list),
             ],
         )
     ]
@@ -96,7 +104,7 @@ class TestValidateTypes(unittest.TestCase):
             _MODEL_SECTION: {"temperature": "abc", "api_key": "gpt", "triggers": ["a"]}
         }
         errors = validate_types(_schema(), data)
-        self.assertIn(_item(ConfigKey.TEMPERATURE), errors)
+        self.assertIn(_item(_TEMPERATURE), errors)
 
     def test_int_accepted_for_float_field(self) -> None:
         """整数可赋给浮点字段"""
@@ -109,14 +117,14 @@ class TestValidateTypes(unittest.TestCase):
         data = {
             _MODEL_SECTION: {"temperature": True, "api_key": "gpt", "triggers": ["a"]}
         }
-        self.assertIn(_item(ConfigKey.TEMPERATURE), validate_types(_schema(), data))
+        self.assertIn(_item(_TEMPERATURE), validate_types(_schema(), data))
 
     def test_list_requires_str_items(self) -> None:
         """列表字段元素必须为字符串"""
         data = {
             _MODEL_SECTION: {"temperature": 0.5, "api_key": "gpt", "triggers": [1, 2]}
         }
-        self.assertIn(_item(ConfigKey.TRIGGERS), validate_types(_schema(), data))
+        self.assertIn(_item(_TRIGGERS), validate_types(_schema(), data))
 
     def test_all_valid_empty(self) -> None:
         """全部合法返回空 dict"""
@@ -148,13 +156,11 @@ class TestRequiredValidation(unittest.TestCase):
                 section=_MODEL_SECTION,
                 group=_GROUP,
                 group_title="AI 设置",
-                section_id=ConfigSection.MODEL,
+                section_id=_MODEL,
                 fields=[
-                    FieldSchema(
-                        ConfigKey.API_KEY, "密钥", "", "sk", str, required=True
-                    ),
-                    FieldSchema(ConfigKey.TEMPERATURE, "温度", "", 0.7, float),
-                    FieldSchema(ConfigKey.TRIGGERS, "标签", "", ["a"], list),
+                    FieldSchema(_API_KEY, "密钥", "", "", str, required=True),
+                    FieldSchema(_TEMPERATURE, "温度", "", 0.7, float),
+                    FieldSchema(_TRIGGERS, "标签", "", ["a"], list),
                 ],
             ),
             TabSchema(
@@ -162,11 +168,9 @@ class TestRequiredValidation(unittest.TestCase):
                 section=_CHORE_SECTION,
                 group=_GROUP,
                 group_title="AI 设置",
-                section_id=ConfigSection.CHORE,
+                section_id=_CHORE,
                 fields=[
-                    FieldSchema(
-                        ConfigKey.TRIGGERS, "触发词", "", ["a"], list, required=True
-                    )
+                    FieldSchema(_TRIGGERS, "触发词", "", ["a"], list, required=True)
                 ],
             ),
         ]
@@ -175,8 +179,8 @@ class TestRequiredValidation(unittest.TestCase):
         """必填键缺失报必填文案"""
         data = {_MODEL_SECTION: {"temperature": 0.5, "triggers": ["a"]}}
         errors = validate_types(self._schema(), data)
-        self.assertIn(_item(ConfigKey.API_KEY), errors)
-        self.assertEqual(errors[_item(ConfigKey.API_KEY)], ConfigMessage.REQUIRED_MARK)
+        self.assertIn(_item(_API_KEY), errors)
+        self.assertEqual(errors[_item(_API_KEY)], ConfigMessage.REQUIRED_MARK)
 
     def test_blank_required_value_flagged(self) -> None:
         """必填键空白字符串与空列表都算未填写"""
@@ -185,9 +189,9 @@ class TestRequiredValidation(unittest.TestCase):
             _CHORE_SECTION: {"triggers": []},
         }
         errors = validate_types(self._schema(), data)
-        self.assertEqual(errors[_item(ConfigKey.API_KEY)], ConfigMessage.REQUIRED_MARK)
+        self.assertEqual(errors[_item(_API_KEY)], ConfigMessage.REQUIRED_MARK)
         self.assertEqual(
-            errors[_item(ConfigKey.TRIGGERS, ConfigSection.CHORE)],
+            errors[_item(_TRIGGERS, _CHORE)],
             ConfigMessage.REQUIRED_MARK,
         )
 
@@ -204,7 +208,60 @@ class TestRequiredValidation(unittest.TestCase):
         """
         data = {_MODEL_SECTION: {"api_key": 123, "temperature": 0.5, "triggers": ["a"]}}
         errors = validate_types(self._schema(), data)
-        self.assertIn("类型应为 str", errors[_item(ConfigKey.API_KEY)])
+        self.assertIn("类型应为 str", errors[_item(_API_KEY)])
+
+    def test_missing_required_nonblank_default_passes(self) -> None:
+        """必填键缺键但默认值非空即按默认值放行
+
+        - 老实例升级后缺新键不报红
+        """
+        schema = [
+            TabSchema(
+                title="AI",
+                section=_MODEL_SECTION,
+                group=_GROUP,
+                group_title="AI 设置",
+                section_id=_MODEL,
+                fields=[
+                    FieldSchema(_MODEL, "模型", "", "qwen3.7-flash", str, required=True)
+                ],
+            )
+        ]
+        errors = validate_types(schema, {_MODEL_SECTION: {}})
+        self.assertEqual(errors, {})
+
+    def test_hidden_field_not_validated(self) -> None:
+        """显隐条件不命中的字段不校验"""
+        schema = [
+            TabSchema(
+                title="AI",
+                section=_MODEL_SECTION,
+                group=_GROUP,
+                group_title="AI 设置",
+                section_id=_MODEL,
+                fields=[
+                    FieldSchema(
+                        _CONTEXT_K,
+                        "上下文上限",
+                        "",
+                        "16",
+                        str,
+                        options=(("16", "16K"), ("custom", "自定义")),
+                    ),
+                    FieldSchema(
+                        _CONTEXT_CUSTOM_K,
+                        "自定义上限（K）",
+                        "",
+                        16.0,
+                        float,
+                        required=True,
+                        visible_when=(FieldCondition(_CONTEXT_K, ("custom",)),),
+                    ),
+                ],
+            )
+        ]
+        data = {_MODEL_SECTION: {_CONTEXT_K: "16", _CONTEXT_CUSTOM_K: "abc"}}
+        self.assertEqual(validate_types(schema, data), {})
 
 
 class TestConfigManagerFallback(unittest.TestCase):
@@ -228,7 +285,7 @@ class TestConfigManagerFallback(unittest.TestCase):
 
         manager = self._manager()
         manager.load({_MODEL_SECTION: {"temperature": 0.5}})
-        self.assertEqual(manager.get(_item(ConfigKey.API_KEY), str), "gpt")
+        self.assertEqual(manager.get(_item(_API_KEY), str), "gpt")
 
     def test_missing_section_falls_back(self) -> None:
         """整段缺失
@@ -238,7 +295,7 @@ class TestConfigManagerFallback(unittest.TestCase):
 
         manager = self._manager()
         manager.load({})
-        self.assertEqual(manager.get(_item(ConfigKey.TRIGGERS), list), ["a"])
+        self.assertEqual(manager.get(_item(_TRIGGERS), list), ["a"])
 
     def test_required_missing_still_raises(self) -> None:
         """schema 里没有的项照抛缺键"""
@@ -247,7 +304,7 @@ class TestConfigManagerFallback(unittest.TestCase):
         manager = self._manager()
         manager.load({_MODEL_SECTION: {"api_key": "", "temperature": 0.5}})
         with self.assertRaises(ConfigPathMissingError):
-            manager.get(_item(ConfigKey.OWNER, ConfigSection.CHORE), str)
+            manager.get(_item(_OWNER, _CHORE), str)
 
     def test_schema_default_isolated(self) -> None:
         """回退值与 schema 默认对象隔离
@@ -257,9 +314,9 @@ class TestConfigManagerFallback(unittest.TestCase):
 
         manager = self._manager()
         manager.load({})
-        first = cast("list[str]", manager._schema_default(_item(ConfigKey.TRIGGERS)))
+        first = cast("list[str]", manager._schema_default(_item(_TRIGGERS)))
         first.append("mutated")
-        self.assertEqual(manager._schema_default(_item(ConfigKey.TRIGGERS)), ["a"])
+        self.assertEqual(manager._schema_default(_item(_TRIGGERS)), ["a"])
 
     def test_get_all_isolated(self) -> None:
         """整表读出与内存配置隔离
@@ -271,7 +328,7 @@ class TestConfigManagerFallback(unittest.TestCase):
         manager.load({_MODEL_SECTION: {"temperature": 0.5}})
         snapshot = manager.get_all()
         snapshot[_MODEL_SECTION]["temperature"] = 9.9
-        self.assertEqual(manager.get(_item(ConfigKey.TEMPERATURE), float), 0.5)
+        self.assertEqual(manager.get(_item(_TEMPERATURE), float), 0.5)
 
 
 class TestLocalRow(unittest.TestCase):
@@ -342,7 +399,9 @@ class TestRequiredKeysReconcile(unittest.TestCase):
         self.assertEqual(
             paths,
             {
+                "plugin.AI.model.base_url",
                 "plugin.AI.model.api_key",
+                "plugin.AI.model.model",
                 "plugin.AI.chore.owner",
                 "plugin.AI.chore.triggers",
             },

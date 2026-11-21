@@ -84,6 +84,35 @@ class BaseClient:
                         yield chunk
 
     @classmethod
+    async def post_json(
+        cls,
+        base_url: str = "",
+        request_path: str = "",
+        headers: dict[str, Any] | None = None,
+        payload: Any = None,
+        timeout: float = _DEFAULT_TIMEOUT,
+        connect_timeout: float = _CONNECT_TIMEOUT,
+    ) -> Any:
+        """非流式 POST 请求
+
+        - 网络与状态码异常各自转成本体异常上抛
+        """
+        async with cls._create_client(
+            base_url=base_url,
+            headers=headers,
+            timeout=timeout,
+            connect_timeout=connect_timeout,
+        ) as client:
+            try:
+                response = await client.post(request_path, json=payload)
+            except httpx.TimeoutException as e:
+                raise RequestTimeoutError() from e
+            except httpx.ConnectError as e:
+                raise ConnectionFailedError() from e
+            cls._deal_with_exception(response, "POST")
+            return response.json()
+
+    @classmethod
     async def get_content(
         cls,
         method: Literal["json", "text", "bytes"],

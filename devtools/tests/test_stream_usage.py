@@ -9,6 +9,7 @@
 import asyncio
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -24,6 +25,7 @@ set_profile("tg.000000")
 from bundled.AI.core import _client  # noqa: E402
 from bundled.AI.core._client import AIClient, StreamUsage  # noqa: E402
 from bundled.AI.services import worker  # noqa: E402
+from exceptions import HTTPStatusError  # noqa: E402
 from finshin_sdk.domain.ids import SessionKey  # noqa: E402
 
 _TURN = [{"role": "user", "content": "说一句"}]
@@ -55,7 +57,6 @@ def _config() -> SimpleNamespace:
     return SimpleNamespace(
         model_name="模型",
         temperature=0.5,
-        think_mode=(),
         base_url="https://example.test/v1",
         request_path="/chat/completions",
         api_key="密钥串",
@@ -123,6 +124,62 @@ class TestStreamUsage(unittest.TestCase):
                 self.assertEqual(final_msg, "回话")
                 self.assertFalse(has_error)
                 self.assertEqual(logged, expected)
+
+
+class TestReasoningRetry(unittest.IsolatedAsyncioTestCase):
+    """推理强度开关被拒后的重试"""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self._cache = Path(self._tmp.name) / "ai_no_reasoning.json"
+        self._cache_patch = patch.object(_client, "_CACHE_FILE", self._cache)
+        self._cache_patch.start()
+        _client._rejected_pairs = None
+
+    def tearDown(self) -> None:
+        self._cache_patch.stop()
+        _client._rejected_pairs = None
+        self._tmp.cleanup()
+
+    async def _run_once(self, *errors: Exception) -> list[dict[str, Any]]:
+        """跑一次非流式请求，按序抛给定的异常，交出每次请求体"""
+        calls: list[dict[str, Any]] = []
+
+        async def _fake(**kwargs: Any) -> dict[str, Any]:
+            calls.append(dict(kwargs["payload"]))
+            if len(calls) <= len(errors):
+                raise errors[len(calls) - 1]
+            return {}
+
+        with (
+            patch.object(_client, "ai_config", _config()),
+            patch.object(_client.BaseClient, "post_json", _fake),
+        ):
+            await AIClient.chat_once(_TURN, 1)
+        return calls
+
+    async def test_drops_field_and_remembers_after_success(self) -> None:
+        """422 后去字段重试成功即记住这组接口与模型"""
+        calls = await self._run_once(HTTPStatusError(422, "bad field"))
+
+        self.assertIn("reasoning_effort", calls[0])
+        self.assertNotIn("reasoning_effort", calls[1])
+        self.assertEqual(
+            _client._load_rejected(), {("https://example.test/v1", "模型")}
+        )
+
+        again = await self._run_once()
+        self.assertNotIn("reasoning_effort", again[0])
+
+    async def test_model_error_does_not_remember(self) -> None:
+        """400 与推理强度无关时重试仍失败，不记住"""
+        with self.assertRaises(HTTPStatusError):
+            await self._run_once(
+                HTTPStatusError(400, "model not found"),
+                HTTPStatusError(400, "model not found"),
+            )
+
+        self.assertEqual(_client._load_rejected(), set())
 
 
 if __name__ == "__main__":

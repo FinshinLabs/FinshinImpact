@@ -11,6 +11,7 @@ from finshin_sdk.domain import (
     FieldSpec,
     PluginFileName,
     SectionSpec,
+    SourceDeclaration,
 )
 from utils.config import ConfigSource, SourceKind
 from utils.logger import get_logger
@@ -80,12 +81,13 @@ def _core_source() -> ConfigSource:
     )
 
 
-def _plugin_sources() -> tuple[ConfigSource, ...]:
-    """已启用插件交出的来源
+def enabled_plugin_declarations() -> tuple[tuple[str, SourceDeclaration], ...]:
+    """已启用插件交出的来源声明
 
-    - 按启用序列排
+    - 按启用序列排，交出插件名与整份声明
+    - 装载不成的那一只跳过
     """
-    sources: list[ConfigSource] = []
+    declarations: list[tuple[str, SourceDeclaration]] = []
     for manifest in enabled_manifests(PROFILE_DIR / PluginFileName.STATE):
         try:
             declared = load_plugin(manifest).source_declaration()
@@ -94,12 +96,21 @@ def _plugin_sources() -> tuple[ConfigSource, ...]:
                 f"插件 {manifest.name} 装载失败，它交出的配置段不进配置：{type(e).__name__}"
             )
             continue
-        sources.append(
-            ConfigSource(
-                kind=SourceKind.PLUGIN,
-                code=manifest.name,
-                title=declared.title,
-                sections=declared.sections,
-            )
+        declarations.append((manifest.name, declared))
+    return tuple(declarations)
+
+
+def _plugin_sources() -> tuple[ConfigSource, ...]:
+    """已启用插件交出的来源
+
+    - 按启用序列排
+    """
+    return tuple(
+        ConfigSource(
+            kind=SourceKind.PLUGIN,
+            code=name,
+            title=declared.title,
+            sections=declared.sections,
         )
-    return tuple(sources)
+        for name, declared in enabled_plugin_declarations()
+    )

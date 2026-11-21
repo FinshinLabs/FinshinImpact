@@ -1,7 +1,7 @@
 """配置管理器
 
 - 按配置项身份读取配置
-- 非必填缺键回退 schema 默认值，必填缺键维持抛错
+- 缺键回退 schema 默认值，必填空默认缺键维持抛错
 """
 
 from copy import deepcopy
@@ -11,7 +11,7 @@ from exceptions import ConfigAttrError, ConfigPathMissingError
 from finshin_sdk.domain import ConfigPath
 
 from .config import AppConfigData, AppSchema, get_schema, section_name
-from .config.models import ConfigValue, TabData
+from .config.models import ConfigValue, TabData, is_blank
 
 T = TypeVar("T")
 
@@ -46,7 +46,7 @@ class _ConfigManager:
 
         - 盘上段名由来源串与段名拼出
         - 非必填键缺失取 schema 默认值
-        - 必填键缺失直接抛错，由校验轮标红引导填写
+        - 必填键默认值非空时也回退默认，空默认才抛错
         """
         section = section_name(item.source, item.section)
         values: TabData = self._config.get(section) or {}
@@ -89,7 +89,7 @@ class _ConfigManager:
             for fld in tab.fields:
                 if fld.key != item.key:
                     continue
-                if fld.required:
+                if fld.required and is_blank(fld.default):
                     raise ConfigPathMissingError(item, item.key) from None
 
                 # deepcopy 隔离：防调用方就地改写 schema 里的共享默认对象

@@ -76,9 +76,9 @@ class TestErrorGuard(unittest.TestCase):
         - 供面板按同一身份标红
         """
         from exceptions import ConfigPathMissingError
-        from finshin_sdk.domain import ConfigKey, ConfigSection
+        from finshin_sdk.domain import ConfigPath
 
-        item = ConfigKey.API_KEY.path("plugin.AI", ConfigSection.MODEL)
+        item = ConfigPath(source="plugin.AI", section="model", key="api_key")
 
         @error_guard("测试")
         def boom() -> None:
@@ -112,9 +112,9 @@ class TestErrorGuard(unittest.TestCase):
         - 向导错误表的键是配置项身份，不再按点路径取尾段
         """
         from exceptions import ConfigPathMissingError
-        from finshin_sdk.domain import ConfigKey, ConfigSection
+        from finshin_sdk.domain import ConfigPath
 
-        item = ConfigKey.OWNER.path("plugin.AI", ConfigSection.CHORE)
+        item = ConfigPath(source="plugin.AI", section="chore", key="owner")
 
         @error_guard("测试")
         def boom() -> None:
