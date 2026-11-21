@@ -8,8 +8,7 @@ exclude = [
     "dist",
     ".git",
     "assets",
-    "data",
-    "logs",
+    "instances",
 ]
 
 [lint]
@@ -41,16 +40,9 @@ fixable = ["ALL"]
 [lint.pydocstyle]
 convention = "google"  # Google 风格
 
-[lint.pep8-naming]
-extend-ignore-names = [
-    "ORANGE", 
-    # 其他忽略大写检查的常量
-]
-
 [lint.isort]
 # 接口包、适配器包与外装插件包同带 finshin_ 前缀，按前缀收
-known-first-party = ["finshin_*", "bootstrap", "bot", "bundled", "core", "data",
-                   "exceptions", "services", "skin", "system", "ui", "utils"]
+known-first-party = ["finshin_*"]
 
 [format]
 quote-style = "double"  # 普通字符串强制使用双引号 ""

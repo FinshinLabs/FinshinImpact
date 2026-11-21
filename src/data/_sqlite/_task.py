@@ -4,9 +4,9 @@
 """
 
 import json
+from typing import cast
 
 import aiosqlite
-from typing import cast
 
 from core import TaskRepository
 from finshin_sdk.domain import (

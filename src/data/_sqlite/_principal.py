@@ -9,7 +9,7 @@ import aiosqlite
 
 from core import PrincipalRepository
 from finshin_sdk.domain import Platform
-from finshin_sdk.domain.ids import ContainerKey, PrincipalKey, UserId
+from finshin_sdk.domain.ids import ContainerKey, UserId
 from finshin_sdk.dto import PrincipalDTO
 
 _SELECT_COLUMNS = "platform, container, user"
