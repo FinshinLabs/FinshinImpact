@@ -1,5 +1,5 @@
 {
-  "exclude": ["devtools/tests"],
+  "exclude": ["devtools/tests", "**/build", "**/dist"],
   "executionEnvironments": [
     {
       "root": "devtools/tests",
