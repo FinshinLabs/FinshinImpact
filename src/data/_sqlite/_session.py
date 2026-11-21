@@ -4,8 +4,9 @@
 - 删会话行即连同其消息一起删
 """
 
-import aiosqlite
 from typing import cast
+
+import aiosqlite
 
 from core import SessionRepository
 from finshin_sdk.domain import ChatRole, Platform
@@ -28,17 +29,10 @@ class SqliteSessionRepository(SessionRepository):
         - 带条数上限时只取尾部若干条
         """
         platform, container = _split_session_key(session_key)
-        async with self._conn.execute(
-            "SELECT summary FROM session WHERE key = ?",
-            (session_key,),
-        ) as cursor:
-            row = await cursor.fetchone()
-
         return SessionDTO(
             platform=platform,
             container=container,
             messages=await self._messages(session_key, limit),
-            summary="" if row is None else row["summary"],
         )
 
     async def apply_patch(
@@ -54,12 +48,6 @@ class SqliteSessionRepository(SessionRepository):
         if patch.reset_to_system:
             await self._conn.execute(
                 "DELETE FROM session_message WHERE session_key = ?", (session_key,)
-            )
-
-        if patch.summary is not None:
-            await self._conn.execute(
-                "UPDATE session SET summary = ? WHERE key = ?",
-                (patch.summary, session_key),
             )
 
         if patch.append:

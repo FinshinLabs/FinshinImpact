@@ -117,7 +117,6 @@ class TestRecordMerge(unittest.TestCase):
         cases = [
             ("21", "a ssis t an t 小助手", "[* 小助手|21]"),
             ("22", "ＡＳＳＩＳＴＡＮＴ", "[22]"),
-            ("23", "历 史 摘 要", "[23]"),
             ("24", "引用了那个张三", "[*了那个张三|24]"),
         ]
         with tempfile.TemporaryDirectory() as tmp:

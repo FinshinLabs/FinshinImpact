@@ -2,7 +2,7 @@
 
 - 标注帧与引用帧同形，日志侧与模型侧只差内容
 - 媒体一律换成种类占位帧，被引侧与问句侧同形
-- 统一拼接摘要与网址的占位标记
+- 统一拼接网址的占位标记
 - 显示名只留字母数字与间隔符，命中标记词即遮成星号
 """
 
@@ -15,7 +15,6 @@ from finshin_sdk.domain.ids import UserId
 # 标注里出现的词，拼给模型的标记与遮名称用的词都从这里取
 _ASSISTANT_SLOT = "assistant"  # 机器人自身的标注位，不带 id
 _QUOTE_SLOT = "引用"
-_SUMMARY_SLOT = "历史摘要"
 _LINK_SLOT = "链接"
 
 # 标注与引用帧，形状与随包人设 §二 逐字一致，改一处必改另一处
@@ -40,7 +39,6 @@ _SPACE_RUN = re.compile(r"\s+")
 _MARK_WORDS = (
     _ASSISTANT_SLOT,
     _QUOTE_SLOT,
-    _SUMMARY_SLOT,
     _LINK_SLOT,
     _KIND_DEFAULT,
     *KIND_LABELS.values(),
@@ -146,11 +144,6 @@ def media_mark(kind: ContentKind) -> str:
     - 模型侧只见种类不见内容，未收录的种类按媒体占位
     """
     return _MARK.format(slot=KIND_LABELS.get(kind, _KIND_DEFAULT))
-
-
-def summary_mark() -> str:
-    """拼摘要轮的行首标记"""
-    return _MARK.format(slot=_SUMMARY_SLOT)
 
 
 def link_mark() -> str:

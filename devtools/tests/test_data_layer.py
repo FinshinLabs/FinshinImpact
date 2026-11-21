@@ -162,7 +162,7 @@ class TestSchema(_RealDb):
             rows = list(await cursor.fetchall())
 
         self.assertLessEqual(_EXPECTED_OBJECTS, names)
-        self.assertEqual([row["version"] for row in rows], [1, 2, 3])
+        self.assertEqual([row["version"] for row in rows], [1, 2, 3, 4])
         self.assertTrue(rows[0]["checksum"])
         self.assertEqual((await _one(self.conn, "PRAGMA journal_mode"))[0], "wal")
         self.assertEqual((await _one(self.conn, "PRAGMA foreign_keys"))[0], 1)
@@ -192,7 +192,7 @@ class TestSchema(_RealDb):
             principal_columns,
             {"key", "platform", "container", "user", "display_name", "created_at"},
         )
-        self.assertEqual(session_columns, {"key", "summary"})
+        self.assertEqual(session_columns, {"key"})
 
     async def test_rerun_is_idempotent(self) -> None:
         """整库删净重跑，对象数与版本行一致"""
@@ -207,7 +207,7 @@ class TestSchema(_RealDb):
         after = (await _one(self.conn, "SELECT COUNT(*) FROM sqlite_master"))[0]
         self.assertEqual(before, after)
         versions = await _one(self.conn, "SELECT COUNT(*) FROM schema_version")
-        self.assertEqual(versions[0], 3)
+        self.assertEqual(versions[0], 4)
         # 新库一行数据都没有，没什么可丢
         self.assertEqual(list(self.backup_dir.glob("bot-*.db")), [])
 
@@ -278,11 +278,11 @@ class TestLegacyDb(unittest.IsolatedAsyncioTestCase):
         async with self.conn.execute("PRAGMA table_info(session)") as cursor:
             columns = {row["name"] for row in await cursor.fetchall()}
         row = await _one(
-            self.conn, "SELECT summary FROM session WHERE key = ?", "telegram.g100123"
+            self.conn, "SELECT key FROM session WHERE key = ?", "telegram.g100123"
         )
 
-        self.assertEqual(columns, {"key", "summary"})
-        self.assertEqual(row[0], "老摘要")
+        self.assertEqual(columns, {"key"})
+        self.assertEqual(row[0], "telegram.g100123")
         self.assertEqual(len(list(self.backup_dir.glob("bot-*.db"))), 1)
 
 
@@ -319,8 +319,8 @@ class TestSession(_RealDb):
             await self.repos.session.load(_session_key()), _empty_session()
         )
 
-    async def test_append_and_summary(self) -> None:
-        """追加问答带上发言人，摘要同写入"""
+    async def test_append_with_sender(self) -> None:
+        """追加问答带上发言人"""
         key = _session_key()
 
         patched = await self.repos.session.apply_patch(
@@ -336,14 +336,12 @@ class TestSession(_RealDb):
                     ),
                     MessageDTO(role=ChatRole.ASSISTANT, content="在的", created_at=2.0),
                 ),
-                summary="摘要一",
             ),
         )
 
         self.assertEqual(_contents(patched), ["你好", "在的"])
         self.assertEqual(patched.messages[0].sender_id, "456")
         self.assertEqual(patched.messages[0].sender_name, "张三")
-        self.assertEqual(patched.summary, "摘要一")
 
     async def test_limit_takes_tail(self) -> None:
         """限量只取最末几条"""

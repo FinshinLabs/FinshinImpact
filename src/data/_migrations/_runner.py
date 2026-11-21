@@ -12,22 +12,28 @@ import time
 from datetime import datetime
 from pathlib import Path
 from types import ModuleType
-from system.digest import text_digest
 
 import aiosqlite
 
 from finshin_sdk.domain import TaskStatus
+from system.digest import text_digest
 
-from . import _0001_baseline, _0002_purge_task_surplus, _0003_purge_session_surplus
+from . import (
+    _0001_baseline,
+    _0002_purge_task_surplus,
+    _0003_purge_session_surplus,
+    _0004_drop_session_summary,
+)
 
 # 代码内置的结构版本，库内更高即拒绝启动
-SUPPORTED_SCHEMA = 3
+SUPPORTED_SCHEMA = 4
 
 # 版本号与脚本模块的对照，升序即执行顺序
 _MIGRATIONS: tuple[tuple[int, ModuleType], ...] = (
     (1, _0001_baseline),
     (2, _0002_purge_task_surplus),
     (3, _0003_purge_session_surplus),
+    (4, _0004_drop_session_summary),
 )
 
 _BACKUP_KEEP = 3  # 超出份数即删最旧

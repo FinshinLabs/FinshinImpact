@@ -1,7 +1,7 @@
 """对话工作循环
 
 - 流式接收、会话落库与记录持久化
-- 上下文超线即裁窗并投递后台压缩
+- 上下文超线从最旧一组问答丢起，丢空仍超即回一句不调模型
 """
 
 import asyncio
@@ -11,31 +11,23 @@ from typing import Any, Literal
 
 from finshin_sdk import HandlerContext
 from finshin_sdk.domain.ids import SessionKey
-from finshin_sdk.dto import InboundEventDTO, MessageDTO
+from finshin_sdk.dto import InboundEventDTO
 from finshin_sdk.exceptions import DomainError, MessageVanishedError
 from utils import get_logger
 
 from ..._shared.messages import BotMessage
 from ..config import ai_config
-from ..core import (
-    AIClient,
-    StreamUsage,
-    active_tasks,
-    purge_stale,
-    save_session,
-)
+from ..core import AIClient, StreamUsage, purge_stale, save_session
 from ..markdown import strip_model_marks
 from ..utils import (
     build_turns,
     compose_user_text,
-    estimate_window,
+    fit_history,
     learn_turn_overhead,
     make_rows,
     make_session_key,
     open_window,
-    split_rounds,
 )
-from ._summary import compress_history
 
 _logger = get_logger("Plg.AI.Worker")
 
@@ -107,34 +99,6 @@ async def _collect_reply(
     return final_msg, has_error
 
 
-def _kick_compression(
-    key: SessionKey, head: tuple[MessageDTO, ...], tokens: int
-) -> None:
-    """投递后台压缩协程
-
-    - 压缩另起协程跑，不进对话队列
-    """
-    _logger.info(f"{key} 上下文 {tokens} token 超线，交后台压缩")
-    summary_task = asyncio.create_task(compress_history(key, head))
-    active_tasks.add(summary_task)
-    summary_task.add_done_callback(active_tasks.discard)
-
-
-def _cut_for_budget(
-    window: tuple[MessageDTO, ...], summary: str, prompt: str
-) -> tuple[tuple[MessageDTO, ...], tuple[MessageDTO, ...], int]:
-    """按 token 触发线裁窗
-
-    - 交出裁过的窗口、待压段与体量估算
-    - 没超线窗口一字不动，待压段为空
-    """
-    tokens = estimate_window(window, summary, prompt)
-    if tokens <= ai_config.summary_trigger_tokens:
-        return window, (), tokens
-    head, rows = split_rounds(window[1:], ai_config.summary_keep_rounds)
-    return (window[0], *rows), head, tokens
-
-
 async def worker_loop(ctx: HandlerContext) -> None:
     """核心工作循环"""
     text = ctx.event.content.text
@@ -157,15 +121,15 @@ async def worker_loop(ctx: HandlerContext) -> None:
     window = open_window(persona, snapshot.messages)
     prompt = compose_user_text(ctx.event)
 
-    # 超线当轮即裁到保留窗口照常发出，被裁的问答交后台压成摘要，用户不等待
-    window, head, tokens = _cut_for_budget(window, snapshot.summary, prompt)
+    # 超线从最旧一组问答丢起，丢空仍超即不再调模型，本轮不入库不落记录
+    limit = ai_config.context_tokens
+    history, tokens = fit_history(persona, window[1:], prompt, limit)
+    if tokens > limit:
+        await ctx.reply(BotMessage.AI_CONTEXT_OVERFLOW)
+        return
+    window = (window[0], *history)
 
-    msg = build_turns(
-        persona=persona,
-        summary=snapshot.summary,
-        history=window[1:],
-        thisinput=prompt,
-    )
+    msg = build_turns(persona=persona, history=history, thisinput=prompt)
 
     try:
         final_msg, has_error = await _collect_reply(msg, session_key, tokens)
@@ -184,9 +148,6 @@ async def worker_loop(ctx: HandlerContext) -> None:
         await asyncio.to_thread(
             _save_conversation_record, session_key, ctx.event, final_msg
         )
-
-        if head:
-            _kick_compression(session_key, head, tokens)
 
     except DomainError:
         raise

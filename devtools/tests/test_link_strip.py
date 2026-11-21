@@ -19,9 +19,9 @@ from system.profile_env import set_profile  # noqa: E402
 set_profile("tg.000000")
 
 from bundled.AI.utils import (  # noqa: E402
+    _estimate_window,
     build_turns,
     compose_user_text,
-    estimate_window,
 )
 from finshin_sdk.domain import ChatRole, ChatScope, ContentKind, Platform  # noqa: E402
 from finshin_sdk.domain.ids import ContainerKey, MessageId, UserId  # noqa: E402
@@ -112,7 +112,7 @@ class TestKindMarks(unittest.TestCase):
 class TestLinkStrip(unittest.TestCase):
     def _turn(self, text: str) -> str:
         """取这一轮发往模型的问句正文"""
-        turns = build_turns(persona="人设正文", summary="", history=(), thisinput=text)
+        turns = build_turns(persona="人设正文", history=(), thisinput=text)
         return turns[-1]["content"]
 
     def test_question_url_becomes_mark(self) -> None:
@@ -130,20 +130,10 @@ class TestLinkStrip(unittest.TestCase):
         """全角标点与中文不算网址的一部分"""
         self.assertEqual(self._turn("见 www.example.com，就这样"), "见 [链接]，就这样")
 
-    def test_summary_url_stripped(self) -> None:
-        """摘要轮的网址换成占位标记，行首标记照旧"""
-        turns = build_turns(
-            persona="人设正文",
-            summary="早前聊到 https://example.com 的事",
-            history=(),
-            thisinput="一句",
-        )
-        self.assertEqual(turns[1]["content"], "[历史摘要] 早前聊到 [链接] 的事")
-
     def test_persona_turn_untouched(self) -> None:
         """人设轮一个字不改"""
         persona = "人设里的 https://example.com 照留"
-        turns = build_turns(persona=persona, summary="", history=(), thisinput="一句")
+        turns = build_turns(persona=persona, history=(), thisinput="一句")
         self.assertEqual(turns[0]["content"], persona)
 
     def test_history_rows_stripped(self) -> None:
@@ -157,9 +147,7 @@ class TestLinkStrip(unittest.TestCase):
             ),
             MessageDTO(role=ChatRole.ASSISTANT, content="回一句 https://example.com"),
         )
-        turns = build_turns(
-            persona="人设正文", summary="", history=history, thisinput="再说一句"
-        )
+        turns = build_turns(persona="人设正文", history=history, thisinput="再说一句")
         self.assertEqual(
             turns[1]["content"], "[张三|111]（引用 [王五|999]：[链接]）正文"
         )
@@ -176,9 +164,7 @@ class TestLinkStrip(unittest.TestCase):
         """体量折算按剥完的那份算，长网址撑不大窗口"""
         window = (MessageDTO(role=ChatRole.SYSTEM, content="人设正文"),)
         long_url = "https://example.com/" + "x" * 400
-        gap = estimate_window(window, "", long_url) - estimate_window(
-            window, "", "一句"
-        )
+        gap = _estimate_window(window, long_url) - _estimate_window(window, "一句")
         self.assertLess(gap, 20)
 
 

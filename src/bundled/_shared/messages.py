@@ -45,4 +45,5 @@ class BotMessage:
 
     # AI 对话
     AI_UNAVAILABLE = "AI 对话服务暂不可用"
+    AI_CONTEXT_OVERFLOW = "这段内容太长，连同人设已超出上下文上限，请缩短后再发"
     CHAT_PRIVATE_DENIED = "私聊要主人或管理员，群里 @我 或说触发词就能聊"

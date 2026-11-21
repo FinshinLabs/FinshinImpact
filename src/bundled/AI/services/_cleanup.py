@@ -14,12 +14,7 @@ from services.tasks import get_task_service
 from utils import get_logger
 
 from ..config import ai_config
-from ..core import (
-    active_tasks,
-    purge_idle_sessions,
-    purge_pending,
-    purge_sessions,
-)
+from ..core import purge_idle_sessions, purge_pending, purge_sessions
 
 _logger = get_logger("Plg.AI.Cleanup")
 
@@ -61,16 +56,8 @@ def _purge_records(deadline: float) -> tuple[SessionKey, ...]:
 
 
 async def _release_inflight() -> None:
-    """收掉在途问答与压缩协程"""
+    """收掉在途问答"""
     await get_task_service().release()
-
-    # 摘要压缩不排队，停服时单独收
-    tasks = list(active_tasks)
-    active_tasks.clear()
-    for task in tasks:
-        task.cancel()
-    if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def cleanup_loop() -> NoReturn:

@@ -2,9 +2,8 @@
 
 - 字符折算按中文与其余两套系数
 - 每条消息的打包开销由端点读数倒推
-- 窗口超线切段问答成对不断
-- 压缩文本带上发言人标注
-- 摘要跟人设轮作第一条独立 user 轮
+- 窗口超线从最旧一组问答丢起，人设行始终保留
+- 丢空仍超线即交出空历史与超线读数
 """
 
 import sys
@@ -51,110 +50,82 @@ def _pair(name: str) -> tuple[MessageDTO, ...]:
 class TestTokenEstimate(unittest.TestCase):
     def test_cjk_and_ascii_use_different_rates(self) -> None:
         """中文与英文各按自己的系数折算"""
-        self.assertEqual(utils.estimate_tokens("你好世界"), 2)
-        self.assertEqual(utils.estimate_tokens("abcdefgh"), 2)
+        self.assertEqual(utils._estimate_tokens("你好世界"), 2)
+        self.assertEqual(utils._estimate_tokens("abcdefgh"), 2)
 
     def test_window_sum_includes_all_parts(self) -> None:
-        """窗口估算把人设、摘要与问句一起计入"""
-        persona = "人设正文"
-        window = (
-            MessageDTO(role=ChatRole.SYSTEM, content=persona),
-            *_rounds(1),
+        """窗口估算把人设、历史与问句一起计入"""
+        short = (MessageDTO(role=ChatRole.SYSTEM, content="人设"), *_rounds(1))
+        long = (MessageDTO(role=ChatRole.SYSTEM, content="人设正文加长"), *_rounds(1))
+
+        self.assertGreater(
+            utils._estimate_window(long, "新问"), utils._estimate_window(short, "新问")
         )
-        only_rows = utils.estimate_window(window, "", "")
-        self.assertGreater(only_rows, utils.estimate_window(window[1:], "", ""))
-        self.assertGreater(utils.estimate_window(window, "摘要", "新问"), only_rows)
+        self.assertGreater(
+            utils._estimate_window(short, "新问"), utils._estimate_window(short, "")
+        )
 
     def test_sender_mark_prices_in_by_length(self) -> None:
         """正文一字不差，发言人名字越长折算的体量越大"""
         window = (MessageDTO(role=ChatRole.SYSTEM, content="人设"),)
-        short = utils.estimate_window((*window, *_pair("甲")), "", "问")
-        long = utils.estimate_window((*window, *_pair("甲乙丙丁戊")), "", "问")
+        short = utils._estimate_window((*window, *_pair("甲")), "问")
+        long = utils._estimate_window((*window, *_pair("甲乙丙丁戊")), "问")
         self.assertGreater(long, short)
 
     def test_turn_overhead_learns_from_reading(self) -> None:
         """每条消息的打包开销由端点读数倒推，下一轮按条数补上"""
         window = (MessageDTO(role=ChatRole.SYSTEM, content="人设"), *_rounds(2))
-        summary, ask = "早前聊过两句", "[人名0|100]说一句"
-        turns = utils.build_turns(
-            persona="人设", summary=summary, history=window[1:], thisinput=ask
-        )
-        content = sum(utils.estimate_tokens(turn["content"]) for turn in turns)
+        ask = "[人名0|100]说一句"
+        turns = utils.build_turns(persona="人设", history=window[1:], thisinput=ask)
+        content = sum(utils._estimate_tokens(turn["content"]) for turn in turns)
         actual = content + len(turns) * 8
         utils.learn_turn_overhead(turns, actual)
-        self.assertEqual(utils.estimate_window(window, summary, ask), actual)
+        self.assertEqual(utils._estimate_window(window, ask), actual)
 
     def test_reading_below_content_keeps_overhead(self) -> None:
         """读数不大于正文折算即不刷新，倒推不出负数"""
         window = (MessageDTO(role=ChatRole.SYSTEM, content="人设"), *_rounds(1))
-        before = utils.estimate_window(window, "", "[人名0|100]问")
+        before = utils._estimate_window(window, "[人名0|100]问")
         turns = utils.build_turns(
-            persona="人设", summary="", history=window[1:], thisinput="[人名0|100]问"
+            persona="人设", history=window[1:], thisinput="[人名0|100]问"
         )
         utils.learn_turn_overhead(turns, 0)
-        self.assertEqual(utils.estimate_window(window, "", "[人名0|100]问"), before)
+        self.assertEqual(utils._estimate_window(window, "[人名0|100]问"), before)
 
 
-class TestSplitRounds(unittest.TestCase):
-    def test_keep_tail_rounds(self) -> None:
-        """尾部留满指定轮数，更早的进待压段"""
-        head, tail = utils.split_rounds(_rounds(8), 3)
-        self.assertEqual(len(head), 10)
-        self.assertEqual(len(tail), 6)
-
-    def test_no_split_when_within_keep(self) -> None:
-        """轮数不足保留窗口即不切"""
-        head, tail = utils.split_rounds(_rounds(2), 6)
-        self.assertEqual(head, ())
-        self.assertEqual(len(tail), 4)
-
-    def test_head_never_ends_with_question(self) -> None:
-        """切点撞上答句时连答句一起进待压段"""
-        rows = (*_rounds(2), MessageDTO(role=ChatRole.USER, content="半截问"))
-        head, tail = utils.split_rounds(rows, 1)
-        self.assertEqual(len(tail), 1)
-        self.assertEqual(tail[0].role, ChatRole.USER)
-        self.assertEqual(head[-1].role, ChatRole.ASSISTANT)
-
-
-class TestRenderHistory(unittest.TestCase):
-    def test_marks_survive_render(self) -> None:
-        """压缩文本逐字保留名称与 id 标注"""
-        text = utils.render_history(_rounds(2))
-        self.assertIn("[人名0|100]说一句0", text)
-        self.assertIn("回1回1回1回1", text)
-
-    def test_system_row_skipped(self) -> None:
-        """人设行不进压缩文本"""
-        window = (MessageDTO(role=ChatRole.SYSTEM, content="人设"), *_rounds(1))
-        self.assertNotIn("人设", utils.render_history(window))
-
-
-class TestTurnAssembly(unittest.TestCase):
-    """摘要轮位置"""
-
-    def test_summary_follows_persona_as_user(self) -> None:
-        """摘要跟人设轮之后作第一条独立 user 轮，后面不配 assistant"""
-        turns = utils.build_turns(
-            persona="人设",
-            summary="早前聊过两句",
-            history=_rounds(1),
-            thisinput="[人名0|100]再说一遍",
+class TestFitHistory(unittest.TestCase):
+    def test_drops_oldest_rounds_until_under_limit(self) -> None:
+        """从最旧一组问答丢起，留下尾部整轮"""
+        history = _rounds(3)
+        prompt = "[人名0|100]新问"
+        one_round = utils._estimate_window(
+            (MessageDTO(role=ChatRole.SYSTEM, content="人设"), *_rounds(1)), prompt
         )
-        self.assertEqual(turns[0]["role"], ChatRole.SYSTEM)
-        self.assertEqual(turns[1]["role"], ChatRole.USER)
-        self.assertTrue(turns[1]["content"].startswith("[历史摘要]"))
-        self.assertEqual(turns[2]["role"], ChatRole.USER)
 
-    def test_no_summary_row_when_empty(self) -> None:
-        """没有摘要即不占轮位，人设后直接是历史"""
-        turns = utils.build_turns(
-            persona="人设",
-            summary="",
-            history=_rounds(1),
-            thisinput="[人名0|100]再说一遍",
-        )
-        self.assertNotIn("[历史摘要]", str(turns))
+        kept, tokens = utils.fit_history("人设", history, prompt, one_round)
+
+        self.assertEqual(len(kept), 2)
+        self.assertEqual(kept[0].content, "说一句2")
+        self.assertLessEqual(tokens, one_round)
+
+    def test_keeps_all_when_within_limit(self) -> None:
+        """没超线一字不动"""
+        history = _rounds(2)
+        prompt = "问"
+
+        kept, _ = utils.fit_history("人设", history, prompt, 10**9)
+
+        self.assertEqual(kept, history)
+
+    def test_empties_history_when_still_over(self) -> None:
+        """丢空历史仍超线即交出空历史与超线读数"""
+        history = _rounds(3)
+        prompt = "问"
+
+        kept, tokens = utils.fit_history("人设", history, prompt, 1)
+
+        self.assertEqual(kept, ())
+        self.assertGreater(tokens, 1)
 
 
 class TestWindowCap(unittest.TestCase):
@@ -168,6 +139,21 @@ class TestWindowCap(unittest.TestCase):
         self.assertGreaterEqual(len(window) - 1, cap - 1)
         self.assertEqual((len(window) - 1) % utils._ROUND_ROWS, 0)
         self.assertEqual(window[1].role, ChatRole.USER)
+
+
+class TestTurnAssembly(unittest.TestCase):
+    def test_persona_then_history_then_prompt(self) -> None:
+        """人设轮后直接是历史，当前问句在末尾"""
+        turns = utils.build_turns(
+            persona="人设",
+            history=_rounds(1),
+            thisinput="[人名0|100]再说一遍",
+        )
+        self.assertEqual(turns[0]["role"], ChatRole.SYSTEM)
+        self.assertEqual(turns[1]["role"], ChatRole.USER)
+        self.assertEqual(turns[2]["role"], ChatRole.ASSISTANT)
+        self.assertEqual(turns[-1]["role"], ChatRole.USER)
+        self.assertTrue(turns[-1]["content"].endswith("再说一遍"))
 
 
 if __name__ == "__main__":

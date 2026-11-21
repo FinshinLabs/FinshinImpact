@@ -3,7 +3,7 @@
 - 同群两名成员共用一串会话键
 - 不同容器各占一串
 - 入队走任务服务，同串第二条排在本条之后
-- 停服收尾清空排队与在途压缩
+- 停服收尾清空排队
 """
 
 import asyncio
@@ -20,7 +20,6 @@ set_profile("tg.000000")
 
 from config_plan import assemble_for_case  # noqa: E402
 
-from bundled.AI.core import active_tasks  # noqa: E402
 from bundled.AI.services import _ai_chat, _cleanup  # noqa: E402
 from bundled.AI.utils import make_session_key  # noqa: E402
 from finshin_sdk.domain import ChatScope, Platform, QueuedAction  # noqa: E402
@@ -169,12 +168,10 @@ class TestShutdownRelease(unittest.TestCase):
     """停服收尾"""
 
     def setUp(self) -> None:
-        active_tasks.clear()
         assemble_for_case(self)
 
-    def test_teardown_clears_queue_and_cancels_inflight(self) -> None:
-        """收尾清空排队，在途压缩收到取消"""
-        box: dict[str, asyncio.Task] = {}
+    def test_teardown_clears_queue(self) -> None:
+        """收尾清空排队"""
         ledger = _StubLedger()
 
         async def _fault(item: object, error: Exception) -> None:
@@ -188,10 +185,6 @@ class TestShutdownRelease(unittest.TestCase):
             )
             await _enqueue(ctx=_Ctx(_event("111", ChatScope.GROUP)))
             await _enqueue(ctx=_Ctx(_event("222", ChatScope.GROUP)))
-
-            inflight = asyncio.create_task(asyncio.sleep(30))
-            active_tasks.add(inflight)
-            box["inflight"] = inflight
 
             cleaner = asyncio.create_task(_cleanup.cleanup_loop())
             await asyncio.sleep(0)
@@ -209,8 +202,6 @@ class TestShutdownRelease(unittest.TestCase):
         configure_task_service([], ledger=_StubLedger(), on_fault=_fault)
 
         self.assertEqual(queued, 0)
-        self.assertEqual(active_tasks, set())
-        self.assertTrue(box["inflight"].cancelled())
         # 在途那条被取消即不写终态，库里留着活行等下次启动交代
         self.assertEqual(ledger.calls, ["enqueue", "enqueue", "begin", "reset"])
 

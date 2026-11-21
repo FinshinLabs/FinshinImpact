@@ -3,6 +3,7 @@
 - 消息构建与发言人标注拼装
 - 会话窗口归一与人设版本判定
 - 上下文体量折算，含每条消息的打包开销
+- 超线从最旧一组问答丢起
 """
 
 import re
@@ -17,7 +18,6 @@ from utils.speaker import (
     media_mark,
     quote_block,
     speaker_mark,
-    summary_mark,
 )
 
 # 会话窗口条数上限，含人设首行，条数只当兜底
@@ -93,14 +93,6 @@ def _cut_oldest(rows: _Rows, keep: int) -> tuple[_Rows, _Rows]:
     return rows[:start], rows[start:]
 
 
-def split_rounds(rows: _Rows, keep_rounds: int) -> tuple[_Rows, _Rows]:
-    """按保留轮数切窗口
-
-    - 尾部留满指定轮数原文，更早的问答进丢掉段
-    """
-    return _cut_oldest(rows, keep_rounds * _ROUND_ROWS)
-
-
 class _TurnOverhead:
     """每条消息的打包开销现值
 
@@ -124,7 +116,7 @@ class _TurnOverhead:
 _turn_overhead = _TurnOverhead()
 
 
-def estimate_tokens(text: str) -> int:
+def _estimate_tokens(text: str) -> int:
     """按字符估算 token
 
     - 汉字与其余字符各按自己的系数折算
@@ -150,57 +142,54 @@ def learn_turn_overhead(turns: _Turns, actual: int) -> None:
     _turn_overhead.refresh(_content_tokens(turns), actual, len(turns))
 
 
-def estimate_window(window: _Rows, summary: str, prompt: str) -> int:
+def _estimate_window(window: _Rows, prompt: str) -> int:
     """估算一轮请求的上下文体量
 
-    - 按实际发出的那份消息列表折算，人设与摘要一并计入
+    - 按实际发出的那份消息列表折算，人设一并计入
     """
     return _estimate_turns(
         build_turns(
             persona=window[0].content,
-            summary=summary,
             history=window[1:],
             thisinput=prompt,
         )
     )
 
 
+def fit_history(
+    persona: str, history: _Rows, prompt: str, limit: int
+) -> tuple[_Rows, int]:
+    """按上限从最旧一组问答丢起
+
+    - 丢满两条即一轮，丢到不超或历史丢空
+    - 交回留下的历史与最终体量
+    """
+    window = (MessageDTO(role=ChatRole.SYSTEM, content=persona), *history)
+    tokens = _estimate_window(window, prompt)
+    while tokens > limit and history:
+        history = history[_ROUND_ROWS:]
+        window = (window[0], *history)
+        tokens = _estimate_window(window, prompt)
+    return history, tokens
+
+
 def _content_tokens(turns: _Turns) -> int:
     """逐条折算消息正文"""
-    return sum(estimate_tokens(turn["content"]) for turn in turns)
-
-
-def render_history(rows: _Rows) -> str:
-    """渲染交模型压缩的问答文本
-
-    - 发言人标注逐字带上
-    """
-    return "\n".join(
-        _render_turn(message)["content"]
-        for message in rows
-        if message.role != ChatRole.SYSTEM
-    )
+    return sum(_estimate_tokens(turn["content"]) for turn in turns)
 
 
 def build_turns(
     *,
     persona: str,
-    summary: str,
     history: tuple[MessageDTO, ...],
     thisinput: str,
 ) -> list[dict[str, str]]:
     """构建发给模型的消息列表
 
     - 人设轮按当前正文现取，库里那行人设不重复发
-    - 摘要固定作第一条独立 user 轮紧跟人设，后面不配 assistant 回复
-    - 发给模型的正文与摘要里的网址换成占位标记
+    - 发给模型的正文里的网址换成占位标记
     """
     turns = [build_message(ChatRole.SYSTEM, persona)]
-    if summary:
-        turns.append(
-            build_message(ChatRole.USER, f"{summary_mark()} {_strip_links(summary)}")
-        )
-
     turns.extend(
         _render_turn(message) for message in history if message.role != ChatRole.SYSTEM
     )
