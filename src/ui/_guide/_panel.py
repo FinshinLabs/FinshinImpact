@@ -79,10 +79,12 @@ def _status_label(manifest: dict[str, Any]) -> str:
 class _PluginPanelDialog(BaseDialog):
     """插件设置面板"""
 
-    def __init__(self, code: str, *, mode: str = MODE_AUTO) -> None:
+    def __init__(
+        self, code: str, *, mode: str = MODE_AUTO, parent: QWidget | None = None
+    ) -> None:
         """按实例与来源装配面板"""
         # code 为实例身份码，全程显式传参不读冻结值
-        super().__init__(title=PluginMessage.TITLE.format(code=code))
+        super().__init__(parent=parent, title=PluginMessage.TITLE.format(code=code))
         self._code = code
         self._mode = mode
         self._manifests: list[dict[str, Any]] = []
@@ -279,7 +281,9 @@ class _PluginPanelDialog(BaseDialog):
         self.accept()
 
 
-def open_panel(code: str, *, mode: str = MODE_AUTO) -> bool:
+def open_panel(
+    code: str, *, mode: str = MODE_AUTO, parent: QWidget | None = None
+) -> bool:
     """打开面板并返回是否保存
 
     - 空身份码直接拒绝，不打开面板
@@ -287,5 +291,5 @@ def open_panel(code: str, *, mode: str = MODE_AUTO) -> bool:
     if not code:
         raise ValueError(PluginMessage.PANEL_NEED_CODE)
     ensure_app()
-    dialog = _PluginPanelDialog(code, mode=mode)
+    dialog = _PluginPanelDialog(code, mode=mode, parent=parent)
     return bool(dialog.exec())

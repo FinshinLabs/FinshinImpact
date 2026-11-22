@@ -138,7 +138,7 @@ class _ProfilePickerDialog(BaseDialog):
         if not code:
             return
 
-        open_panel(code, mode=MODE_EDIT)
+        open_panel(code, mode=MODE_EDIT, parent=self)
 
     def _on_new(self) -> None:
         """转入新建窗
