@@ -60,6 +60,12 @@ match = "ConfigMode"
 reason = "纯分支标识只判相等，不比大小也不落盘，auto 属规范允许形态"
 
 [[waiver]]
+section = "枚举"
+path = "src/bootstrap/_slot.py"
+match = "_SlotResult"
+reason = "启动资格结果只作分支标识，只判相等，不比大小也不落盘，auto 属规范允许形态"
+
+[[waiver]]
 section = "文案类"
 path = "src/skin/messages/_check.py"
 match = "启动"

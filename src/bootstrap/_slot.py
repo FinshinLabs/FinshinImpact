@@ -9,7 +9,7 @@
 import importlib
 import threading
 import time
-from enum import IntEnum
+from enum import IntEnum, auto
 
 from system.instance_lock import (
     acquire_bootstrap_lock,
@@ -38,10 +38,10 @@ class _SlotResult(IntEnum):
     - 值只作分支标识
     """
 
-    RUN = 0
-    CANCEL = 1
-    CONFLICT = 2
-    PICKER_BUSY = 3
+    RUN = auto()
+    CANCEL = auto()
+    CONFLICT = auto()
+    PICKER_BUSY = auto()
 
 
 def _migrate_config(code: str) -> None:
