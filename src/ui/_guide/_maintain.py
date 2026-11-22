@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from services.env_setup.deps_install import sync_env
-from services.env_setup.deps_keep import keep_conflicts, keep_union
+from services.env_setup.deps_keep import keep_plan
 from services.env_setup.subprocess_ops import ProgressCallback, clean_cache
 from skin.messages import PluginMessage
 
@@ -23,16 +23,22 @@ from ._popup import confirm_popup
 from ._progress import run_with_progress
 
 
+def _sync_task(on_line: ProgressCallback) -> list[str]:
+    """按保留清单重建环境
+
+    - 保留清单与冲突说明一次算齐，同一份喂给 sync
+    """
+    keep, notes = keep_plan()
+    return sync_env(keep, on_line, notes)
+
+
 def _sync_flow(parent: QWidget | None) -> list[str]:
     """二次确认后按保留清单重建环境"""
     if not confirm_popup(
         PluginMessage.SETTLE_TITLE, PluginMessage.SYNC_WARNING, parent
     ):
         return []
-    return run_with_progress(
-        PluginMessage.PROGRESS_SYNC,
-        lambda on_line: sync_env(keep_union(), on_line, keep_conflicts()),
-    )
+    return run_with_progress(PluginMessage.PROGRESS_SYNC, _sync_task)
 
 
 def _cache_task(on_line: ProgressCallback | None = None) -> list[str]:

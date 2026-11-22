@@ -55,6 +55,9 @@ class PluginMessage:
     SETTLE_TITLE = "插件依赖结算"
     STARTUP_FAIL = "以下插件依赖安装失败，已自动禁用\n{plugins}\n失败项\n{items}\n下次启动会自动重试"
 
+    # 用：ui._guide._panel 保存后补缺失败
+    SAVE_FAIL = "以下依赖安装失败，本次选择已保存\n失败项\n{items}\n下次启动会自动重试"
+
     # 用：ui._guide._panel 底栏按钮行
     BTN_SAVE_START = "保存并启动"
 

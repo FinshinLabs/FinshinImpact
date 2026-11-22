@@ -1,11 +1,13 @@
-"""启动期插件规则
+"""插件依赖规则
 
-- 定本实例应结算哪几只插件，把装失败的插件移出启用集
+- 启动期定本实例结算范围，把装失败的插件移出启用集
+- 保存插件选择后按全局清单补缺，只加不删
 """
 
 from finshin_sdk.domain import ManifestKey, StateKey, is_enabled
 from system.plugin_state import load_instance_enabled
 
+from .deps_keep import keep_union
 from .deps_manifest import (
     catalog_digest,
     load_manifests,
@@ -14,6 +16,15 @@ from .deps_manifest import (
     state_path_of,
     top_package_name,
 )
+from .subprocess_ops import is_pin_installed
+
+
+def missing_global() -> list[str]:
+    """全局保留清单里本机还缺的 pin
+
+    - 保存插件选择后按这份清单增量补装
+    """
+    return [pin for pin in keep_union() if not is_pin_installed(pin)]
 
 
 def target_manifests(code: str) -> list[dict]:

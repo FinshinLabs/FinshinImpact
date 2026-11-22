@@ -29,6 +29,7 @@ from finshin_sdk.domain import (
     is_enabled,
     resolve_claims,
 )
+from services.env_setup.deps_install import install_deps
 from services.env_setup.deps_manifest import (
     catalog_digest,
     load_manifests,
@@ -37,6 +38,7 @@ from services.env_setup.deps_manifest import (
     shadowed_manifests,
     state_path_of,
 )
+from services.env_setup.deps_startup import missing_global
 from services.env_setup.subprocess_ops import is_pin_installed
 from services.env_setup.toolchain import dev_mode
 from skin.messages import DialogMessage, PluginMessage
@@ -52,6 +54,8 @@ from ._conflict import (
     make_clash_button,
     make_command_button,
 )
+from ._popup import show_popup
+from ._progress import run_with_progress
 from ._search import ROLE_MANIFEST, build_searchable_list
 
 MODE_AUTO = "auto"  # 自动弹出：保存并启动
@@ -273,11 +277,28 @@ class _PluginPanelDialog(BaseDialog):
         return names
 
     def _on_save(self) -> None:
-        """保存启用集与目录指纹"""
+        """保存启用集与目录指纹，按全局保留清单增量补装
+
+        - 只补缺的件，不删任何已装库
+        - 补装失败不挡保存，下次启动会重试
+        """
         enabled = self._checked_names()
         roots = plugins_roots()
         catalog = catalog_digest(load_manifests(roots)) if roots else ""
         save_state(self._code, enabled, catalog)
+        if not dev_mode():
+            missing = missing_global()
+            if missing:
+                failed = run_with_progress(
+                    PluginMessage.PROGRESS_RUNTIME,
+                    lambda on_line: install_deps(missing, on_line),
+                )
+                if failed:
+                    show_popup(
+                        PluginMessage.SETTLE_TITLE,
+                        PluginMessage.SAVE_FAIL.format(items="\n".join(failed)),
+                        parent=self,
+                    )
         self.accept()
 
 

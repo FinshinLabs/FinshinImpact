@@ -21,23 +21,20 @@ from ..adapter_manifest import adapter_deps_union, installed_adapter_pins
 from .deps_manifest import load_manifests, plugins_roots, top_package_name
 
 
-def keep_union(exclude: Platform | None = None) -> list[str]:
-    """全局保留清单
+def keep_plan(exclude: Platform | None = None) -> tuple[list[str], list[str]]:
+    """全局保留清单与冲突说明，一次算齐
 
     - 核心依赖、接口包、适配器声明依赖、已装适配器包与全实例启用插件依赖并集
     - 同一只库只留一条，取各路顺序里先读到的那条 pin
     - 启用集按盘上状态现读
     - 点名排除即不计那一平台适配器的声明与包
     """
-    return _merge_keep(exclude)[0]
+    return _merge_keep(exclude)
 
 
-def keep_conflicts() -> list[str]:
-    """同一只库被两处钉了不同版本时的说明行
-
-    - 报的是同一只库后面那路被丢下的 pin
-    """
-    return _merge_keep()[1]
+def keep_union(exclude: Platform | None = None) -> list[str]:
+    """全局保留清单，口径见 keep_plan"""
+    return keep_plan(exclude)[0]
 
 
 def dev_dependencies() -> list[str]:

@@ -27,7 +27,7 @@ import pack_spec  # noqa: E402
 
 from finshin_sdk.domain import ManifestKey  # noqa: E402
 from services import adapter_manifest  # noqa: E402
-from services.env_setup import deps_install, deps_keep  # noqa: E402
+from services.env_setup import deps_install, deps_keep, deps_startup  # noqa: E402
 
 _KEEP = ["aiogram==3.29.1", "pillow==12.1.1"]
 _DEV_PIN = "ruff==0.16.3"
@@ -174,7 +174,7 @@ class TestKeepMerge(unittest.TestCase):
             for patcher in self._four(["pillow==12.1.1"], ["pillow==12.1.1"], [], []):
                 stack.enter_context(patcher)
             self.assertEqual(deps_keep.keep_union(), ["pillow==12.1.1"])
-            self.assertEqual(deps_keep.keep_conflicts(), [])
+            self.assertEqual(deps_keep.keep_plan()[1], [])
 
     def test_conflict_keeps_the_first_and_reports(self) -> None:
         """同名不同写法时留先读到的那条，并交代让开的那条
@@ -187,7 +187,7 @@ class TestKeepMerge(unittest.TestCase):
             ):
                 stack.enter_context(patcher)
             self.assertEqual(deps_keep.keep_union(), ["httpx==0.28.1"])
-            notes = deps_keep.keep_conflicts()
+            notes = deps_keep.keep_plan()[1]
 
         self.assertEqual(len(notes), 2)
         self.assertIn("httpx", notes[0])
@@ -267,6 +267,31 @@ class TestInstanceEnabledUnion(unittest.TestCase):
             self._union([self.help_row, self.web_row]),
             ["foo==1.0", "markdown==3.10.2"],
         )
+
+
+class TestMissingGlobal(unittest.TestCase):
+    """保存插件选择后按全局清单挑出本机缺件"""
+
+    def test_only_missing_pins_returned(self) -> None:
+        installed = {"aiogram==3.29.1"}
+        with (
+            patch.object(
+                deps_startup,
+                "keep_union",
+                lambda: ["aiogram==3.29.1", "pillow==12.1.1"],
+            ),
+            patch.object(
+                deps_startup, "is_pin_installed", lambda pin: pin in installed
+            ),
+        ):
+            self.assertEqual(deps_startup.missing_global(), ["pillow==12.1.1"])
+
+    def test_nothing_missing_returns_empty(self) -> None:
+        with (
+            patch.object(deps_startup, "keep_union", lambda: ["aiogram==3.29.1"]),
+            patch.object(deps_startup, "is_pin_installed", lambda pin: True),
+        ):
+            self.assertEqual(deps_startup.missing_global(), [])
 
 
 class TestDeclarationsParity(unittest.TestCase):
