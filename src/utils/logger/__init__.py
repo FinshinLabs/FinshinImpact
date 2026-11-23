@@ -14,7 +14,7 @@ from ._enhancer import BotLogger
 from ._formatter import create_formatter
 from ._handler import create_file_handler
 
-_initialized = False  # 模块级状态
+_initialized = False
 _setup_lock = threading.Lock()
 
 # 派生格式器：文件日志自用，仪表盘那份对外
@@ -86,10 +86,6 @@ def get_logger(name: str = "") -> BotLogger:
         bot_logger.addHandler(create_file_handler(_FORMATTER, BOT_LOG))
         bot_logger.addHandler(create_file_handler(_FORMATTER, DEBUG_LOG, logging.DEBUG))
 
-        # 事件库把处理函数的崩错只记在自己那只日志器上，根日志器静音就一起吞了
-        logging.getLogger("aiogram").addHandler(
-            create_file_handler(_FORMATTER, DEBUG_LOG, logging.ERROR)
-        )
         _initialized = True  # 此后走无锁快速路径
 
     return logger
