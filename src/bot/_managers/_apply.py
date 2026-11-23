@@ -6,16 +6,17 @@
 from typing import TYPE_CHECKING
 
 from finshin_sdk import PlatformMoment
-from finshin_sdk.domain import ConfigKey, FieldKey
 from skin.messages import CheckMessage, DialogMessage
 from system.profile_env import get_profile, read_token
 from ui import gui_bridge
 from utils import config_manager
-from utils.config import FieldErrors
+from utils.config import FieldErrors, owner_item
 from utils.init_files import save_persona_text
 from utils.network import link_report
+from utils.paths import PLATFORM
 from utils.persona import applied_persona_text, load_persona_cache, save_applied_persona
 
+from .._adapter_host import parts_for
 from ..error_guard import error_guard
 
 if TYPE_CHECKING:
@@ -111,7 +112,7 @@ class ConfigApplier:
         self._resolved_proxy = None
 
         errors = host._settings_manager.last_errors
-        if self._is_token_fatal(errors):
+        if host._settings_manager.last_fatal or self._is_token_fatal(errors):
             host._logger.error("Token 探测失败，弹窗引导退出")
             gui_bridge.request_notice.emit(CheckMessage.TOKEN_FATAL, True)
             return
@@ -137,7 +138,8 @@ class ConfigApplier:
 
         - 由主人 id 与生效正文两项构成
         """
-        owner = config_manager.get(ConfigKey.OWNER.path("plugin.AI", "chore"), str)
+        item = owner_item()
+        owner = config_manager.get(item, str) if item is not None else ""
         return (owner.strip(), applied_persona_text())
 
     async def commit_persona(self, text: str, source: str) -> None:
@@ -198,7 +200,7 @@ class ConfigApplier:
     def _is_token_fatal(self, errors: FieldErrors) -> bool:
         """判定是否凭证致命错"""
         # 面板改不了凭证，拦在配置向导里出不去，故报错即致命
-        return FieldKey.TOKEN in errors
+        return parts_for(PLATFORM).credential.item in errors
 
     def get_config_func(self) -> tuple[str, str | None]:
         """读取 Token 与生效 Proxy

@@ -26,7 +26,7 @@ async def handle_ai_chat(ctx: HandlerContext) -> None:
     await service.enqueue(
         TaskItem(
             container_key=key,
-            principal_key=ctx.event.principal.key,
+            principal_key=ctx.event.principal.dotted,
             kind=_TASK_KIND,
             ctx=ctx,
         )

@@ -17,9 +17,12 @@ from utils.check import local_row, run_probe_round
 from utils.config import (
     AppSchema,
     FieldErrors,
+    SourceKind,
     ensure_config,
     get_schema,
     load_config,
+    owner_item,
+    source_identity,
     source_values,
 )
 from utils.network import (
@@ -37,13 +40,13 @@ from ._config_sources import config_sources, enabled_plugin_declarations
 from ._probe_frame import pending_rows, settled_rows, skipped_plan
 
 
-def _label_of(schema: AppSchema, item: ConfigPath | str) -> str:
+def _label_of(schema: AppSchema, item: ConfigPath) -> str:
     """按配置项身份取界面标题"""
     for tab in schema:
         for fld in tab.fields:
             if tab.path_of(fld) == item:
                 return fld.label
-    return str(item)
+    return item.dotted
 
 
 class SettingsManager(BaseManager):
@@ -69,10 +72,13 @@ class SettingsManager(BaseManager):
         # 最近一轮网络探测的连通结论，与本地校验错身分开记
         self.link_verified = False
 
+        self.last_failure_detail = ""
+        self.last_fatal = False
+
         # 上次验证时的计划输入，变化判定基准
         self._net_key: object = None
 
-        # 插件探测的免测基准：上次复用键与上轮是否通过
+        # 插件探测的免测基准：上次免测键与上轮是否通过
         self._plugin_keys: dict[str, object] = {}
         self._plugin_ok: set[str] = set()
 
@@ -80,21 +86,25 @@ class SettingsManager(BaseManager):
         """加载配置进内存"""
         ensure_config(config_sources())
         config_manager.load(load_config())
+        if owner_item() is None:
+            self.logger.info("配置里没有标 owner 的字段，主人档保持空白")
 
     async def verify_connectivity(self, from_candidate: bool = False) -> bool:
         """按字段变化分流的连通校验
 
         - 网络参数全未变、上轮连通通过且引擎不在断连周期时只跑本地校验
-        - 保存轮再跑插件交的探测，启动轮一律不跑
-        - 先跑平台那轮再跑插件那轮，行并进同一张表
+        - 保存轮再跑插件交的探测，启动轮一律不跑，平台那轮先于插件那轮，行并进同一张表
         """
         t0 = time.monotonic()
+        self.last_failure_detail = ""
+        self.last_fatal = False
         schema = get_schema()
         parts = parts_for(PLATFORM)
-        values = source_values(
-            f"adapter.{PLATFORM}", parts.sections, config_manager.get_all()
+        identity = source_identity(SourceKind.ADAPTER, str(PLATFORM))
+        values = source_values(identity, parts.sections, config_manager.get_all())
+        plan = parts.plan_for(
+            values, self._get_token(), system_proxy=detect_system_proxy()
         )
-        plan = parts.plan_for(values, self._get_token(), detect_system_proxy())
         local_frame, type_errors = local_row(schema, config_manager.get_all())
         rounds = self._plugin_rounds(type_errors) if from_candidate else ()
         runnable = tuple((name, item) for name, item in rounds if item.channels)
@@ -128,6 +138,7 @@ class SettingsManager(BaseManager):
             self.resolved_proxy = resolved
             self.link_verified = resolved is not None
             settled = settled_rows(plan, outcome)
+            self._remember_verdict(verdict)
             self._log_verdict(verdict)
 
         plugin_errors = await self._run_plugin_rounds(
@@ -159,6 +170,7 @@ class SettingsManager(BaseManager):
             )
             plugin_verdict = item.finish(outcome)
             plugin_errors.update(plugin_verdict.field_errors)
+            self._remember_verdict(plugin_verdict)
             self._log_verdict(plugin_verdict)
             self._plugin_keys[name] = item.reuse_key
             if outcome.accepted is not None:
@@ -174,20 +186,19 @@ class SettingsManager(BaseManager):
         """按保存轮候选值装配插件探测计划
 
         - 本地已有类型错、不交计划或计划为空的来源都不探测
-        - 值没变且上轮通过的直接给绿灯行，不再发请求
+        - 值没变且上轮通过的直接给绿灯行，不发请求
         """
         rounds: list[tuple[str, ConnectionPlan]] = []
         for name, declared in enabled_plugin_declarations():
             if declared.probe is None:
                 continue
-            source = f"plugin.{name}"
-            if any(
-                isinstance(item, ConfigPath) and item.source == source
-                for item in type_errors
-            ):
+            source = source_identity(SourceKind.PLUGIN, name)
+            if any(item.source == source for item in type_errors):
                 continue
             try:
-                plan = declared.probe()
+                plan = declared.probe(
+                    source_values(source, declared.sections, config_manager.get_all())
+                )
             except Exception as e:
                 self.logger.send_error(f"插件 {name} 探测计划造不出来", e)
                 continue
@@ -235,6 +246,15 @@ class SettingsManager(BaseManager):
             self.logger.debug(head)
         gui_bridge.verify_progress.emit(frame)
 
+    def _remember_verdict(self, verdict: PlanVerdict) -> None:
+        """记下结论句与致命旗
+
+        - 非空结论句只留先到的一句，致命旗一旦为真即保持
+        """
+        if not self.last_failure_detail and verdict.failure_detail:
+            self.last_failure_detail = verdict.failure_detail
+        self.last_fatal = self.last_fatal or verdict.fatal
+
     def _log_verdict(self, verdict: PlanVerdict) -> None:
         """把裁决里的日志句写进日志"""
         if verdict.notice:
@@ -250,13 +270,16 @@ class SettingsManager(BaseManager):
         """
         _, type_errors = local_row(schema, config_manager.get_all())
         self.last_errors = type_errors
+        self.last_failure_detail = ""
+        self.last_fatal = False
         self.logger.info(CheckMessage.LOCAL_ONLY)
         return self._emit_advice(schema)
 
     def _emit_advice(self, schema: AppSchema) -> bool:
         """发送结论帧
 
-        - 失败只报数量，明细由字段标红与悬浮提示显示
+        - 失败优先用结论句，没有才报字段数量
+        - 明细由字段标红与悬浮提示显示
         """
         passed = not self.last_errors
         gui_bridge.verify_progress.emit(
@@ -266,7 +289,8 @@ class SettingsManager(BaseManager):
                 "detail": (
                     CheckMessage.ADVICE_OK
                     if passed
-                    else CheckMessage.VERIFY_ADVICE_FAIL.format(n=len(self.last_errors))
+                    else self.last_failure_detail
+                    or CheckMessage.VERIFY_ADVICE_FAIL.format(n=len(self.last_errors))
                 ),
             }
         )

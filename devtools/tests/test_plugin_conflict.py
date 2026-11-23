@@ -22,11 +22,11 @@ from system.profile_env import set_profile  # noqa: E402
 set_profile("tg.000000")
 
 from finshin_sdk.domain import (  # noqa: E402
-    PLUGINS_PKG,
+    BUNDLED_PLUGINS_PKG,
     CommandTaken,
-    HelpKey,
-    ManifestKey,
+    HelpKeys,
     PluginClaim,
+    PluginManifestKeys,
     resolve_claims,
 )
 from services.env_setup import deps_manifest  # noqa: E402
@@ -127,7 +127,7 @@ class TestLoaderRefusal(unittest.TestCase):
         _write(self.root, "first", ("ping",))
         _write(self.root, "second", ("ping",))
         patcher = patch.object(
-            _manifest, "_plugins_roots", lambda: [(self.root, PLUGINS_PKG)]
+            _manifest, "_plugins_roots", lambda: [(self.root, BUNDLED_PLUGINS_PKG)]
         )
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -165,8 +165,10 @@ class TestTwoReadersAgree(unittest.TestCase):
     ) -> tuple[dict[str, tuple[str, ...]], dict[str, tuple[str, ...]]]:
         """分别取两份读侧认到的命令名"""
         rows = {
-            row[ManifestKey.NAME]: tuple(cmd for cmd, _ in row[HelpKey.COMMANDS])
-            for row in deps_manifest.load_manifests([(root, PLUGINS_PKG)])
+            row[PluginManifestKeys.NAME]: tuple(
+                cmd for cmd, _ in row[HelpKeys.COMMANDS]
+            )
+            for row in deps_manifest.load_manifests([(root, BUNDLED_PLUGINS_PKG)])
         }
         manifests = {
             name: tuple(
@@ -175,7 +177,7 @@ class TestTwoReadersAgree(unittest.TestCase):
                 for command in section.commands
             )
             for name, manifest in _manifest._load_manifests(
-                root, PLUGINS_PKG, False
+                root, BUNDLED_PLUGINS_PKG, False
             ).items()
         }
         return rows, manifests

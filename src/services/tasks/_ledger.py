@@ -9,7 +9,7 @@ from pathlib import Path
 
 from data import Repositories, build_repositories, get_connection
 from finshin_sdk.domain import TaskStatus
-from finshin_sdk.domain.ids import KEY_SEP, PrincipalKey, TaskId
+from finshin_sdk.domain.ids import PrincipalKey
 from finshin_sdk.dto import TaskPatchDTO, TaskRequestDTO
 
 from ._queue import TaskItem
@@ -106,9 +106,13 @@ class TaskLedger:
 
         - 报错与查无此行一并上报
         """
-        task_id = TaskId(f"{item.principal_key}{KEY_SEP}{item.kind}")
+        task_key = TaskRequestDTO(
+            principal=item.ctx.event.principal,
+            kind=item.kind,
+            source_ref=item.ctx.event.ref,
+        ).dotted
         try:
             repos = await self._book()
-            await repos.task.patch(task_id, patch)
+            await repos.task.patch(task_key, patch)
         except Exception as e:
             self._on_fault(item, e)

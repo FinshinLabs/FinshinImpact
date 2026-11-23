@@ -29,7 +29,7 @@ from bundled._shared.messages import BotMessage  # noqa: E402
 from bundled.help import _commands  # noqa: E402
 from finshin_sdk import HandlerContext  # noqa: E402
 from finshin_sdk.domain import ContentKind, MessageRoute  # noqa: E402
-from finshin_sdk.dto import MsgReferenceDTO, OutboundPayloadDTO  # noqa: E402
+from finshin_sdk.dto import MessageRefDTO, OutboundPayloadDTO  # noqa: E402
 
 _GROUP = Chat(id=-100123, type="supergroup", title="测试群")
 _PRIVATE = Chat(id=456, type="private")
@@ -66,7 +66,7 @@ class _RecordingInteraction:
     def __init__(self) -> None:
         self.sent: list[str] = []
         self.payloads: list[OutboundPayloadDTO] = []
-        self.replies: list[MsgReferenceDTO | None] = []
+        self.replies: list[MessageRefDTO | None] = []
 
     async def send_message(
         self,
@@ -74,8 +74,8 @@ class _RecordingInteraction:
         payload: OutboundPayloadDTO,
         *,
         mention: bool = False,
-        reply_ref: MsgReferenceDTO | None = None,
-    ) -> MsgReferenceDTO | None:
+        reply_ref: MessageRefDTO | None = None,
+    ) -> MessageRefDTO | None:
         self.sent.append(payload.text)
         self.payloads.append(payload)
         self.replies.append(reply_ref)

@@ -11,7 +11,7 @@ from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QTextEdit, QWidget
 
 from skin.theme import FiveStateDialogTheme, ObjectName
-from utils.network import FrameKey, RowStatus
+from utils.network import CHECKING, FrameKey, RowStatus
 
 from .._lifecycle import Ticker
 
@@ -22,7 +22,7 @@ def _state_map(cfg: FiveStateDialogTheme) -> dict[str, tuple[str, str]]:
     """按弹窗令牌拼状态到符号颜色的渲染表"""
     return {
         RowStatus.PENDING: (cfg.pending_mark, cfg.pending_color),
-        RowStatus.CHECKING: (cfg.checking_mark, cfg.checking_color),
+        CHECKING: (cfg.checking_mark, cfg.checking_color),
         RowStatus.OK: (cfg.ok_mark, cfg.ok_color),
         RowStatus.FAIL: (cfg.fail_mark, cfg.fail_color),
         RowStatus.SKIP: (cfg.skip_mark, cfg.skip_color),
@@ -64,7 +64,7 @@ class RowTable(QTextEdit):
         self._rows = {r["id"]: [r["title"], r["status"], r["detail"]] for r in rows}
         self._budgets = {r["id"]: int(r["budget"]) for r in rows if "budget" in r}
         self._elapsed = {
-            rid: 0 for rid in self._budgets if self._rows[rid][1] == RowStatus.CHECKING
+            rid: 0 for rid in self._budgets if self._rows[rid][1] == CHECKING
         }
         self._sync_clock()
         self._render()
@@ -80,12 +80,12 @@ class RowTable(QTextEdit):
             self.reset(frame[FrameKey.ROWS])
             return
         entry = self._rows.get(frame["id"])
-        if entry is None or entry[1] not in (RowStatus.PENDING, RowStatus.CHECKING):
+        if entry is None or entry[1] not in (RowStatus.PENDING, CHECKING):
             return
         entry[1] = frame.get("status", entry[1])
         entry[2] = frame.get("detail", entry[2])
         rid = frame["id"]
-        if entry[1] == RowStatus.CHECKING and rid in self._budgets:
+        if entry[1] == CHECKING and rid in self._budgets:
             self._elapsed.setdefault(rid, 0)
         else:
             self._elapsed.pop(rid, None)
@@ -103,7 +103,7 @@ class RowTable(QTextEdit):
     def _advance_clock(self) -> None:
         """进行中的行计时加一秒"""
         for rid in list(self._elapsed):
-            if self._rows.get(rid, ["", ""])[1] != RowStatus.CHECKING:
+            if self._rows.get(rid, ["", ""])[1] != CHECKING:
                 self._elapsed.pop(rid)
                 continue
             self._elapsed[rid] += 1
@@ -120,7 +120,7 @@ class RowTable(QTextEdit):
         for rid, (title, status, detail) in self._rows.items():
             mark, color = self._states[status]
             text = detail
-            if rid in self._elapsed and status == RowStatus.CHECKING:
+            if rid in self._elapsed and status == CHECKING:
                 tick = self._countdown.format(
                     n=self._elapsed[rid], budget=self._budgets[rid]
                 )

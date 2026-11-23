@@ -24,7 +24,7 @@ set_profile("tg.000000")
 from bundled._shared.messages import BotMessage  # noqa: E402
 from bundled.help import _services  # noqa: E402
 from exceptions import PluginManifestError  # noqa: E402
-from finshin_sdk.domain import HelpKey  # noqa: E402
+from finshin_sdk.domain import HelpKeys  # noqa: E402
 from finshin_sdk.dto import HelpCommandDTO, HelpFlagDTO, HelpSectionDTO  # noqa: E402
 from utils.plugin import _manifest_help  # noqa: E402
 
@@ -35,7 +35,7 @@ _PLUGIN = "demo"
 def _section(raw_command: Any) -> list[dict[str, Any]]:
     """把单条命令包成一段帮助贡献"""
     return [
-        {HelpKey.SECTION: "工具", HelpKey.NOTE: "", HelpKey.COMMANDS: [raw_command]}
+        {HelpKeys.SECTION: "工具", HelpKeys.NOTE: "", HelpKeys.COMMANDS: [raw_command]}
     ]
 
 
@@ -51,32 +51,32 @@ class TestHelpCommandParse(unittest.TestCase):
         return _read(_section(raw_command))[0].commands[0]
 
     def test_defaults_when_optional_keys_absent(self) -> None:
-        spec = self._parse({HelpKey.CMD: "md", HelpKey.DESC: "图片输出"})
+        spec = self._parse({HelpKeys.CMD: "md", HelpKeys.DESC: "图片输出"})
         self.assertEqual(spec.flags, ())
         self.assertEqual(spec.args, "")
 
     def test_registered_args_kept_as_declared(self) -> None:
         spec = self._parse(
             {
-                HelpKey.CMD: "push",
-                HelpKey.DESC: "推送消息",
-                HelpKey.ARGS: "文件路径",
+                HelpKeys.CMD: "push",
+                HelpKeys.DESC: "推送消息",
+                HelpKeys.ARGS: "文件路径",
             }
         )
         self.assertEqual(spec.args, "文件路径")
 
     def test_non_str_args_skips_command(self) -> None:
         sections = _section(
-            {HelpKey.CMD: "push", HelpKey.DESC: "推送消息", HelpKey.ARGS: ["路径"]}
+            {HelpKeys.CMD: "push", HelpKeys.DESC: "推送消息", HelpKeys.ARGS: ["路径"]}
         )
         self.assertEqual(_read(sections)[0].commands, ())
 
     def test_registered_flags_kept_as_declared(self) -> None:
         spec = self._parse(
             {
-                HelpKey.CMD: "md",
-                HelpKey.DESC: "图片输出",
-                HelpKey.FLAGS: [["-i", "图片输入"], ["-t", "输出速度", 1.0]],
+                HelpKeys.CMD: "md",
+                HelpKeys.DESC: "图片输出",
+                HelpKeys.FLAGS: [["-i", "图片输入"], ["-t", "输出速度", 1.0]],
             }
         )
         self.assertEqual(
@@ -86,16 +86,20 @@ class TestHelpCommandParse(unittest.TestCase):
 
     def test_flag_without_default_is_pure_switch(self) -> None:
         spec = self._parse(
-            {HelpKey.CMD: "md", HelpKey.DESC: "图片输出", HelpKey.FLAGS: [["-i", "图"]]}
+            {
+                HelpKeys.CMD: "md",
+                HelpKeys.DESC: "图片输出",
+                HelpKeys.FLAGS: [["-i", "图"]],
+            }
         )
         self.assertIsNone(spec.flags[0].default)
 
     def test_integer_default_parses_as_int(self) -> None:
         spec = self._parse(
             {
-                HelpKey.CMD: "md",
-                HelpKey.DESC: "图片输出",
-                HelpKey.FLAGS: [["-n", "次数", 3]],
+                HelpKeys.CMD: "md",
+                HelpKeys.DESC: "图片输出",
+                HelpKeys.FLAGS: [["-n", "次数", 3]],
             }
         )
         self.assertEqual(spec.flags[0].default, 3)
@@ -109,9 +113,9 @@ class TestHelpCommandParse(unittest.TestCase):
             with self.subTest(raw_flag=raw_flag):
                 sections = _section(
                     {
-                        HelpKey.CMD: "md",
-                        HelpKey.DESC: "图片输出",
-                        HelpKey.FLAGS: [raw_flag],
+                        HelpKeys.CMD: "md",
+                        HelpKeys.DESC: "图片输出",
+                        HelpKeys.FLAGS: [raw_flag],
                     }
                 )
                 with self.assertRaises(PluginManifestError):
@@ -119,28 +123,34 @@ class TestHelpCommandParse(unittest.TestCase):
 
     def test_flag_name_without_dash_skips_command(self) -> None:
         sections = _section(
-            {HelpKey.CMD: "md", HelpKey.DESC: "图片输出", HelpKey.FLAGS: [["i", "图"]]}
+            {
+                HelpKeys.CMD: "md",
+                HelpKeys.DESC: "图片输出",
+                HelpKeys.FLAGS: [["i", "图"]],
+            }
         )
         self.assertEqual(_read(sections)[0].commands, ())
 
     def test_flag_item_with_four_parts_skips_command(self) -> None:
         sections = _section(
             {
-                HelpKey.CMD: "md",
-                HelpKey.DESC: "图片输出",
-                HelpKey.FLAGS: [["-i", "图", "值", "多一段"]],
+                HelpKeys.CMD: "md",
+                HelpKeys.DESC: "图片输出",
+                HelpKeys.FLAGS: [["-i", "图", "值", "多一段"]],
             }
         )
         self.assertEqual(_read(sections)[0].commands, ())
 
     def test_empty_flags_list_parses_empty(self) -> None:
         spec = self._parse(
-            {HelpKey.CMD: "md", HelpKey.DESC: "图片输出", HelpKey.FLAGS: []}
+            {HelpKeys.CMD: "md", HelpKeys.DESC: "图片输出", HelpKeys.FLAGS: []}
         )
         self.assertEqual(spec.flags, ())
 
     def test_unlisted_key_keeps_command_and_logs(self) -> None:
-        sections = _section({HelpKey.CMD: "md", HelpKey.DESC: "图片输出", "arg": True})
+        sections = _section(
+            {HelpKeys.CMD: "md", HelpKeys.DESC: "图片输出", "arg": True}
+        )
         with self.assertLogs("Bot.Plugin", level="DEBUG") as captured:
             commands = _read(sections)[0].commands
         self.assertEqual([spec.cmd for spec in commands], ["md"])
@@ -148,47 +158,56 @@ class TestHelpCommandParse(unittest.TestCase):
 
     def test_extra_key_keeps_declared_fields(self) -> None:
         spec = self._parse(
-            {HelpKey.CMD: "md", HelpKey.DESC: "图片输出", "switch": ["-i"]}
+            {HelpKeys.CMD: "md", HelpKeys.DESC: "图片输出", "switch": ["-i"]}
         )
         self.assertEqual(spec.desc, "图片输出")
 
     def test_wrong_type_with_extra_key_still_skips_command(self) -> None:
         sections = _section(
-            {HelpKey.CMD: "md", HelpKey.DESC: "图片输出", HelpKey.FLAGS: "-i", "tip": 1}
+            {
+                HelpKeys.CMD: "md",
+                HelpKeys.DESC: "图片输出",
+                HelpKeys.FLAGS: "-i",
+                "tip": 1,
+            }
         )
         self.assertEqual(_read(sections)[0].commands, ())
 
     def test_missing_desc_skips_command(self) -> None:
-        sections = _section({HelpKey.CMD: "md"})
+        sections = _section({HelpKeys.CMD: "md"})
         self.assertEqual(_read(sections)[0].commands, ())
 
     def test_non_list_flags_skips_command(self) -> None:
         sections = _section(
-            {HelpKey.CMD: "md", HelpKey.DESC: "图片输出", HelpKey.FLAGS: "-i"}
+            {HelpKeys.CMD: "md", HelpKeys.DESC: "图片输出", HelpKeys.FLAGS: "-i"}
         )
         self.assertEqual(_read(sections)[0].commands, ())
 
     def test_bare_flag_token_skips_command(self) -> None:
         sections = _section(
-            {HelpKey.CMD: "md", HelpKey.DESC: "图片输出", HelpKey.FLAGS: ["-i"]}
+            {HelpKeys.CMD: "md", HelpKeys.DESC: "图片输出", HelpKeys.FLAGS: ["-i"]}
         )
         self.assertEqual(_read(sections)[0].commands, ())
 
     def test_flag_item_without_note_skips_command(self) -> None:
         sections = _section(
-            {HelpKey.CMD: "md", HelpKey.DESC: "图片输出", HelpKey.FLAGS: [["-i"]]}
+            {HelpKeys.CMD: "md", HelpKeys.DESC: "图片输出", HelpKeys.FLAGS: [["-i"]]}
         )
         self.assertEqual(_read(sections)[0].commands, ())
 
     def test_flag_item_with_empty_note_skips_command(self) -> None:
         sections = _section(
-            {HelpKey.CMD: "md", HelpKey.DESC: "图片输出", HelpKey.FLAGS: [["-i", ""]]}
+            {
+                HelpKeys.CMD: "md",
+                HelpKeys.DESC: "图片输出",
+                HelpKeys.FLAGS: [["-i", ""]],
+            }
         )
         self.assertEqual(_read(sections)[0].commands, ())
 
     def test_non_str_member_skips_command(self) -> None:
         sections = _section(
-            {HelpKey.CMD: "md", HelpKey.DESC: "图片输出", HelpKey.FLAGS: [12]}
+            {HelpKeys.CMD: "md", HelpKeys.DESC: "图片输出", HelpKeys.FLAGS: [12]}
         )
         self.assertEqual(_read(sections)[0].commands, ())
 
@@ -199,9 +218,9 @@ class TestHelpSectionParse(unittest.TestCase):
     def test_extra_key_keeps_section_and_logs(self) -> None:
         sections = [
             {
-                HelpKey.SECTION: "工具",
-                HelpKey.NOTE: "说明",
-                HelpKey.COMMANDS: [],
+                HelpKeys.SECTION: "工具",
+                HelpKeys.NOTE: "说明",
+                HelpKeys.COMMANDS: [],
                 "tip": "多写一段",
             }
         ]
@@ -211,7 +230,7 @@ class TestHelpSectionParse(unittest.TestCase):
         self.assertIn("tip", captured.records[0].getMessage())
 
     def test_wrong_type_with_extra_key_still_skips_section(self) -> None:
-        sections = [{HelpKey.SECTION: "工具", HelpKey.COMMANDS: {}, "tip": 1}]
+        sections = [{HelpKeys.SECTION: "工具", HelpKeys.COMMANDS: {}, "tip": 1}]
         self.assertEqual(_read(sections), ())
 
 

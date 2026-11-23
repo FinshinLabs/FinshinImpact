@@ -12,13 +12,13 @@ from pathlib import Path
 from typing import Any
 
 from finshin_sdk.domain import (
-    ADAPTER_DECLARATION_FILE,
     ADAPTER_ENTRY_ATTR,
     ADAPTER_ENTRY_GROUP,
-    ADAPTER_MANIFEST_FIELDS,
-    ADAPTERS_PKG,
-    AdapterManifestKey,
-    Platform,
+    ADAPTER_MANIFEST_FILE,
+    ADAPTER_MANIFEST_TABLE,
+    ADAPTERS_DIR,
+    AdapterManifestKeys,
+    PlatformCode,
 )
 from finshin_sdk.dto import AdapterManifestDTO
 from system.distributions import SDK_DISTRIBUTION, requires_of
@@ -26,26 +26,26 @@ from system.profile_env import ROOT_DIR
 from system.toml_read import read_toml
 
 # 声明里的标量字段与期望类型
-_SCALAR_TYPES: dict[AdapterManifestKey, type] = {
+_SCALAR_TYPES: dict[AdapterManifestKeys, type] = {
     spec.key: spec.value_type
-    for spec in ADAPTER_MANIFEST_FIELDS
+    for spec in ADAPTER_MANIFEST_TABLE
     if spec.value_type is not list
 }
 
 # 声明里的必填字段，缺任一即整份拒收
-_REQUIRED_KEYS = tuple(spec.key for spec in ADAPTER_MANIFEST_FIELDS if spec.required)
+_REQUIRED_KEYS = tuple(spec.key for spec in ADAPTER_MANIFEST_TABLE if spec.required)
 
 # 入口点值里模块与属性的分隔符
 _ENTRY_SEP = ":"
 
 
-def load_adapter_manifests() -> dict[Platform, AdapterManifestDTO]:
+def load_adapter_manifests() -> dict[PlatformCode, AdapterManifestDTO]:
     """按目录与已装包两路聚合适配器声明
 
     - 目录先读，同平台的已装包那份不进表
     - 目录按名升序插入并保留顺序
     """
-    manifests: dict[Platform, AdapterManifestDTO] = {}
+    manifests: dict[PlatformCode, AdapterManifestDTO] = {}
     for dto, _name in _scan_dirs():
         manifests.setdefault(dto.platform, dto)
     for dto in _from_installed():
@@ -54,7 +54,7 @@ def load_adapter_manifests() -> dict[Platform, AdapterManifestDTO]:
     return manifests
 
 
-def tree_distributions() -> dict[Platform, str]:
+def tree_distributions() -> dict[PlatformCode, str]:
     """挂载仓适配器的发行件名表
 
     - 交出平台码到声明发行件名的表
@@ -63,7 +63,7 @@ def tree_distributions() -> dict[Platform, str]:
     return {dto.platform: name for dto, name in _scan_dirs()}
 
 
-def adapter_deps_union(exclude: Platform | None = None) -> list[str]:
+def adapter_deps_union(exclude: PlatformCode | None = None) -> list[str]:
     """汇总各适配器声明的依赖
 
     - 全部适配器的依赖都进表，与启用集无关
@@ -77,7 +77,7 @@ def adapter_deps_union(exclude: Platform | None = None) -> list[str]:
     ]
 
 
-def installed_adapter_pins(exclude: Platform | None = None) -> list[str]:
+def installed_adapter_pins(exclude: PlatformCode | None = None) -> list[str]:
     """已装适配器包的 pin 清单
 
     - 目录里的适配器以源码在场，不进这份表
@@ -94,7 +94,7 @@ def installed_adapter_pins(exclude: Platform | None = None) -> list[str]:
     return pins
 
 
-def _excluded(name: str, exclude: Platform | None) -> bool:
+def _excluded(name: str, exclude: PlatformCode | None) -> bool:
     """判入口点是否属点名排除的平台
 
     - 没点名排除即一律不排，平台标识认不出的也留下
@@ -107,7 +107,7 @@ def _adapters_dir() -> Path | None:
 
     - 根不在盘上返回 None，由调用方处理
     """
-    root = ROOT_DIR / ADAPTERS_PKG
+    root = ROOT_DIR / ADAPTERS_DIR
     return root if root.is_dir() else None
 
 
@@ -130,12 +130,12 @@ def _read_dir(adapter_dir: Path) -> tuple[AdapterManifestDTO, str] | None:
     """读取适配器声明
 
     - 文件缺失或解析失败返回 None
-    - 必填项缺失、字段空值、平台标识非法则整份拒收
+    - 必填项缺失、字段空值、平台码为空则整份拒收
     - 数组字段缺省为空表，出现非字符串或空串项同样整份拒收
     - 入口点没点名本平台、或属性名不合本体规定，整份拒收
     - 认下来交出声明与项目名
     """
-    data = read_toml(adapter_dir / ADAPTER_DECLARATION_FILE)
+    data = read_toml(adapter_dir / ADAPTER_MANIFEST_FILE)
     if data is None:
         return None
 
@@ -143,7 +143,7 @@ def _read_dir(adapter_dir: Path) -> tuple[AdapterManifestDTO, str] | None:
     if values is None:
         return None
 
-    platform = _platform_of(values[AdapterManifestKey.PLATFORM])
+    platform = _platform_of(values[AdapterManifestKeys.PLATFORM])
     if platform is None:
         return None
 
@@ -151,7 +151,7 @@ def _read_dir(adapter_dir: Path) -> tuple[AdapterManifestDTO, str] | None:
     if entry is None:
         return None
 
-    deps = values[AdapterManifestKey.DEPS]
+    deps = values[AdapterManifestKeys.DEPS]
 
     return (
         AdapterManifestDTO(
@@ -176,7 +176,7 @@ def _project_name(data: dict[str, Any]) -> str:
 def _declared_values(data: dict[str, Any]) -> dict[str, Any] | None:
     """按字段表读取声明值"""
     values: dict[str, Any] = {}
-    for spec in ADAPTER_MANIFEST_FIELDS:
+    for spec in ADAPTER_MANIFEST_TABLE:
         raw = _dig(data, spec.key.value)
         if spec.value_type is list:
             if raw is None:
@@ -211,7 +211,7 @@ def _dig(data: dict[str, Any], key: str) -> Any:
     return node
 
 
-def _entry_module(data: dict[str, Any], platform: Platform) -> str | None:
+def _entry_module(data: dict[str, Any], platform: PlatformCode) -> str | None:
     """读取本平台入口模块名
 
     - 段名即本体规定的入口点组，键为平台标识
@@ -259,7 +259,7 @@ class InstalledAdapter:
     - 平台码取入口点名，发行件名与版本取包元数据
     """
 
-    platform: Platform
+    platform: PlatformCode
     distribution: str
     version: str
     requires: tuple[str, ...]
@@ -269,7 +269,7 @@ class InstalledAdapter:
 def installed_adapters() -> tuple[InstalledAdapter, ...]:
     """列已装且本体认得平台的适配器包
 
-    - 平台码不在词表、或入口属性名不合本体规定的不进表
+    - 平台码为空、或入口属性名不合本体规定的不进表
     """
     found: list[InstalledAdapter] = []
     for point in _installed_points():
@@ -295,9 +295,9 @@ def _installed_points() -> tuple[EntryPoint, ...]:
     return tuple(entry_points(group=ADAPTER_ENTRY_GROUP))
 
 
-def _platform_of(name: str) -> Platform | None:
-    """认平台标识"""
-    try:
-        return Platform(name)
-    except ValueError:
-        return None
+def _platform_of(name: str) -> PlatformCode | None:
+    """取适配器自报的平台码
+
+    - 空串交出 None，其余原样收下
+    """
+    return PlatformCode(name) if name else None

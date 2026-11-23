@@ -11,20 +11,19 @@ import aiosqlite
 from core import TaskRepository
 from finshin_sdk.domain import (
     ChatRole,
-    Platform,
+    PlatformCode,
     TaskPayload,
     TaskStatus,
 )
 from finshin_sdk.domain.ids import (
-    KEY_SEP,
-    ContainerKey,
+    ContainerCode,
     MessageId,
     PrincipalKey,
-    TaskId,
+    TaskKey,
     UserId,
 )
 from finshin_sdk.dto import (
-    MsgReferenceDTO,
+    MessageRefDTO,
     PrincipalDTO,
     TaskDTO,
     TaskPatchDTO,
@@ -62,10 +61,10 @@ class SqliteTaskRepository(TaskRepository):
             " sequence = excluded.sequence, status = excluded.status,"
             " payload = excluded.payload, source_ref = excluded.source_ref",
             (
-                TaskId(f"{request.principal.key}{KEY_SEP}{request.kind}"),
-                request.principal.key,
+                request.dotted,
+                request.principal.dotted,
                 request.kind,
-                await self._next_sequence(request.principal.key),
+                await self._next_sequence(request.principal.dotted),
                 TaskStatus.PENDING,
                 _encode_payload(request.payload),
                 _encode_ref(request.source_ref),
@@ -81,7 +80,7 @@ class SqliteTaskRepository(TaskRepository):
             payload=request.payload,
         )
 
-    async def patch(self, task_id: TaskId, patch: TaskPatchDTO) -> TaskDTO | None:
+    async def patch(self, task_id: TaskKey, patch: TaskPatchDTO) -> TaskDTO | None:
         """更新任务
 
         - 任务不存在或状态迁移非法返回 None
@@ -101,8 +100,8 @@ class SqliteTaskRepository(TaskRepository):
         await self._conn.commit()
         return await self.find(task_id)
 
-    async def find(self, task_id: TaskId) -> TaskDTO | None:
-        """按 ID 查询"""
+    async def find(self, task_id: TaskKey) -> TaskDTO | None:
+        """按任务键查询"""
         async with self._conn.execute(
             f"SELECT {_TASK_COLUMNS} FROM task WHERE id = ?", (task_id,)
         ) as cursor:
@@ -134,19 +133,19 @@ class SqliteTaskRepository(TaskRepository):
 
     def _to_dto(self, row: aiosqlite.Row) -> TaskDTO:
         """行转任务快照"""
-        platform, container, user = row["principal"].split(KEY_SEP, 2)
+        platform, container, user = row["principal"].split(".", 2)
         source = json.loads(row["source_ref"])
         return TaskDTO(
             principal=PrincipalDTO(
-                platform=Platform(platform),
-                container=ContainerKey(container),
+                platform=PlatformCode(platform),
+                container=ContainerCode(container),
                 user=UserId(user),
             ),
             kind=row["kind"],
             status=TaskStatus(row["status"]),
-            source_ref=MsgReferenceDTO(
-                platform=Platform(source["platform"]),
-                container=ContainerKey(source["container"]),
+            source_ref=MessageRefDTO(
+                platform=PlatformCode(source["platform"]),
+                container=ContainerCode(source["container"]),
                 message_id=MessageId(source["message_id"]),
             ),
             payload=_decode_payload(row["payload"]),
@@ -163,11 +162,11 @@ def _decode_payload(raw: str) -> TaskPayload:
     return tuple((ChatRole(role), text) for role, text in json.loads(raw))
 
 
-def _encode_ref(ref: MsgReferenceDTO) -> str:
+def _encode_ref(ref: MessageRefDTO) -> str:
     """消息定位三元组编码为 JSON"""
     return json.dumps(
         {
-            "platform": str(ref.platform),
+            "platform": ref.platform,
             "container": ref.container,
             "message_id": ref.message_id,
         },

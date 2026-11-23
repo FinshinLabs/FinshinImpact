@@ -93,7 +93,7 @@ def assemble(sources: Sequence[ConfigSource]) -> ConfigPlan:
     items: list[AssembledSection] = []
     owners: dict[str, str] = {}
     for source in sources:
-        identity = _identity(source)
+        identity = source_identity(source.kind, source.code)
         names = "、".join(str(sec.section) for sec in source.sections)
         if identity in owners:
             _logger.error(
@@ -131,6 +131,14 @@ def current_plan() -> ConfigPlan | None:
     return _PLAN
 
 
+def source_identity(kind: SourceKind, code: str) -> str:
+    """来源身份码
+
+    - 本体来源只有类型一段，其余拼上身份码
+    """
+    return str(kind) if kind == SourceKind.CORE else f"{kind}.{code}"
+
+
 def section_name(source: str, section: str) -> str:
     """来源身份码与段名拼成盘上段名
 
@@ -152,18 +160,6 @@ def source_values(
         sec.section: data.get(section_name(source, sec.section)) or {}
         for sec in sections
     }
-
-
-def _identity(source: ConfigSource) -> str:
-    """来源身份码
-
-    - 本体侧只有来源类型一段
-    """
-    return (
-        str(source.kind)
-        if source.kind == SourceKind.CORE
-        else f"{source.kind}.{source.code}"
-    )
 
 
 def _unique_fields(identity: str, spec: SectionSpec) -> SectionSpec:

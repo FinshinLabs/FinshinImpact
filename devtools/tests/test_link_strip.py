@@ -23,26 +23,31 @@ from bundled.AI.utils import (  # noqa: E402
     build_turns,
     compose_user_text,
 )
-from finshin_sdk.domain import ChatRole, ChatScope, ContentKind, Platform  # noqa: E402
-from finshin_sdk.domain.ids import ContainerKey, MessageId, UserId  # noqa: E402
+from finshin_sdk.domain import (  # noqa: E402
+    ChatRole,
+    ChatScope,
+    ContentKind,
+    PlatformCode,
+)
+from finshin_sdk.domain.ids import ContainerCode, MessageId, UserId  # noqa: E402
 from finshin_sdk.dto import (  # noqa: E402
     ContentDTO,
     InboundEventDTO,
     MediaEntryDTO,
     MessageDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     PrincipalDTO,
 )
 
 
 def _event(text: str) -> InboundEventDTO:
     """构造一条群聊入站事件"""
-    container = ContainerKey("g100123")
+    container = ContainerCode("g100123")
     principal = PrincipalDTO(
-        platform=Platform.TELEGRAM, container=container, user=UserId("111")
+        platform=PlatformCode("tg"), container=container, user=UserId("111")
     )
-    ref = MsgReferenceDTO(
-        platform=Platform.TELEGRAM, container=container, message_id=MessageId("7")
+    ref = MessageRefDTO(
+        platform=PlatformCode("tg"), container=container, message_id=MessageId("7")
     )
     return InboundEventDTO(
         ref=ref,
@@ -55,12 +60,12 @@ def _event(text: str) -> InboundEventDTO:
 
 def _media_event(text: str, kind: ContentKind) -> InboundEventDTO:
     """构造一条带媒体与附文的入站事件"""
-    container = ContainerKey("g100123")
+    container = ContainerCode("g100123")
     principal = PrincipalDTO(
-        platform=Platform.TELEGRAM, container=container, user=UserId("111")
+        platform=PlatformCode("tg"), container=container, user=UserId("111")
     )
-    ref = MsgReferenceDTO(
-        platform=Platform.TELEGRAM, container=container, message_id=MessageId("7")
+    ref = MessageRefDTO(
+        platform=PlatformCode("tg"), container=container, message_id=MessageId("7")
     )
     media = MediaEntryDTO(
         kind=kind,

@@ -6,7 +6,7 @@
 
 from collections.abc import Sequence
 
-from finshin_sdk.domain import platform_of_profile
+from finshin_sdk.domain import PlatformCode, ProfileKey, platform_of_key
 
 from ..adapter_catalog import ReleaseRow
 from ..adapter_manifest import installed_adapters
@@ -19,17 +19,19 @@ from .wheel_fetch import download_release
 from .wheel_install import WheelFile, install_releases
 
 
-def instances_of(platform: str) -> int:
+def instances_of(platform: PlatformCode) -> int:
     """本机还有几个这一平台的实例
 
-    - 认不出平台的目录不算任何平台的实例
+    - 只数身份码前缀等于这一平台码的实例
     """
     return sum(
-        1 for code, _remark in list_profiles() if platform_of_profile(code) == platform
+        1
+        for code, _remark in list_profiles()
+        if platform_of_key(ProfileKey(code)) == platform
     )
 
 
-def uninstall_names(platform: str) -> tuple[str, ...]:
+def uninstall_names(platform: PlatformCode) -> tuple[str, ...]:
     """卸一只平台适配器要动的发行件名
 
     - 适配器包自身，加只有这一只声明过的库
@@ -37,7 +39,7 @@ def uninstall_names(platform: str) -> tuple[str, ...]:
     - 只算顶层发行件，传递依赖不在本函数算
     """
     target = next(
-        (item for item in installed_adapters() if str(item.platform) == platform), None
+        (item for item in installed_adapters() if item.platform == platform), None
     )
     if target is None:
         return ()

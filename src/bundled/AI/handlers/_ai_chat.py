@@ -68,7 +68,7 @@ async def _triggers_chat(ctx: HandlerContext) -> bool:
 
 async def _deny_private(platform_raw: object, ctx: HandlerContext) -> None:
     """私聊门槛回执"""
-    _logger.info(f"{ctx.event.principal.key} 无权私聊，已拦下")
+    _logger.info(f"{ctx.event.principal.dotted} 无权私聊，已拦下")
     await ctx.answer(BotMessage.CHAT_PRIVATE_DENIED)
 
 

@@ -8,8 +8,8 @@ import time
 import aiosqlite
 
 from core import PrincipalRepository
-from finshin_sdk.domain import Platform
-from finshin_sdk.domain.ids import ContainerKey, UserId
+from finshin_sdk.domain import PlatformCode
+from finshin_sdk.domain.ids import ContainerCode, UserId
 from finshin_sdk.dto import PrincipalDTO
 
 _SELECT_COLUMNS = "platform, container, user"
@@ -35,7 +35,7 @@ class SqlitePrincipalRepository(PrincipalRepository):
                 display_name = excluded.display_name
             """,
             (
-                principal.key,
+                principal.dotted,
                 principal.platform,
                 principal.container,
                 principal.user,
@@ -50,7 +50,7 @@ class SqlitePrincipalRepository(PrincipalRepository):
 def _to_dto(row: aiosqlite.Row) -> PrincipalDTO:
     """行转主体快照"""
     return PrincipalDTO(
-        platform=Platform(row["platform"]),
-        container=ContainerKey(row["container"]),
+        platform=PlatformCode(row["platform"]),
+        container=ContainerCode(row["container"]),
         user=UserId(row["user"]),
     )

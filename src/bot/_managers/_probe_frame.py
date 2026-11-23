@@ -6,7 +6,7 @@
 
 from finshin_sdk import ConnectionPlan, ProbeOutcome, ProbeRow
 from skin.messages import CheckMessage
-from utils.network import RowStatus
+from utils.network import CHECKING, RowStatus
 
 
 def pending_rows(plan: ConnectionPlan) -> list[dict]:
@@ -22,7 +22,7 @@ def pending_rows(plan: ConnectionPlan) -> list[dict]:
         }
         channel = channels.get(row.row_id)
         if channel is not None:
-            item["status"] = RowStatus.CHECKING
+            item["status"] = CHECKING
             item["budget"] = int(channel.budget)
         rows.append(item)
     return rows

@@ -6,7 +6,7 @@
 
 from dataclasses import dataclass, field
 
-from finshin_sdk.domain import ConfigPath, ConfigValue, FieldCondition
+from finshin_sdk.domain import ConfigPath, ConfigValue, FieldCondition, SourceCode
 
 # 一个标签页的键值表，键为配置键名
 TabData = dict[str, ConfigValue]
@@ -15,7 +15,7 @@ TabData = dict[str, ConfigValue]
 AppConfigData = dict[str, TabData]
 
 # 配置校验错误表：键为出错字段，值为提示文案
-FieldErrors = dict[ConfigPath | str, str]
+FieldErrors = dict[ConfigPath, str]
 
 # 单段说明子表，键名与该段下的值键同名
 SectionNotes = dict[str, str]
@@ -45,6 +45,7 @@ class FieldSchema:
     - options 非空即枚举字段，每项为「值 文案」对
     - bounds 为闭区间，仅 float 字段生效
     - 显隐条件全部命中才显示，空元组即恒显
+    - tags 为声明里带的用途标记
     """
 
     key: str
@@ -56,6 +57,7 @@ class FieldSchema:
     required: bool = False
     bounds: tuple[float, float] | None = None
     visible_when: tuple[FieldCondition, ...] = ()
+    tags: tuple[str, ...] = ()
 
 
 @dataclass
@@ -74,7 +76,9 @@ class TabSchema:
 
     def path_of(self, field: FieldSchema) -> ConfigPath:
         """字段在本来源下的完整身份"""
-        return ConfigPath(source=self.group, section=self.section_id, key=field.key)
+        return ConfigPath(
+            source=SourceCode(self.group), section=self.section_id, key=field.key
+        )
 
 
 AppSchema = list[TabSchema]  # 完整 UI 渲染结构树

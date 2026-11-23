@@ -148,7 +148,7 @@ md 的分号与相对链接判据见 [中文措辞](writing-style.md#中文措�
   - 分组顺序与文件内定义顺序对应，读者能对着看。
 - `__all__` 只有一项时豁免分组注释，直接裸写（如 `main`、`Main` 这类单一入口）。
 - 同源的散装模块级变量（常量、配置项、协议串）攒够三五件即收进命名空间类，不许裸变量持续堆积。
-- 接口包 `finshin_sdk/dto` 类型一律 `DTO` 后缀（如 `PrincipalDTO`、`MsgReferenceDTO`）。
+- 接口包 `finshin_sdk/dto` 类型一律 `DTO` 后缀（如 `PrincipalDTO`、`MessageRefDTO`）。
 - 类型后缀分三类：类型定义 `XxxType`，定位与寻址 `XxxKey`，身份 `XxxId`。
 - 语义冲突时优先保语义正确，枚举惯用后缀照旧保留（`Kind`、`Mode`、`Status`、`Role`、`Scope`、`Priority`、`Flag`、`Path`、`Spec`、`Schema`、`Callback`、`Result`），不为三类硬改成 `Type`。
 - 词根贯通：表达同一概念的属性、形参、局部缩写变量同批改名。

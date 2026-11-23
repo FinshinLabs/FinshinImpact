@@ -13,17 +13,18 @@ from pathlib import Path
 from typing import Any
 
 from finshin_sdk.domain import (
-    BUNDLED_PLUGIN_PRIORITY,
-    INSTALLED_PLUGINS_NAME,
+    BUNDLED_PLUGINS,
+    BUNDLED_PLUGINS_PKG,
+    BUNDLED_PRIORITY_TABLE,
+    INSTALLED_PLUGINS_DIR,
     INSTALLED_PLUGINS_PKG,
-    MANIFEST_FIELDS,
-    PLUGINS_PKG,
-    CommandPriority,
-    ManifestKey,
+    PLUGIN_MANIFEST_TABLE,
     PluginClaim,
     PluginFileName,
-    StateKey,
-    is_enabled,
+    PluginManifestKeys,
+    PluginPriority,
+    StateKeys,
+    is_plugin_enabled,
     resolve_claims,
 )
 from finshin_sdk.dto import PluginManifestDTO
@@ -36,10 +37,12 @@ from system.tool_settings import declared_dependencies
 from ._manifest_help import read_help_sections
 
 # 清单标量字段与期望类型，deps/assets 列表成员一律 str
-_SCALAR_TYPES: dict[str, type] = {spec.key: spec.value_type for spec in MANIFEST_FIELDS}
+_SCALAR_TYPES: dict[str, type] = {
+    spec.key: spec.value_type for spec in PLUGIN_MANIFEST_TABLE
+}
 
 # 清单必填项，缺任一拒收
-_REQUIRED_KEYS = tuple(spec.key for spec in MANIFEST_FIELDS if spec.required)
+_REQUIRED_KEYS = tuple(spec.key for spec in PLUGIN_MANIFEST_TABLE if spec.required)
 
 # 插件根：目录与这棵树的顶层包名
 _PluginRoot = tuple[Path, str]
@@ -54,7 +57,7 @@ def _bundled_dir() -> Path | None:
     - find_spec 只定位不执行模块代码，冻结包下路径随包走
     - 定位失败返回 None，由调用方处理
     """
-    spec = importlib.util.find_spec(PLUGINS_PKG)
+    spec = importlib.util.find_spec(BUNDLED_PLUGINS_PKG)
     if spec is None or not spec.submodule_search_locations:
         return None
     return Path(next(iter(spec.submodule_search_locations)))
@@ -62,7 +65,7 @@ def _bundled_dir() -> Path | None:
 
 def _installed_dir() -> Path:
     """定位外部插件挂载点"""
-    return ROOT_DIR / INSTALLED_PLUGINS_NAME
+    return ROOT_DIR / INSTALLED_PLUGINS_DIR
 
 
 def _plugins_roots() -> list[_PluginRoot]:
@@ -76,7 +79,7 @@ def _plugins_roots() -> list[_PluginRoot]:
 
     bundled = _bundled_dir()
     if bundled is not None:
-        roots.append((bundled, PLUGINS_PKG))
+        roots.append((bundled, BUNDLED_PLUGINS_PKG))
 
     installed = _installed_dir()
     if installed.is_dir():
@@ -150,14 +153,14 @@ def _read_manifest(dir_path: Path, dir_name: str, pkg: str) -> PluginManifestDTO
 
     if not all(k in kwargs for k in _REQUIRED_KEYS):
         return None
-    if kwargs[ManifestKey.NAME] != dir_name:
+    if kwargs[PluginManifestKeys.NAME] != dir_name:
         return None
 
     deps = _deps_of(dir_path, pkg)
     if deps is None:
         return None
 
-    if raw_sections := data.get(ManifestKey.HELP):
+    if raw_sections := data.get(PluginManifestKeys.HELP):
         kwargs["help_section"] = read_help_sections(raw_sections, dir_name)
 
     return PluginManifestDTO(deps=deps, module=f"{pkg}.{dir_name}", **kwargs)
@@ -169,7 +172,7 @@ def _deps_of(plugin_dir: Path, pkg: str) -> tuple[str, ...] | None:
     - 随包那份的库在根声明里，此处即空表
     - 外部那份交出 None 即自家声明的依赖表读不出，整份不认
     """
-    if pkg == PLUGINS_PKG:
+    if pkg == BUNDLED_PLUGINS_PKG:
         return ()
 
     return declared_dependencies(plugin_dir / DECLARATION_FILE_NAME)
@@ -181,18 +184,18 @@ def _resolve_enabled(
 ) -> list[PluginManifestDTO]:
     """计算启用插件序列
 
-    - 在场与否由 is_enabled 定，随包表里的插件恒启用
-    - 先按随包表定档，表外插件一律常规档，同档按 name 字典序
+    - 在场与否由 is_plugin_enabled 定，随包表里的插件恒启用
+    - 档位查 BUNDLED_PRIORITY_TABLE，表外一律常规档，同档按 name 字典序
     """
     picked = [
         manifest
         for manifest in manifests.values()
-        if is_enabled(manifest.name, enabled)
+        if is_plugin_enabled(manifest.name, enabled)
     ]
     return sorted(
         picked,
         key=lambda m: (
-            BUNDLED_PLUGIN_PRIORITY.get(m.name, CommandPriority.NORMAL),
+            BUNDLED_PRIORITY_TABLE.get(m.name, PluginPriority.NORMAL),
             m.name,
         ),
     )
@@ -217,13 +220,13 @@ def enabled_manifests(state_path: Path) -> list[PluginManifestDTO]:
     manifests: dict[str, PluginManifestDTO] = {}
     for dir_path, pkg in _plugins_roots():
         for name, manifest in _load_manifests(
-            dir_path, pkg, pkg != PLUGINS_PKG
+            dir_path, pkg, pkg != BUNDLED_PLUGINS_PKG
         ).items():
-            if pkg != PLUGINS_PKG and name in BUNDLED_PLUGIN_PRIORITY:
+            if pkg != BUNDLED_PLUGINS_PKG and name in BUNDLED_PLUGINS:
                 continue
             manifests.setdefault(name, manifest)
 
-    enabled = load_instance_enabled(state_path, StateKey.ENABLED)
+    enabled = load_instance_enabled(state_path, StateKeys.ENABLED)
     claims = [
         PluginClaim(name=manifest.name, commands=_declared_commands(manifest))
         for manifest in manifests.values()

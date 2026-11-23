@@ -21,7 +21,7 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import Platform  # noqa: E402
+from finshin_sdk.domain import PlatformCode  # noqa: E402
 from services import adapter_catalog as catalog_mod  # noqa: E402
 from skin.messages import CatalogMessage  # noqa: E402
 
@@ -48,7 +48,7 @@ _SDK_FIELDS = {
     "sha256": _SHA_SDK,
 }
 _TG_FIELDS = {
-    "platform": str(Platform.TELEGRAM),
+    "platform": str(PlatformCode("tg")),
     "distribution": "finshin-adapter-tg",
     "version": "9.9.9",
     "url": _TG_URL,
@@ -126,7 +126,7 @@ class TestCatalogParse(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(catalog.rejects, ())
         self.assertEqual(catalog.sdk.distribution, "finshin-sdk")
         self.assertEqual(catalog.sdk.sha256, _SHA_SDK)
-        self.assertEqual(catalog.adapters[Platform.TELEGRAM].url, _TG_URL)
+        self.assertEqual(catalog.adapters[PlatformCode("tg")].url, _TG_URL)
 
     async def test_sdk_requires_read(self) -> None:
         """适配器行读到接口包区间，接口包段没写这一键即空串"""
@@ -135,7 +135,7 @@ class TestCatalogParse(unittest.IsolatedAsyncioTestCase):
             self.fail(f"完整目录被拒收：{catalog.rejects}")
 
         self.assertEqual(
-            catalog.adapters[Platform.TELEGRAM].sdk_requires, _SDK_REQUIRES
+            catalog.adapters[PlatformCode("tg")].sdk_requires, _SDK_REQUIRES
         )
         self.assertEqual(catalog.sdk.sdk_requires, "")
 
@@ -144,10 +144,10 @@ class TestCatalogParse(unittest.IsolatedAsyncioTestCase):
         catalog, _ = await self._read(
             _sdk_text() + _adapter_text(dict(_TG_FIELDS, sdk_requires=""))
         )
-        if catalog.adapters.get(Platform.TELEGRAM) is None:
+        if catalog.adapters.get(PlatformCode("tg")) is None:
             self.fail(f"空值被当成缺字段拒收：{catalog.rejects}")
 
-        self.assertEqual(catalog.adapters[Platform.TELEGRAM].sdk_requires, "")
+        self.assertEqual(catalog.adapters[PlatformCode("tg")].sdk_requires, "")
 
     async def test_url_independent_of_distribution(self) -> None:
         """直链换 host 照收，不由分发名拼出"""
@@ -222,31 +222,30 @@ class TestPlatformJudge(unittest.IsolatedAsyncioTestCase):
         with patch.object(catalog_mod.GitClient, "get_pages", fetch):
             return await catalog_mod.load_catalog()
 
-    async def test_unknown_platform_rejected(self) -> None:
-        """词表外的平台码整行不进表并报出那一值"""
+    async def test_unknown_platform_accepted(self) -> None:
+        """平台码由适配器自报，词表外的新码照常进表"""
         catalog = await self._read(dict(_TG_FIELDS, platform="wx"))
-        self.assertEqual(catalog.adapters, {})
-        self.assertEqual(len(catalog.rejects), 1)
-        self.assertIn("wx", catalog.rejects[0])
+        self.assertEqual(list(catalog.adapters), [PlatformCode("wx")])
+        self.assertEqual(catalog.rejects, ())
 
     async def test_distribution_name_not_a_judge(self) -> None:
         """分发名换掉不影响平台码认下来的那只"""
         catalog = await self._read(
             dict(_TG_FIELDS, distribution="finshin-adapter-telegram")
         )
-        self.assertEqual(list(catalog.adapters), [Platform.TELEGRAM])
+        self.assertEqual(list(catalog.adapters), [PlatformCode("tg")])
         self.assertEqual(catalog.rejects, ())
 
     async def test_duplicated_platform_keeps_first(self) -> None:
         """同一平台码出现两行时只认先读到的那条"""
         later = dict(_TG_FIELDS, version="8.8.8", sha256=_SHA_SDK)
         catalog = await self._read(_TG_FIELDS, later)
-        if catalog.adapters.get(Platform.TELEGRAM) is None:
+        if catalog.adapters.get(PlatformCode("tg")) is None:
             self.fail(f"先读到的那行没进表：{catalog.rejects}")
 
-        self.assertEqual(catalog.adapters[Platform.TELEGRAM].version, "9.9.9")
+        self.assertEqual(catalog.adapters[PlatformCode("tg")].version, "9.9.9")
         self.assertEqual(len(catalog.rejects), 1)
-        self.assertIn(str(Platform.TELEGRAM), catalog.rejects[0])
+        self.assertIn(str(PlatformCode("tg")), catalog.rejects[0])
 
 
 class TestVersionList(unittest.IsolatedAsyncioTestCase):
@@ -261,7 +260,7 @@ class TestVersionList(unittest.IsolatedAsyncioTestCase):
 
     async def test_old_shape_lists_latest_only(self) -> None:
         """目录没带清单时，清单里只有行内那一版"""
-        row = (await self._read(_full_text())).adapters[Platform.TELEGRAM]
+        row = (await self._read(_full_text())).adapters[PlatformCode("tg")]
         self.assertEqual([item.version for item in row.versions], ["9.9.9"])
 
     async def test_older_versions_are_read(self) -> None:
@@ -270,7 +269,7 @@ class TestVersionList(unittest.IsolatedAsyncioTestCase):
         if catalog.rejects:
             self.fail(f"带清单的目录被拒收：{catalog.rejects}")
 
-        versions = catalog.adapters[Platform.TELEGRAM].versions
+        versions = catalog.adapters[PlatformCode("tg")].versions
         self.assertEqual([item.version for item in versions], ["9.9.9", "8.8.8"])
         self.assertEqual(
             {item.distribution for item in versions}, {"finshin-adapter-tg"}
@@ -281,7 +280,7 @@ class TestVersionList(unittest.IsolatedAsyncioTestCase):
     async def test_older_versions_carry_sdk_requires(self) -> None:
         """旧版条目各读各的接口包区间，没写的即空串"""
         catalog = await self._read(_listed_text(_older(sdk_requires=">=0.0.9,<0.1.0")))
-        versions = catalog.adapters[Platform.TELEGRAM].versions
+        versions = catalog.adapters[PlatformCode("tg")].versions
         self.assertEqual(versions[0].sdk_requires, _SDK_REQUIRES)
         self.assertEqual(versions[1].sdk_requires, ">=0.0.9,<0.1.0")
 
@@ -293,13 +292,13 @@ class TestVersionList(unittest.IsolatedAsyncioTestCase):
         if catalog.rejects:
             self.fail(f"带坏条目的目录整行被拒收：{catalog.rejects}")
 
-        versions = catalog.adapters[Platform.TELEGRAM].versions
+        versions = catalog.adapters[PlatformCode("tg")].versions
         self.assertEqual([item.version for item in versions], ["9.9.9", "7.7.7"])
 
     async def test_duplicate_version_listed_once(self) -> None:
         """与行内同号的条目不进清单"""
         catalog = await self._read(_listed_text(_older(version="9.9.9")))
-        versions = catalog.adapters[Platform.TELEGRAM].versions
+        versions = catalog.adapters[PlatformCode("tg")].versions
         self.assertEqual([item.version for item in versions], ["9.9.9"])
 
     async def test_old_reader_ignores_the_list(self) -> None:
@@ -310,7 +309,7 @@ class TestVersionList(unittest.IsolatedAsyncioTestCase):
 
         catalog = await self._read(text)
         self.assertEqual(catalog.rejects, ())
-        self.assertEqual(catalog.adapters[Platform.TELEGRAM].version, "9.9.9")
+        self.assertEqual(catalog.adapters[PlatformCode("tg")].version, "9.9.9")
 
 
 if __name__ == "__main__":

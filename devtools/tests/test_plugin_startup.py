@@ -19,20 +19,20 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import ManifestKey  # noqa: E402
+from finshin_sdk.domain import PluginManifestKeys  # noqa: E402
 from services.env_setup import deps_startup  # noqa: E402
 from ui._guide import _startup  # noqa: E402
 
 _SENTINEL = Path("plugins-sentinel")
 _WEB = {
-    ManifestKey.NAME: "webshot",
-    ManifestKey.DEPS: ["markdown==3.10.2", "playwright==1.62.0"],
-    ManifestKey.ASSETS: ["playwright chromium-headless-shell"],
+    PluginManifestKeys.NAME: "webshot",
+    PluginManifestKeys.DEPS: ["markdown==3.10.2", "playwright==1.62.0"],
+    PluginManifestKeys.ASSETS: ["playwright chromium-headless-shell"],
 }
 _AI = {
-    ManifestKey.NAME: "AI",
-    ManifestKey.DEPS: [],
-    ManifestKey.ASSETS: [],
+    PluginManifestKeys.NAME: "AI",
+    PluginManifestKeys.DEPS: [],
+    PluginManifestKeys.ASSETS: [],
 }
 
 _PATCHED = {
@@ -102,9 +102,9 @@ class TestCollectMissing(_StartupBase):
         """启用集为空也覆盖随包插件的缺失"""
         self.m["load_instance_enabled"].return_value = frozenset()
         bundled = {
-            ManifestKey.NAME: "help",
-            ManifestKey.DEPS: ["foo==1.0"],
-            ManifestKey.ASSETS: [],
+            PluginManifestKeys.NAME: "help",
+            PluginManifestKeys.DEPS: ["foo==1.0"],
+            PluginManifestKeys.ASSETS: [],
         }
         self.m["load_manifests"].return_value = [bundled]
         self.m["is_pin_installed"].return_value = False
@@ -117,9 +117,9 @@ class TestCollectMissing(_StartupBase):
         """实例从没保存过勾选，随包插件的缺失照样列入计划"""
         self.m["load_instance_enabled"].return_value = None
         bundled = {
-            ManifestKey.NAME: "help",
-            ManifestKey.DEPS: ["foo==1.0"],
-            ManifestKey.ASSETS: [],
+            PluginManifestKeys.NAME: "help",
+            PluginManifestKeys.DEPS: ["foo==1.0"],
+            PluginManifestKeys.ASSETS: [],
         }
         self.m["load_manifests"].return_value = [bundled, _WEB]
         self.m["is_pin_installed"].return_value = False
@@ -207,9 +207,9 @@ class TestDisableFailed(_StartupBase):
         """失败项命中某插件的依赖，只禁该插件并落盘剩余启用集"""
         self.m["load_instance_enabled"].return_value = frozenset({"webshot", "other"})
         other = {
-            ManifestKey.NAME: "other",
-            ManifestKey.DEPS: ["foo==1.0"],
-            ManifestKey.ASSETS: [],
+            PluginManifestKeys.NAME: "other",
+            PluginManifestKeys.DEPS: ["foo==1.0"],
+            PluginManifestKeys.ASSETS: [],
         }
         self.m["load_manifests"].return_value = [_AI, _WEB, other]
 

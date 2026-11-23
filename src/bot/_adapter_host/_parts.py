@@ -13,7 +13,7 @@ from exceptions import (
     AdapterOutOfDateError,
 )
 from finshin_sdk import SDK_VERSION, AdapterParts
-from finshin_sdk.domain import Platform
+from finshin_sdk.domain import PlatformCode
 from services.adapter_manifest import load_adapter_manifests
 from system.versions import requires_met
 from utils import get_logger
@@ -22,7 +22,7 @@ from utils.external_scope import check_external_imports
 _logger = get_logger("Mgr.Adapter")
 
 
-def parts_for(platform: Platform) -> AdapterParts:
+def parts_for(platform: PlatformCode) -> AdapterParts:
     """按平台标识取适配器交出的入口件
 
     - 清单缺席或字段非法即缺件

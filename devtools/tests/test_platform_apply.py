@@ -15,7 +15,7 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import Platform  # noqa: E402
+from finshin_sdk.domain import PlatformCode  # noqa: E402
 from services.adapter_manifest import InstalledAdapter  # noqa: E402
 from services.env_setup import platform_apply as mod  # noqa: E402
 
@@ -25,7 +25,7 @@ _ADAPTER = "finshin-adapter-tg"
 def _adapter(version: str) -> InstalledAdapter:
     """一只已装的 Telegram 适配器包"""
     return InstalledAdapter(
-        platform=Platform.TELEGRAM,
+        platform=PlatformCode("tg"),
         distribution=_ADAPTER,
         version=version,
         requires=("aiogram==3.29.1", "finshin-sdk>=0.1.0"),
@@ -45,14 +45,14 @@ class TestUninstallNames(unittest.TestCase):
             ),
         ):
             self.assertEqual(
-                mod.uninstall_names(str(Platform.TELEGRAM)),
+                mod.uninstall_names(str(PlatformCode("tg"))),
                 (_ADAPTER, "aiogram"),
             )
 
     def test_absent_adapter_names_nothing(self) -> None:
         """本机没装那只包即一个名字都不交"""
         with patch.object(mod, "installed_adapters", lambda: ()):
-            self.assertEqual(mod.uninstall_names(str(Platform.TELEGRAM)), ())
+            self.assertEqual(mod.uninstall_names(str(PlatformCode("tg"))), ())
 
 
 class TestInstancesOf(unittest.TestCase):

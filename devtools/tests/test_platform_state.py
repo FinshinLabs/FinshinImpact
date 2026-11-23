@@ -29,7 +29,7 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import Platform  # noqa: E402
+from finshin_sdk.domain import PlatformCode  # noqa: E402
 from services.adapter_catalog import Catalog, ReleaseRow  # noqa: E402
 from services.adapter_manifest import InstalledAdapter  # noqa: E402
 from services.env_setup import platform_rows as rows_mod  # noqa: E402
@@ -44,7 +44,7 @@ _SHA = "0" * 64
 def _adapter(version: str) -> InstalledAdapter:
     """一只已装的 Telegram 适配器包"""
     return InstalledAdapter(
-        platform=Platform.TELEGRAM,
+        platform=PlatformCode("tg"),
         distribution=_ADAPTER,
         version=version,
         requires=("aiogram==3.29.1", "finshin-sdk>=0.1.0"),
@@ -57,7 +57,7 @@ def _catalog(version: str) -> Catalog:
     return Catalog(
         sdk=None,
         adapters={
-            Platform.TELEGRAM: ReleaseRow(
+            PlatformCode("tg"): ReleaseRow(
                 distribution=_ADAPTER,
                 version=version,
                 url=f"https://example.invalid/{_ADAPTER}.whl",
@@ -71,7 +71,7 @@ def _catalog(version: str) -> Catalog:
 def _tg_row(installed: str, online: str, tree: bool = False) -> rows_mod.ComponentRow:
     """按本机在场版本、在线版本与来路排出一行读数"""
     item = _adapter(installed) if installed else None
-    tree_names = {Platform.TELEGRAM: _ADAPTER} if tree else {}
+    tree_names = {PlatformCode("tg"): _ADAPTER} if tree else {}
     with (
         patch.object(
             rows_mod, "installed_adapters", lambda: () if item is None else (item,)
@@ -83,7 +83,7 @@ def _tg_row(installed: str, online: str, tree: bool = False) -> rows_mod.Compone
     ):
         rows = rows_mod.component_rows(_catalog(online))
 
-    return next(row for row in rows if row.platform == str(Platform.TELEGRAM))
+    return next(row for row in rows if row.platform == str(PlatformCode("tg")))
 
 
 def _rows(sdk: str, adapter: str) -> tuple[rows_mod.ComponentRow, ...]:
@@ -103,7 +103,7 @@ def _rows(sdk: str, adapter: str) -> tuple[rows_mod.ComponentRow, ...]:
 
 def _adapter_row(rows: tuple[rows_mod.ComponentRow, ...]) -> rows_mod.ComponentRow:
     """读数里 Telegram 那一行"""
-    return next(row for row in rows if row.platform == str(Platform.TELEGRAM))
+    return next(row for row in rows if row.platform == str(PlatformCode("tg")))
 
 
 _WHEEL_BODY = b"wheel body"
@@ -141,7 +141,7 @@ def _multi_row(installed: str, *versions: ReleaseRow) -> rows_mod.ComponentRow:
     release = replace(newest, versions=tuple(versions))
 
     return rows_mod.ComponentRow(
-        platform=str(Platform.TELEGRAM),
+        platform=str(PlatformCode("tg")),
         distribution=_ADAPTER,
         source=rows_mod.ComponentSource.INSTALLED,
         installed=installed,
@@ -287,7 +287,7 @@ class TestUpdateTarget(unittest.TestCase):
         """接口包一行加一只在场适配器，它要求接口包落在 0.1.0 到 0.2.0 之间"""
         sdk = _component("", _SDK, installed, "", *versions)
         adapter = _component(
-            str(Platform.TELEGRAM), _ADAPTER, "0.1.0", self._RANGE, "0.1.1"
+            str(PlatformCode("tg")), _ADAPTER, "0.1.0", self._RANGE, "0.1.1"
         )
 
         return [sdk, adapter]
@@ -509,7 +509,7 @@ class TestOrigin(unittest.TestCase):
             )
 
         return rows_mod.ComponentRow(
-            platform=str(Platform.TELEGRAM),
+            platform=str(PlatformCode("tg")),
             distribution=_ADAPTER,
             source=source,
             installed="0.1.0",
@@ -577,7 +577,7 @@ class TestUpdateTargets(unittest.TestCase):
     def test_upgradable_row_included(self) -> None:
         """可更新的行进差集，交的是目录行自带的直链与指纹"""
         sdk = _component("", _SDK, "0.1.0", "", "0.1.0")
-        adapter = _component(str(Platform.TELEGRAM), _ADAPTER, "0.1.0", "", "0.1.1")
+        adapter = _component(str(PlatformCode("tg")), _ADAPTER, "0.1.0", "", "0.1.1")
         targets = mod.update_targets([sdk, adapter])
         self.assertEqual([release.version for release in targets], ["0.1.1"])
         self.assertEqual([release.distribution for release in targets], [_ADAPTER])
@@ -591,7 +591,7 @@ class TestUpdateTargets(unittest.TestCase):
         sdk = _component("", _SDK, "0.2.0", "", "0.2.0")
         rows = [
             sdk,
-            _target_row(str(Platform.TELEGRAM), _ADAPTER, "<0.2.0"),
+            _target_row(str(PlatformCode("tg")), _ADAPTER, "<0.2.0"),
             _target_row("qq", "finshin-adapter-qq", ">=0.2.0"),
         ]
 
@@ -623,7 +623,7 @@ class TestInstallBlocked(unittest.TestCase):
 
     def test_sdk_below_range_blocks(self) -> None:
         """接口包在场但够不到适配器要求的下限，那句指向更新程序"""
-        requires = {str(Platform.TELEGRAM): ">=9.9.9"}
+        requires = {str(PlatformCode("tg")): ">=9.9.9"}
         with patch.object(rows_mod, "_declared_requires", lambda: requires):
             rows = _rows("0.1.0", "0.1.0")
         self.assertEqual(
@@ -633,7 +633,7 @@ class TestInstallBlocked(unittest.TestCase):
 
     def test_sdk_over_ceiling_blocks(self) -> None:
         """接口包高出适配器写的上限，那句换成接口包太新"""
-        requires = {str(Platform.TELEGRAM): "<0.0.1"}
+        requires = {str(PlatformCode("tg")): "<0.0.1"}
         with patch.object(rows_mod, "_declared_requires", lambda: requires):
             rows = _rows("0.1.0", "0.1.0")
         self.assertEqual(
@@ -643,7 +643,7 @@ class TestInstallBlocked(unittest.TestCase):
 
     def test_sdk_in_range_frees(self) -> None:
         """接口包落在要求的区间之内即放行"""
-        requires = {str(Platform.TELEGRAM): ">=0.1.0,<0.2.0"}
+        requires = {str(PlatformCode("tg")): ">=0.1.0,<0.2.0"}
         with patch.object(rows_mod, "_declared_requires", lambda: requires):
             rows = _rows("0.1.5", "0.1.0")
         self.assertEqual(
@@ -652,7 +652,7 @@ class TestInstallBlocked(unittest.TestCase):
 
     def test_target_version_requirement_wins(self) -> None:
         """要装那一版自带要求即按它判，同一行按已装声明判本来放行"""
-        requires = {str(Platform.TELEGRAM): ">=0.1.0,<0.2.0"}
+        requires = {str(PlatformCode("tg")): ">=0.1.0,<0.2.0"}
         with patch.object(rows_mod, "_declared_requires", lambda: requires):
             rows = _rows("0.1.0", "0.1.0")
         row = _adapter_row(rows)
@@ -665,7 +665,7 @@ class TestInstallBlocked(unittest.TestCase):
 
     def test_requires_line_keeps_both_bounds(self) -> None:
         """要求那一行把上下限原样带出来"""
-        requires = {str(Platform.TELEGRAM): ">=0.1.0,<0.2.0"}
+        requires = {str(PlatformCode("tg")): ">=0.1.0,<0.2.0"}
         with (
             patch.object(rows_mod, "_declared_requires", lambda: requires),
             patch.object(mod, "installed_version", lambda name: "0.2.0"),
@@ -700,7 +700,7 @@ class TestPresentPlatforms(unittest.TestCase):
                 patch.object(
                     rows_mod,
                     "tree_distributions",
-                    lambda: {Platform.TELEGRAM: _ADAPTER},
+                    lambda: {PlatformCode("tg"): _ADAPTER},
                 ),
                 patch.object(rows_mod, "load_adapter_manifests", lambda: {}),
                 patch.object(rows_mod, "installed_version", lambda name: ""),

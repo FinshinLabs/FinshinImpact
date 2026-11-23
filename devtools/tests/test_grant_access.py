@@ -30,10 +30,10 @@ from finshin_sdk.domain import (  # noqa: E402
     ChatScope,
     CommandRole,
     ContentKind,
-    Platform,
+    PlatformCode,
 )
 from finshin_sdk.domain.ids import (  # noqa: E402
-    ContainerKey,
+    ContainerCode,
     MessageId,
     UserId,
 )
@@ -42,12 +42,12 @@ from finshin_sdk.dto import (  # noqa: E402
     ContentDTO,
     InboundEventDTO,
     MediaEntryDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     OutboundPayloadDTO,
     PrincipalDTO,
 )
 
-_CONTAINER = ContainerKey("g100123")
+_CONTAINER = ContainerCode("g100123")
 _PHOTO = MediaEntryDTO(kind=ContentKind.PHOTO, local_path="")
 
 
@@ -63,12 +63,12 @@ class _Port:
         content: OutboundPayloadDTO,
         *,
         mention: bool = False,
-        reply_ref: MsgReferenceDTO | None = None,
-    ) -> MsgReferenceDTO | None:
+        reply_ref: MessageRefDTO | None = None,
+    ) -> MessageRefDTO | None:
         self.sent.append(content.text)
         return None
 
-    async def probe_existence(self, target: MsgReferenceDTO) -> bool:
+    async def probe_existence(self, target: MessageRefDTO) -> bool:
         return True
 
     def mention_fragment(self, principal: PrincipalDTO) -> str:
@@ -108,10 +108,10 @@ def _ctx(
     """构造一条命令事件，默认落在群里"""
     port = _Port()
     principal = PrincipalDTO(
-        platform=Platform.TELEGRAM, container=_CONTAINER, user=UserId(user_id)
+        platform=PlatformCode("tg"), container=_CONTAINER, user=UserId(user_id)
     )
-    ref = MsgReferenceDTO(
-        platform=Platform.TELEGRAM, container=_CONTAINER, message_id=MessageId("7")
+    ref = MessageRefDTO(
+        platform=PlatformCode("tg"), container=_CONTAINER, message_id=MessageId("7")
     )
     event = InboundEventDTO(
         ref=ref,
@@ -138,10 +138,10 @@ def _text_ctx(user_id: str, text: str):
     """构造一条正文消息事件"""
     port = _Port()
     principal = PrincipalDTO(
-        platform=Platform.TELEGRAM, container=_CONTAINER, user=UserId(user_id)
+        platform=PlatformCode("tg"), container=_CONTAINER, user=UserId(user_id)
     )
-    ref = MsgReferenceDTO(
-        platform=Platform.TELEGRAM, container=_CONTAINER, message_id=MessageId("7")
+    ref = MessageRefDTO(
+        platform=PlatformCode("tg"), container=_CONTAINER, message_id=MessageId("7")
     )
     event = InboundEventDTO(
         ref=ref,
@@ -574,8 +574,8 @@ class TestGrantKey(AccessCase):
         """换个群照样算同一个人"""
         asyncio.run(self._grant_user("789"))
         other = PrincipalDTO(
-            platform=Platform.TELEGRAM,
-            container=ContainerKey("g200456"),
+            platform=PlatformCode("tg"),
+            container=ContainerCode("g200456"),
             user=UserId("789"),
         )
         self.assertEqual(asyncio.run(access.role_of(other)), CommandRole.ADMIN)

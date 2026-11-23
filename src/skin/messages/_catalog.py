@@ -31,8 +31,8 @@ class CatalogMessage:
     # 用：services/adapter_catalog.py 下载地址形态不对的原因句
     BAD_URL = "下载地址不是 https 开头的完整串"
 
-    # 用：services/adapter_catalog.py 平台码不在词表里时的说明行
-    PLATFORM_UNKNOWN = "{code}：平台码不在认下来的名单里"
+    # 用：services/adapter_catalog.py 平台码为空时的说明行
+    PLATFORM_UNKNOWN = "{code}：平台码为空，这一行不进表"
 
     # 用：services/adapter_catalog.py 同一平台码出现第二行时的说明行
     PLATFORM_DUP = "{code}：同一平台码出现第二行，只认先读到的那行"

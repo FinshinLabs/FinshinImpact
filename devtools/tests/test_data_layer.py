@@ -26,21 +26,21 @@ from data import (  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
     ChatRole,
     ContentKind,
-    Platform,
+    PlatformCode,
     TaskPayload,
     TaskStatus,
 )
 from finshin_sdk.domain.ids import (  # noqa: E402
-    ContainerKey,
+    ContainerCode,
     MessageId,
     SessionKey,
-    TaskId,
+    TaskKey,
     UserId,
 )
 from finshin_sdk.dto import (  # noqa: E402
     MediaEntryDTO,
     MessageDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     PrincipalDTO,
     SessionDTO,
     SessionPatchDTO,
@@ -77,8 +77,8 @@ _EXPECTED_OBJECTS = frozenset(
 def _principal() -> PrincipalDTO:
     """构造测试主体"""
     return PrincipalDTO(
-        platform=Platform.TELEGRAM,
-        container=ContainerKey("g100123"),
+        platform=PlatformCode("tg"),
+        container=ContainerCode("g100123"),
         user=UserId("456"),
     )
 
@@ -86,29 +86,29 @@ def _principal() -> PrincipalDTO:
 def _other() -> PrincipalDTO:
     """构造第二个测试主体，任务号按主体分行"""
     return PrincipalDTO(
-        platform=Platform.TELEGRAM,
-        container=ContainerKey("g200456"),
+        platform=PlatformCode("tg"),
+        container=ContainerCode("g200456"),
         user=UserId("789"),
     )
 
 
-def _ref() -> MsgReferenceDTO:
+def _ref() -> MessageRefDTO:
     """构造测试消息定位"""
-    return MsgReferenceDTO(
-        platform=Platform.TELEGRAM,
-        container=ContainerKey("g100123"),
+    return MessageRefDTO(
+        platform=PlatformCode("tg"),
+        container=ContainerCode("g100123"),
         message_id=MessageId("789"),
     )
 
 
 def _session_key() -> SessionKey:
     """取测试会话键"""
-    return SessionKey(f"{Platform.TELEGRAM}.g100123")
+    return SessionKey("tg.g100123")
 
 
 def _empty_session() -> SessionDTO:
     """构造空会话快照供比对"""
-    return SessionDTO(platform=Platform.TELEGRAM, container=ContainerKey("g100123"))
+    return SessionDTO(platform=PlatformCode("tg"), container=ContainerCode("g100123"))
 
 
 async def _one(conn: aiosqlite.Connection, sql: str, *params: object) -> aiosqlite.Row:
@@ -305,7 +305,9 @@ class TestPrincipal(_RealDb):
         await self.repos.principal.upsert(principal, "李四")
 
         row = await _one(
-            self.conn, "SELECT display_name FROM principal WHERE key = ?", principal.key
+            self.conn,
+            "SELECT display_name FROM principal WHERE key = ?",
+            principal.dotted,
         )
         self.assertEqual(row[0], "李四")
 
@@ -398,8 +400,8 @@ class TestSession(_RealDb):
 
     async def test_delete_one_key_leaves_others(self) -> None:
         """按键清除连带消息行，另一串不动，键不在库内即零"""
-        mine = SessionKey(f"{Platform.TELEGRAM}.g100456")
-        theirs = SessionKey(f"{Platform.TELEGRAM}.g100789")
+        mine = SessionKey("tg.g100456")
+        theirs = SessionKey("tg.g100789")
         await self._seed(mine, "我的问答")
         await self._seed(theirs, "别人的问答")
 
@@ -419,7 +421,7 @@ class TestSession(_RealDb):
 
     async def test_delete_all_empties_both_tables(self) -> None:
         """整表清除跨会话生效"""
-        other = SessionKey(f"{Platform.TELEGRAM}.g100456")
+        other = SessionKey("tg.g100456")
         await self._seed(_session_key(), "本串问答")
         await self._seed(other, "另一群")
 
@@ -433,9 +435,9 @@ class TestSession(_RealDb):
 
     async def test_delete_idle_clears_stale_and_empty(self) -> None:
         """按最后问答时间清闲置，没消息的会话按零计一并清"""
-        live = SessionKey(f"{Platform.TELEGRAM}.g100456")
-        stale = SessionKey(f"{Platform.TELEGRAM}.g100789")
-        empty = SessionKey(f"{Platform.TELEGRAM}.g100999")
+        live = SessionKey("tg.g100456")
+        stale = SessionKey("tg.g100789")
+        empty = SessionKey("tg.g100999")
         await self._seed(live, "新问答", created_at=_LIVE_AT)
         await self._seed(stale, "旧问答", created_at=_STALE_AT)
         await self.repos.session.apply_patch(
@@ -480,12 +482,12 @@ class TestTask(_RealDb):
         """同主体重复入队盖住那一行，状态退回排队"""
         first = await self.repos.task.insert(self._request(payload=_CHAT_PAYLOAD))
         await self.repos.task.patch(
-            first.task_id, TaskPatchDTO(status=TaskStatus.RUNNING)
+            first.dotted, TaskPatchDTO(status=TaskStatus.RUNNING)
         )
 
         again = await self.repos.task.insert(self._request())
 
-        self.assertEqual(again.task_id, first.task_id)
+        self.assertEqual(again.dotted, first.dotted)
         self.assertEqual(again.status, TaskStatus.PENDING)
         self.assertEqual((await _one(self.conn, "SELECT COUNT(*) FROM task"))[0], 1)
 
@@ -494,7 +496,7 @@ class TestTask(_RealDb):
         first = await self.repos.task.insert(self._request(payload=_CHAT_PAYLOAD))
 
         running = await self.repos.task.patch(
-            first.task_id, TaskPatchDTO(status=TaskStatus.RUNNING)
+            first.dotted, TaskPatchDTO(status=TaskStatus.RUNNING)
         )
 
         assert running is not None
@@ -507,15 +509,15 @@ class TestTask(_RealDb):
         """执行中不得退回排队，库内状态不动"""
         first = await self.repos.task.insert(self._request())
         await self.repos.task.patch(
-            first.task_id, TaskPatchDTO(status=TaskStatus.RUNNING)
+            first.dotted, TaskPatchDTO(status=TaskStatus.RUNNING)
         )
 
         self.assertIsNone(
             await self.repos.task.patch(
-                first.task_id, TaskPatchDTO(status=TaskStatus.PENDING)
+                first.dotted, TaskPatchDTO(status=TaskStatus.PENDING)
             )
         )
-        current = await self.repos.task.find(first.task_id)
+        current = await self.repos.task.find(first.dotted)
         assert current is not None
         self.assertEqual(current.status, TaskStatus.RUNNING)
 
@@ -523,18 +525,18 @@ class TestTask(_RealDb):
         """落定之后不得复活"""
         first = await self.repos.task.insert(self._request())
         await self.repos.task.patch(
-            first.task_id, TaskPatchDTO(status=TaskStatus.RUNNING)
+            first.dotted, TaskPatchDTO(status=TaskStatus.RUNNING)
         )
 
         failed = await self.repos.task.patch(
-            first.task_id, TaskPatchDTO(status=TaskStatus.FAILED)
+            first.dotted, TaskPatchDTO(status=TaskStatus.FAILED)
         )
 
         assert failed is not None
         self.assertEqual(failed.status, TaskStatus.FAILED)
         self.assertIsNone(
             await self.repos.task.patch(
-                first.task_id, TaskPatchDTO(status=TaskStatus.RUNNING)
+                first.dotted, TaskPatchDTO(status=TaskStatus.RUNNING)
             )
         )
 
@@ -542,7 +544,7 @@ class TestTask(_RealDb):
         """改不存在的任务返回空"""
         self.assertIsNone(
             await self.repos.task.patch(
-                TaskId("不存在.id"), TaskPatchDTO(status=TaskStatus.RUNNING)
+                TaskKey("不存在.id"), TaskPatchDTO(status=TaskStatus.RUNNING)
             )
         )
 
@@ -551,10 +553,10 @@ class TestTask(_RealDb):
         settled = await self.repos.task.insert(self._request())
         await self.repos.task.insert(self._request(_other()))
         await self.repos.task.patch(
-            settled.task_id, TaskPatchDTO(status=TaskStatus.RUNNING)
+            settled.dotted, TaskPatchDTO(status=TaskStatus.RUNNING)
         )
         await self.repos.task.patch(
-            settled.task_id, TaskPatchDTO(status=TaskStatus.SUCCEEDED)
+            settled.dotted, TaskPatchDTO(status=TaskStatus.SUCCEEDED)
         )
 
         all_unfinished = await self.repos.task.list_all_unfinished()
@@ -567,15 +569,13 @@ class TestTask(_RealDb):
         chat = await self.repos.task.insert(self._request())
         await self.repos.task.insert(self._request(_other()))
         await self.repos.task.patch(
-            chat.task_id, TaskPatchDTO(status=TaskStatus.RUNNING)
+            chat.dotted, TaskPatchDTO(status=TaskStatus.RUNNING)
         )
 
         self.assertEqual(await purge_dead_tasks(self.conn), 2)
 
         self.assertEqual(await self.repos.task.list_all_unfinished(), ())
-        row = await _one(
-            self.conn, "SELECT status FROM task WHERE id = ?", chat.task_id
-        )
+        row = await _one(self.conn, "SELECT status FROM task WHERE id = ?", chat.dotted)
         self.assertEqual(row["status"], TaskStatus.FAILED)
 
     def _request(
@@ -601,9 +601,9 @@ class TestGrant(_RealDb):
         principal = _principal()
         user = UserId("456")
 
-        self.assertTrue(await self.repos.grant.grant(user, principal.key))
+        self.assertTrue(await self.repos.grant.grant(user, principal.dotted))
         self.assertTrue(await self.repos.grant.contains(user))
-        self.assertFalse(await self.repos.grant.grant(user, principal.key))
+        self.assertFalse(await self.repos.grant.grant(user, principal.dotted))
         self.assertTrue(await self.repos.grant.revoke(user))
         self.assertFalse(await self.repos.grant.contains(user))
         self.assertFalse(await self.repos.grant.revoke(user))
@@ -615,11 +615,11 @@ class TestGrant(_RealDb):
         live = UserId("888")
 
         self.assertTrue(
-            await self.repos.grant.grant(expired, principal.key, expires_at=1.0)
+            await self.repos.grant.grant(expired, principal.dotted, expires_at=1.0)
         )
         self.assertFalse(await self.repos.grant.contains(expired))
         self.assertTrue(
-            await self.repos.grant.grant(live, principal.key, expires_at=9e18)
+            await self.repos.grant.grant(live, principal.dotted, expires_at=9e18)
         )
         self.assertTrue(await self.repos.grant.contains(live))
 
@@ -628,11 +628,11 @@ class TestGrant(_RealDb):
         principal = _principal()
         forever = UserId("111")
         timed = UserId("222")
-        await self.repos.grant.grant(forever, principal.key)
-        await self.repos.grant.grant(timed, principal.key, expires_at=9e18)
-        await self.repos.grant.grant(UserId("333"), principal.key, expires_at=1.0)
+        await self.repos.grant.grant(forever, principal.dotted)
+        await self.repos.grant.grant(timed, principal.dotted, expires_at=9e18)
+        await self.repos.grant.grant(UserId("333"), principal.dotted, expires_at=1.0)
         dropped = UserId("444")
-        await self.repos.grant.grant(dropped, principal.key)
+        await self.repos.grant.grant(dropped, principal.dotted)
         await self.repos.grant.revoke(dropped)
 
         self.assertEqual((forever, timed), await self.repos.grant.list_active())
@@ -657,11 +657,13 @@ class TestMedia(_RealDb):
         self.assertEqual(
             [entry.slot for entry in await self.repos.media.locate(ref)], [0, 1]
         )
-        self.assertEqual(await self.repos.media.delete_by_principal(principal.key), 2)
+        self.assertEqual(
+            await self.repos.media.delete_by_principal(principal.dotted), 2
+        )
         self.assertEqual(await self.repos.media.locate(ref), ())
 
     async def _register(
-        self, ref: MsgReferenceDTO, kind: ContentKind, local_path: str, *, slot: int = 0
+        self, ref: MessageRefDTO, kind: ContentKind, local_path: str, *, slot: int = 0
     ) -> None:
         """登记一条媒体索引"""
         await self.repos.media.register(

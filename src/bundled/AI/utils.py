@@ -10,8 +10,8 @@ import re
 import time
 
 from finshin_sdk.domain import ChatRole, ContentKind
-from finshin_sdk.domain.ids import KEY_SEP, SessionKey
-from finshin_sdk.dto import InboundEventDTO, MessageDTO, PrincipalDTO
+from finshin_sdk.domain.ids import SessionKey
+from finshin_sdk.dto import InboundEventDTO, MessageDTO, PrincipalDTO, SessionDTO
 from utils.speaker import (
     bot_quote_block,
     link_mark,
@@ -57,7 +57,7 @@ def make_session_key(principal: PrincipalDTO) -> SessionKey:
 
     - 键由平台与容器拼成
     """
-    return SessionKey(f"{principal.platform}{KEY_SEP}{principal.container}")
+    return SessionDTO(platform=principal.platform, container=principal.container).dotted
 
 
 def open_window(persona: str, history: _Rows, *, new_count: int = _ROUND_ROWS) -> _Rows:

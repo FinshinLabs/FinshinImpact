@@ -10,6 +10,7 @@ from ._adapter import (
     AdapterMissingError,
     AdapterNotInstalledError,
     AdapterOutOfDateError,
+    PlatformMissingError,
 )
 from ._config import (
     ConfigAttrError,
@@ -99,4 +100,5 @@ __all__ = [
     "AdapterMissingError",
     "AdapterNotInstalledError",
     "AdapterOutOfDateError",
+    "PlatformMissingError",
 ]

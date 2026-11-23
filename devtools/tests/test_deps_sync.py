@@ -25,7 +25,7 @@ set_profile("tg.000000")
 
 import pack_spec  # noqa: E402
 
-from finshin_sdk.domain import ManifestKey  # noqa: E402
+from finshin_sdk.domain import PluginManifestKeys  # noqa: E402
 from services import adapter_manifest  # noqa: E402
 from services.env_setup import deps_install, deps_keep, deps_startup  # noqa: E402
 
@@ -219,12 +219,12 @@ class TestInstanceEnabledUnion(unittest.TestCase):
         self.instance = self.instances / "tg.000001"
         self.instance.mkdir()
         self.help_row = {
-            ManifestKey.NAME: "help",
-            ManifestKey.DEPS: ["foo==1.0"],
+            PluginManifestKeys.NAME: "help",
+            PluginManifestKeys.DEPS: ["foo==1.0"],
         }
         self.web_row = {
-            ManifestKey.NAME: "webshot",
-            ManifestKey.DEPS: ["markdown==3.10.2"],
+            PluginManifestKeys.NAME: "webshot",
+            PluginManifestKeys.DEPS: ["markdown==3.10.2"],
         }
         patcher = patch.object(deps_keep, "INSTANCES_DIR", self.instances)
         patcher.start()

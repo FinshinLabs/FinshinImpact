@@ -5,10 +5,10 @@
 
 from abc import ABC, abstractmethod
 
-from finshin_sdk.domain.ids import PrincipalKey, SessionKey, TaskId, UserId
+from finshin_sdk.domain.ids import PrincipalKey, SessionKey, TaskKey, UserId
 from finshin_sdk.dto import (
     MediaEntryDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     PrincipalDTO,
     SessionDTO,
     SessionPatchDTO,
@@ -72,12 +72,12 @@ class TaskRepository(ABC):
         """落库新任务"""
 
     @abstractmethod
-    async def patch(self, task_id: TaskId, patch: TaskPatchDTO) -> TaskDTO | None:
+    async def patch(self, task_id: TaskKey, patch: TaskPatchDTO) -> TaskDTO | None:
         """更新任务"""
 
     @abstractmethod
-    async def find(self, task_id: TaskId) -> TaskDTO | None:
-        """按 ID 查询"""
+    async def find(self, task_id: TaskKey) -> TaskDTO | None:
+        """按任务键查询"""
 
     @abstractmethod
     async def list_all_unfinished(self) -> tuple[TaskDTO, ...]:
@@ -91,11 +91,11 @@ class MediaRepository(ABC):
     """媒体索引仓储"""
 
     @abstractmethod
-    async def register(self, ref: MsgReferenceDTO, entry: MediaEntryDTO) -> None:
+    async def register(self, ref: MessageRefDTO, entry: MediaEntryDTO) -> None:
         """登记一条媒体索引"""
 
     @abstractmethod
-    async def locate(self, ref: MsgReferenceDTO) -> tuple[MediaEntryDTO, ...]:
+    async def locate(self, ref: MessageRefDTO) -> tuple[MediaEntryDTO, ...]:
         """按三元组定位媒体"""
 
     @abstractmethod

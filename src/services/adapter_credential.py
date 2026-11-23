@@ -7,12 +7,12 @@
 from importlib import import_module
 
 from finshin_sdk import CredentialSpec
-from finshin_sdk.domain import Platform
+from finshin_sdk.domain import PlatformCode
 
 from .adapter_manifest import load_adapter_manifests
 
 
-def credential_of(platform: Platform) -> CredentialSpec | None:
+def credential_of(platform: PlatformCode) -> CredentialSpec | None:
     """按平台码取凭证声明
 
     - 清单里没有这一平台、入口导不进或没交声明，一律交 None

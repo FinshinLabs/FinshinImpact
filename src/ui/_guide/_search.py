@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import HelpKey, ManifestKey
+from finshin_sdk.domain import HelpKeys, PluginManifestKeys
 from skin.messages import PluginMessage
 
 from .._primitives import ThemedList, make_combo
@@ -38,7 +38,9 @@ def _matches(manifest: dict[str, Any], query: str, scope: str) -> bool:
     - 不分大小写，子串命中即留
     - 名字一列比的是面板上看得见的显示名，没填标题即目录名
     """
-    display = (manifest[ManifestKey.TITLE] or manifest[ManifestKey.NAME]).lower()
+    display = (
+        manifest[PluginManifestKeys.TITLE] or manifest[PluginManifestKeys.NAME]
+    ).lower()
     name_ok = scope != _SCOPE_CMD and query in display
     cmd_ok = scope != _SCOPE_NAME and any(query in one for one in _cmd_forms(manifest))
     return name_ok or cmd_ok
@@ -48,7 +50,7 @@ def _cmd_forms(manifest: dict[str, Any]) -> list[str]:
     """交出每条命令名的带斜杠与不带斜杠两种写法"""
     return [
         f"{mark}{cmd}".lower()
-        for cmd, _ in manifest[HelpKey.COMMANDS]
+        for cmd, _ in manifest[HelpKeys.COMMANDS]
         for mark in _CMD_MARKS
     ]
 

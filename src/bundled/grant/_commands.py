@@ -44,7 +44,7 @@ async def _awaits_target(ctx: HandlerContext) -> bool:
         return False
     if event.content.media or not event.content.text:
         return False
-    return _pending.get(event.principal.key) is not None
+    return _pending.get(event.principal.dotted) is not None
 
 
 def _is_id(text: str) -> bool:
@@ -65,7 +65,7 @@ async def _apply(ctx: HandlerContext, step: _GrantStep, raw_id: str) -> bool:
     target = UserId(raw_id)
     try:
         if step == _GrantStep.ADD:
-            done = await add_admin(target, principal.key)
+            done = await add_admin(target, principal.dotted)
             text = BotMessage.GRANT_ADDED if done else BotMessage.GRANT_EXISTS
         else:
             done = await remove_admin(target)
@@ -80,7 +80,7 @@ async def _apply(ctx: HandlerContext, step: _GrantStep, raw_id: str) -> bool:
 
 def _hold_target(ctx: HandlerContext, step: _GrantStep) -> None:
     """把发起人留在待输入里"""
-    _pending[ctx.event.principal.key] = step
+    _pending[ctx.event.principal.dotted] = step
 
 
 def _ask_target(ctx: HandlerContext, step: _GrantStep) -> str:
@@ -152,7 +152,7 @@ async def _show_admins(platform_raw: object, ctx: HandlerContext) -> None:
 @require_role(CommandRole.OWNER)
 async def _finish_grant(platform_raw: object, ctx: HandlerContext) -> None:
     """按待输入流程认目标"""
-    key = ctx.event.principal.key
+    key = ctx.event.principal.dotted
     step = _pending[key]
     target = (ctx.event.content.text or "").strip()
     _logger.info(f"{key} 分步待输入 {step} {target}")

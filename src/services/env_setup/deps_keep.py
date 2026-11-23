@@ -5,11 +5,11 @@
 """
 
 from finshin_sdk.domain import (
-    ManifestKey,
-    Platform,
+    PlatformCode,
     PluginFileName,
-    StateKey,
-    is_enabled,
+    PluginManifestKeys,
+    StateKeys,
+    is_plugin_enabled,
 )
 from skin.messages import PluginMessage
 from system.distributions import SDK_DISTRIBUTION, installed_version
@@ -21,7 +21,7 @@ from ..adapter_manifest import adapter_deps_union, installed_adapter_pins
 from .deps_manifest import load_manifests, plugins_roots, top_package_name
 
 
-def keep_plan(exclude: Platform | None = None) -> tuple[list[str], list[str]]:
+def keep_plan(exclude: PlatformCode | None = None) -> tuple[list[str], list[str]]:
     """全局保留清单与冲突说明，一次算齐
 
     - 核心依赖、接口包、适配器声明依赖、已装适配器包与全实例启用插件依赖并集
@@ -32,7 +32,7 @@ def keep_plan(exclude: Platform | None = None) -> tuple[list[str], list[str]]:
     return _merge_keep(exclude)
 
 
-def keep_union(exclude: Platform | None = None) -> list[str]:
+def keep_union(exclude: PlatformCode | None = None) -> list[str]:
     """全局保留清单，口径见 keep_plan"""
     return keep_plan(exclude)[0]
 
@@ -48,7 +48,7 @@ def dev_dependencies() -> list[str]:
     ]
 
 
-def _keep_sources(exclude: Platform | None = None) -> list[list[str]]:
+def _keep_sources(exclude: PlatformCode | None = None) -> list[list[str]]:
     """按保留优先级排开的各路依赖"""
     return [
         _core_dependencies(),
@@ -78,7 +78,7 @@ def _core_dependencies() -> list[str]:
 
 
 def _merge_keep(
-    exclude: Platform | None = None,
+    exclude: PlatformCode | None = None,
 ) -> tuple[list[str], list[str]]:
     """聚合保留清单与冲突说明"""
     kept: dict[str, str] = {}
@@ -98,7 +98,7 @@ def _merge_keep(
 
 def _enabled_deps_union() -> list[str]:
     """汇总全部实例已启用插件的依赖并集"""
-    return _enabled_field_union(ManifestKey.DEPS)
+    return _enabled_field_union(PluginManifestKeys.DEPS)
 
 
 def _enabled_field_union(field: str) -> list[str]:
@@ -114,8 +114,8 @@ def _enabled_field_union(field: str) -> list[str]:
     for path in sorted(INSTANCES_DIR.iterdir()):
         if not path.is_dir():
             continue
-        enabled = load_instance_enabled(path / PluginFileName.STATE, StateKey.ENABLED)
+        enabled = load_instance_enabled(path / PluginFileName.STATE, StateKeys.ENABLED)
         for manifest in manifests:
-            if is_enabled(manifest[ManifestKey.NAME], enabled):
+            if is_plugin_enabled(manifest[PluginManifestKeys.NAME], enabled):
                 items.extend(manifest[field])
     return items

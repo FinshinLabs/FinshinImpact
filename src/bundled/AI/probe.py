@@ -13,10 +13,10 @@ from finshin_sdk import (
     ProbeResult,
     ProbeRow,
 )
-from finshin_sdk.domain import ConfigPath
+from finshin_sdk.domain import ConfigPath, ConfigValues
 from utils import get_logger
 
-from .config import AIKey, AISection, ai_config
+from .config import SOURCE, PluginKeys, PluginSections
 from .core import AIClient
 
 _logger = get_logger("Plg.AI.Probe")
@@ -29,13 +29,17 @@ _ROW_TITLE = "AI 接口"
 _BUDGET = 20.0
 _DETAIL_LIMIT = 200
 
-# 本插件来源码
-_SOURCE = "plugin.AI"
 
-
-def _item(key: AIKey) -> ConfigPath:
+def _item(key: PluginKeys) -> ConfigPath:
     """本插件配置项的完整身份"""
-    return ConfigPath(source=_SOURCE, section=AISection.MODEL, key=key)
+    return ConfigPath(source=SOURCE, section=PluginSections.MODEL, key=key)
+
+
+def _text(values: ConfigValues, key: PluginKeys) -> str:
+    """取表单里这一项的文本值"""
+    section = values.get(PluginSections.MODEL) or {}
+    raw = section.get(key)
+    return raw.strip() if isinstance(raw, str) else ""
 
 
 def _clip(text: str) -> str:
@@ -44,14 +48,20 @@ def _clip(text: str) -> str:
     return body[:_DETAIL_LIMIT]
 
 
-async def _run() -> ProbeResult:
+async def _run(base_url: str, api_key: str, model: str) -> ProbeResult:
     """发一次最小对话请求
 
     - 只有 200 算通过，状态码按字段归类
     - 超时与连不上只红行，不指认字段
     """
     try:
-        await AIClient.chat_once([{"role": "user", "content": "ping"}], 1)
+        await AIClient.chat_once(
+            [{"role": "user", "content": "ping"}],
+            1,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+        )
     except HTTPStatusError as e:
         return _http_failure(e)
     except RequestTimeoutError:
@@ -70,19 +80,21 @@ def _http_failure(err: HTTPStatusError) -> ProbeResult:
         return ProbeResult(
             accepted=False,
             detail=detail,
-            field_errors={_item(AIKey.API_KEY): f"密钥被接口拒绝（{err.status_code}）"},
+            field_errors={
+                _item(PluginKeys.API_KEY): f"密钥被接口拒绝（{err.status_code}）"
+            },
         )
     if err.status_code == 404:
         return ProbeResult(
             accepted=False,
             detail=detail,
-            field_errors={_item(AIKey.BASE_URL): "接口地址不存在（404）"},
+            field_errors={_item(PluginKeys.BASE_URL): "接口地址不存在（404）"},
         )
     if err.status_code == 400 and "model" in err.msg.lower():
         return ProbeResult(
             accepted=False,
             detail=detail,
-            field_errors={_item(AIKey.MODEL): "接口不认这个模型名（400）"},
+            field_errors={_item(PluginKeys.MODEL): "接口不认这个模型名（400）"},
         )
     return ProbeResult(accepted=False, detail=detail)
 
@@ -102,12 +114,15 @@ def _finish(outcome: ProbeOutcome) -> PlanVerdict:
     return PlanVerdict(failure_detail=detail)
 
 
-def build_probe() -> ConnectionPlan:
+def build_probe(values: ConfigValues) -> ConnectionPlan:
     """造一份 AI 接口探测计划
 
     - 一行一通道，预算 20 秒
-    - 复用键含地址、密钥与模型名
+    - 请求值与免测键都取表单里那三项
     """
+    base_url = _text(values, PluginKeys.BASE_URL)
+    api_key = _text(values, PluginKeys.API_KEY)
+    model = _text(values, PluginKeys.MODEL)
     return ConnectionPlan(
         rows=(ProbeRow(row_id=_ROW_ID, title=_ROW_TITLE),),
         channels=(
@@ -115,13 +130,9 @@ def build_probe() -> ConnectionPlan:
                 row_id=_ROW_ID,
                 label=_ROW_TITLE,
                 budget=_BUDGET,
-                run=_run,
+                run=lambda: _run(base_url, api_key, model),
             ),
         ),
-        reuse_key=(
-            ai_config.base_url.strip(),
-            ai_config.api_key.strip(),
-            ai_config.model_name.strip(),
-        ),
+        reuse_key=(base_url, api_key, model),
         finish=_finish,
     )

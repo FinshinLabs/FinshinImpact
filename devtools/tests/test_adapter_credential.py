@@ -13,7 +13,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
 from finshin_sdk import CredentialSpec  # noqa: E402
-from finshin_sdk.domain import Platform  # noqa: E402
+from finshin_sdk.domain import ConfigPath, PlatformCode  # noqa: E402
 from finshin_sdk.dto import AdapterManifestDTO  # noqa: E402
 from services import adapter_credential as credential_mod  # noqa: E402
 
@@ -21,11 +21,12 @@ _SPEC = CredentialSpec(
     label="假凭证",
     desc="这行是输入框下的提示",
     invalid="这行是认不出时的提示",
+    item=ConfigPath(source="adapter.fake", section="credential", key="token"),
     identity=lambda text: f"fake.{text}" if text else "",
 )
 
 _CARD = AdapterManifestDTO(
-    platform=Platform.TELEGRAM, deps=(), requires_sdk="", entry="fake_entry"
+    platform=PlatformCode("tg"), deps=(), requires_sdk="", entry="fake_entry"
 )
 
 
@@ -38,11 +39,11 @@ class TestAdapterCredential(unittest.TestCase):
             patch.object(
                 credential_mod,
                 "load_adapter_manifests",
-                lambda: {Platform.TELEGRAM: _CARD},
+                lambda: {PlatformCode("tg"): _CARD},
             ),
             patch.object(credential_mod, "import_module", lambda _name: entry_module),
         ):
-            return credential_mod.credential_of(Platform.TELEGRAM)
+            return credential_mod.credential_of(PlatformCode("tg"))
 
     def test_declaration_comes_out_whole(self) -> None:
         """假声明的标签、提示、非法提示与身份推导原样取出"""
@@ -58,7 +59,7 @@ class TestAdapterCredential(unittest.TestCase):
     def test_unlisted_platform_gives_none(self) -> None:
         """清单里没有这一平台即交 None"""
         with patch.object(credential_mod, "load_adapter_manifests", lambda: {}):
-            self.assertIsNone(credential_mod.credential_of(Platform.QQ))
+            self.assertIsNone(credential_mod.credential_of(PlatformCode("qq")))
 
     def test_entry_without_parts_gives_none(self) -> None:
         """入口模块没交 parts 即交 None"""
@@ -74,11 +75,11 @@ class TestAdapterCredential(unittest.TestCase):
             patch.object(
                 credential_mod,
                 "load_adapter_manifests",
-                lambda: {Platform.TELEGRAM: _CARD},
+                lambda: {PlatformCode("tg"): _CARD},
             ),
             patch.object(credential_mod, "import_module", _boom),
         ):
-            self.assertIsNone(credential_mod.credential_of(Platform.TELEGRAM))
+            self.assertIsNone(credential_mod.credential_of(PlatformCode("tg")))
 
 
 if __name__ == "__main__":

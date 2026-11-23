@@ -23,10 +23,10 @@ from PySide6.QtWidgets import (
 )
 
 from finshin_sdk.domain import (
-    BUNDLED_PLUGIN_PRIORITY,
-    ManifestKey,
-    StateKey,
-    is_enabled,
+    BUNDLED_PLUGINS,
+    PluginManifestKeys,
+    StateKeys,
+    is_plugin_enabled,
     resolve_claims,
 )
 from services.env_setup.deps_install import install_deps
@@ -72,7 +72,9 @@ def _status_label(manifest: dict[str, Any]) -> str:
     - 缺库数按这份清单声明的依赖逐条查已装
     - 开发模式只报话不动环境
     """
-    missing = sum(1 for pin in manifest[ManifestKey.DEPS] if not is_pin_installed(pin))
+    missing = sum(
+        1 for pin in manifest[PluginManifestKeys.DEPS] if not is_pin_installed(pin)
+    )
     if not missing:
         return PluginMessage.STATUS_INSTALLED
     if dev_mode():
@@ -138,19 +140,19 @@ class _PluginPanelDialog(BaseDialog):
         if not roots:
             return
 
-        enabled = load_instance_enabled(state_path_of(self._code), StateKey.ENABLED)
+        enabled = load_instance_enabled(state_path_of(self._code), StateKeys.ENABLED)
         self._manifests = load_manifests(roots)
         self._titles = {
-            manifest[ManifestKey.NAME]: manifest[ManifestKey.TITLE]
-            or manifest[ManifestKey.NAME]
+            manifest[PluginManifestKeys.NAME]: manifest[PluginManifestKeys.TITLE]
+            or manifest[PluginManifestKeys.NAME]
             for manifest in self._manifests
         }
 
         _, conflicts = resolve_claims(claims_of(self._manifests), enabled)
         for manifest in self._manifests:
-            name = manifest[ManifestKey.NAME]
+            name = manifest[PluginManifestKeys.NAME]
             lines = clash_lines(conflicts.get(name, ()), self._titles)
-            self._add_row(manifest, is_enabled(name, enabled), lines)
+            self._add_row(manifest, is_plugin_enabled(name, enabled), lines)
         for loser, winner in shadowed_manifests(roots):
             clash = [PluginMessage.CONFLICT_NAME.format(owner=self._titles[winner])]
             self._add_row(loser, False, clash, winner, PluginMessage.BTN_DUP_NAME)
@@ -188,8 +190,8 @@ class _PluginPanelDialog(BaseDialog):
 
         - 名称与说明由插件作者自写，宽度放不下即循环滚，全文挂悬浮提示
         """
-        bundled = manifest[ManifestKey.NAME] in BUNDLED_PLUGIN_PRIORITY
-        title = manifest[ManifestKey.TITLE] or manifest[ManifestKey.NAME]
+        bundled = manifest[PluginManifestKeys.NAME] in BUNDLED_PLUGINS
+        title = manifest[PluginManifestKeys.TITLE] or manifest[PluginManifestKeys.NAME]
 
         row = QWidget()
         row.setFixedHeight(PANEL.row_height)
@@ -202,7 +204,7 @@ class _PluginPanelDialog(BaseDialog):
 
         name_label = MarqueeLabel(title)
         name_label.setFixedWidth(PANEL.name_width)
-        desc_label = MarqueeLabel(manifest[ManifestKey.SUMMARY])
+        desc_label = MarqueeLabel(manifest[PluginManifestKeys.SUMMARY])
         status = QLabel(_status_label(manifest))
         status.setFixedWidth(PANEL.status_width)
         status.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -243,8 +245,8 @@ class _PluginPanelDialog(BaseDialog):
         for row in range(self._list.count()):
             item = self._list.item(row)
             manifest = item.data(ROLE_MANIFEST)
-            name = manifest[ManifestKey.NAME]
-            if item.data(_ROLE_NAME_TAKEN) or name in BUNDLED_PLUGIN_PRIORITY:
+            name = manifest[PluginManifestKeys.NAME]
+            if item.data(_ROLE_NAME_TAKEN) or name in BUNDLED_PLUGINS:
                 continue
             lines = clash_lines(conflicts.get(name, ()), self._titles)
             if lines == item.data(_ROLE_LINES):
@@ -269,11 +271,11 @@ class _PluginPanelDialog(BaseDialog):
             manifest = item.data(ROLE_MANIFEST)
             if (
                 not isinstance(manifest, dict)
-                or manifest[ManifestKey.NAME] in BUNDLED_PLUGIN_PRIORITY
+                or manifest[PluginManifestKeys.NAME] in BUNDLED_PLUGINS
             ):
                 continue
             if self._row_checked(item):
-                names.append(manifest[ManifestKey.NAME])
+                names.append(manifest[PluginManifestKeys.NAME])
         return names
 
     def _on_save(self) -> None:

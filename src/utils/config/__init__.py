@@ -7,8 +7,10 @@
 from collections.abc import Sequence
 
 from ..paths import CONFIG_FILE
+from ._core import CoreKeys, CoreSections, core_item
 from ._differ import compare_configs
 from ._io import ConfigIO
+from ._owner import OWNER_TAG, owner_field, owner_item
 from ._schema import build_schema
 from ._validator import validate_types
 from .models import AppConfigData, AppSchema, FieldErrors
@@ -19,6 +21,7 @@ from .sources import (
     assemble,
     current_plan,
     section_name,
+    source_identity,
     source_values,
     use_plan,
 )
@@ -29,6 +32,7 @@ __all__ = [
     "ConfigSource",
     "SourceKind",
     "section_name",
+    "source_identity",
     "source_values",
     # 数据读写
     "get_schema",
@@ -38,6 +42,13 @@ __all__ = [
     "compare_configs",
     # 类型校验
     "validate_types",
+    # 本体配置项与主人解析
+    "CoreKeys",
+    "CoreSections",
+    "core_item",
+    "OWNER_TAG",
+    "owner_field",
+    "owner_item",
     # 数据结构
     "AppConfigData",
     "AppSchema",

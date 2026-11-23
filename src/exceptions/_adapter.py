@@ -1,6 +1,6 @@
 """适配器异常族
 
-- 定义适配器安装、版本与引用范围三类异常
+- 定义适配器缺失、安装、版本与引用范围几类异常
 """
 
 from finshin_sdk.exceptions import BotError
@@ -13,6 +13,16 @@ class AdapterError(BotError):
     """
 
     fatal = True
+
+
+_PLATFORM_MISSING_TEXT = "没有可用的平台适配器\n请先装一个平台适配器，再重新打开本程序"
+
+
+class PlatformMissingError(AdapterError):
+    """身份码缺平台段"""
+
+    def __str__(self) -> str:
+        return _PLATFORM_MISSING_TEXT
 
 
 class AdapterMissingError(AdapterError):
@@ -53,6 +63,7 @@ class AdapterImportError(AdapterError):
 
 
 ADAPTER_MAP = {
+    PlatformMissingError: _PLATFORM_MISSING_TEXT,
     AdapterMissingError: "{platform} 平台的适配器还没装\n装完请重新打开本程序",
     AdapterNotInstalledError: (
         "{platform} 平台的适配器没装进环境：找不到 {module}\n装完请重新打开本程序"

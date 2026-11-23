@@ -9,8 +9,8 @@ from typing import cast
 import aiosqlite
 
 from core import SessionRepository
-from finshin_sdk.domain import ChatRole, Platform
-from finshin_sdk.domain.ids import KEY_SEP, ContainerKey, SessionKey, UserId
+from finshin_sdk.domain import ChatRole, PlatformCode
+from finshin_sdk.domain.ids import ContainerCode, SessionKey, UserId
 from finshin_sdk.dto import MessageDTO, SessionDTO, SessionPatchDTO
 
 
@@ -149,7 +149,7 @@ class SqliteSessionRepository(SessionRepository):
         return int(row[0])
 
 
-def _split_session_key(session_key: SessionKey) -> tuple[Platform, ContainerKey]:
+def _split_session_key(session_key: SessionKey) -> tuple[PlatformCode, ContainerCode]:
     """拆会话键为平台与容器段"""
-    platform, _, container = session_key.partition(KEY_SEP)
-    return Platform(platform), ContainerKey(container)
+    platform, _, container = session_key.partition(".")
+    return PlatformCode(platform), ContainerCode(container)

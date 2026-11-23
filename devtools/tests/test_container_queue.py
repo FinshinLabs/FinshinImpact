@@ -22,9 +22,9 @@ from config_plan import assemble_for_case  # noqa: E402
 
 from bundled.AI.services import _ai_chat, _cleanup  # noqa: E402
 from bundled.AI.utils import make_session_key  # noqa: E402
-from finshin_sdk.domain import ChatScope, Platform, QueuedAction  # noqa: E402
+from finshin_sdk.domain import ChatScope, PlatformCode, QueuedAction  # noqa: E402
 from finshin_sdk.domain.ids import (  # noqa: E402
-    ContainerKey,
+    ContainerCode,
     MessageId,
     SessionKey,
     UserId,
@@ -32,7 +32,7 @@ from finshin_sdk.domain.ids import (  # noqa: E402
 from finshin_sdk.dto import (  # noqa: E402
     ContentDTO,
     InboundEventDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     PrincipalDTO,
 )
 from services.tasks import configure_task_service, get_task_service  # noqa: E402
@@ -42,12 +42,12 @@ _GROUP_KEY = SessionKey("tg.g100123")
 
 def _event(user: str, scope: ChatScope) -> InboundEventDTO:
     """构造一条入站事件"""
-    container = ContainerKey("g100123" if scope == ChatScope.GROUP else f"u{user}")
+    container = ContainerCode("g100123" if scope == ChatScope.GROUP else f"u{user}")
     principal = PrincipalDTO(
-        platform=Platform.TELEGRAM, container=container, user=UserId(user)
+        platform=PlatformCode("tg"), container=container, user=UserId(user)
     )
-    ref = MsgReferenceDTO(
-        platform=Platform.TELEGRAM, container=container, message_id=MessageId("7")
+    ref = MessageRefDTO(
+        platform=PlatformCode("tg"), container=container, message_id=MessageId("7")
     )
     return InboundEventDTO(
         ref=ref,

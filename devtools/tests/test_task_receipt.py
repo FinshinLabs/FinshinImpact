@@ -34,18 +34,17 @@ from data import (  # noqa: E402
 )
 from finshin_sdk import CapabilityCall  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
-    Platform,
+    PlatformCode,
     TaskStatus,
 )
 from finshin_sdk.domain.ids import (  # noqa: E402
-    KEY_SEP,
-    ContainerKey,
+    ContainerCode,
     MessageId,
-    TaskId,
+    TaskKey,
     UserId,
 )
 from finshin_sdk.dto import (  # noqa: E402
-    MsgReferenceDTO,
+    MessageRefDTO,
     PrincipalDTO,
     TaskPatchDTO,
     TaskRequestDTO,
@@ -71,7 +70,7 @@ class _FakeSayer:
     async def _say(self, principal: PrincipalDTO, text: str) -> None:
         if self._raise_on and self._raise_on in principal.user:
             raise ConnectionError("送不出去")
-        self.sent.append((principal.key, text))
+        self.sent.append((principal.dotted, text))
 
 
 def _fake_client(*, reply: str = "", fail: bool = False):
@@ -95,15 +94,15 @@ def _fake_client(*, reply: str = "", fail: bool = False):
 def _principal(user: str, container: str = "g100123") -> PrincipalDTO:
     """构造测试主体"""
     return PrincipalDTO(
-        platform=Platform.TELEGRAM,
-        container=ContainerKey(container),
+        platform=PlatformCode("tg"),
+        container=ContainerCode(container),
         user=UserId(user),
     )
 
 
-def _chat_id(principal: PrincipalDTO) -> TaskId:
+def _chat_id(principal: PrincipalDTO) -> TaskKey:
     """取该主体的问答任务行号"""
-    return TaskId(f"{principal.key}{KEY_SEP}demo.chat")
+    return TaskKey(f"{principal.dotted}.demo.chat")
 
 
 class TestReportLostTasks(unittest.IsolatedAsyncioTestCase):
@@ -142,7 +141,7 @@ class TestReportLostTasks(unittest.IsolatedAsyncioTestCase):
             TaskRequestDTO(
                 principal=principal,
                 kind="demo.chat",
-                source_ref=MsgReferenceDTO(
+                source_ref=MessageRefDTO(
                     platform=principal.platform,
                     container=principal.container,
                     message_id=MessageId("789"),
@@ -171,7 +170,7 @@ class TestReportLostTasks(unittest.IsolatedAsyncioTestCase):
         await report_lost_tasks(sayer.call)
 
         self.assertEqual(len(sayer.sent), 1)
-        self.assertEqual(sayer.sent[0][0], _principal("111").key)
+        self.assertEqual(sayer.sent[0][0], _principal("111").dotted)
         self.assertIn(sayer.sent[0][1], self.cfg.lost_lines)
         self.assertEqual(await self.repos.task.list_all_unfinished(), ())
 
@@ -185,7 +184,7 @@ class TestReportLostTasks(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             [key for key, _ in sayer.sent],
-            [_principal("111").key, _principal("222", "g200456").key],
+            [_principal("111").dotted, _principal("222", "g200456").dotted],
         )
         for _, text in sayer.sent:
             self.assertIn(text, self.cfg.lost_lines)
@@ -208,7 +207,7 @@ class TestReportLostTasks(unittest.IsolatedAsyncioTestCase):
             await report_lost_tasks(sayer.call)
 
         self.assertEqual(len(seen), 1)
-        self.assertEqual([key for key, _ in sayer.sent], [_principal("111").key])
+        self.assertEqual([key for key, _ in sayer.sent], [_principal("111").dotted])
         self.assertIn(
             sayer.sent[0][1],
             (

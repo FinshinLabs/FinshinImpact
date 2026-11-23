@@ -1,19 +1,19 @@
 # 测试
 
-用例在两处：本体在 `devtools/tests/`，各平台适配器随子仓带在 `finshin/adapter/<平台>/tests/`。一份文件对一个主题，命名 `test_<主题>.py`。
+用例分三处：本体在 `devtools/tests/`，各平台适配器随子仓带在 `finshin/adapter/<平台>/tests/`，接口包在 `finshin/sdk/tests/` 单独跑。一份文件对一个主题，命名 `test_<主题>.py`。
 条文见 [代码规范](coding-style.md)，静态检查见 [规范扫描器](style-checker.md)，发布前的检查顺序见 [发布工作流](release-workflow.md#五项闸门提交与发布前跑齐)。
 
 ## 跑法
 
 ```powershell
-# 全跑
+# 跑本体与各平台适配器
 python -m pytest
 
 # 只跑一组，逐条列用例名
 python -m pytest devtools/tests/test_grant_access.py -v
 ```
 
-- 在项目根一条命令跑完两处。
+- 在项目根一条命令跑完本体与各平台适配器两处，接口包另跑 `python -m pytest finshin/sdk/tests`。
 - 收集范围写在 `pytest.ini` 的 `testpaths` 里。
   - `testpaths` 不展开通配，装载根那一棵只写根目录，pytest 自己走进去收各平台用例树。
   - 没挂载时那棵目录不在，收集范围少一条也不报错，只表现为用例数少一截。

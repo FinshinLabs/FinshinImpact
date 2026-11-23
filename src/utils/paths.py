@@ -4,8 +4,8 @@
 - 导入期身份码必须已写入环境变量，取值即冻结
 """
 
-from exceptions import ProfileMissingError
-from finshin_sdk.domain import Platform, platform_of_profile
+from exceptions import PlatformMissingError, ProfileMissingError
+from finshin_sdk.domain import ProfileKey, platform_of_key
 from system.profile_env import (
     ASSET_PERSONA_EXAMPLE_NAME,
     ASSETS_DIR,
@@ -24,8 +24,12 @@ if not _PROFILE:
 
 PROFILE_DIR = profile_dir(_PROFILE)
 
-# 身份码前缀即平台来源，不属已知平台时回落 Telegram
-PLATFORM = platform_of_profile(_PROFILE) or Platform.TELEGRAM
+# 身份码前缀即平台码
+_platform = platform_of_key(ProfileKey(_PROFILE))
+if _platform is None:
+    # 缺平台段即没有可用适配器
+    raise PlatformMissingError() from None
+PLATFORM = _platform
 
 CONFIG_FILE = PROFILE_DIR / "config.toml"
 

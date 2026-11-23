@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 from finshin_sdk.domain import (  # noqa: E402
     ChatScope,
     ContentKind,
-    Platform,
+    PlatformCode,
     is_flag_name,
     make_container,
 )
@@ -26,7 +26,7 @@ from finshin_sdk.dto import (  # noqa: E402
     ContentDTO,
     InboundEventDTO,
     MediaEntryDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     PrincipalDTO,
 )
 
@@ -125,9 +125,9 @@ def _name_of(message: Msg) -> str:
     return message.chat.title
 
 
-def _ref(message: Msg, container: str) -> MsgReferenceDTO:
-    return MsgReferenceDTO(
-        platform=Platform.TELEGRAM,
+def _ref(message: Msg, container: str) -> MessageRefDTO:
+    return MessageRefDTO(
+        platform=PlatformCode("tg"),
         container=container,
         message_id=MessageId(str(message.id)),
     )
@@ -179,7 +179,7 @@ def _event(
     return InboundEventDTO(
         ref=_ref(head, container),
         principal=PrincipalDTO(
-            platform=Platform.TELEGRAM, container=container, user=user_id
+            platform=PlatformCode("tg"), container=container, user=user_id
         ),
         content=ContentDTO(text=text, media=media),
         scope=scope,

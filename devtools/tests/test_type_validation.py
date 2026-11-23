@@ -22,7 +22,7 @@ from finshin_sdk.domain import (  # noqa: E402
     ConfigPath,
     FieldCondition,
     FieldSpec,
-    Platform,
+    PlatformCode,
     SectionSpec,
 )
 from skin.messages import CheckMessage, ConfigMessage  # noqa: E402
@@ -437,7 +437,7 @@ class TestPlatformSchema(unittest.TestCase):
                 )
                 section = replace(source, title="页签标题", fields=(field,))
                 with (
-                    patch("bot._managers._config_sources.PLATFORM", Platform.QQ),
+                    patch("bot._managers._config_sources.PLATFORM", PlatformCode("qq")),
                     fake_adapter_parts("大类标题", (section,)),
                 ):
                     tab = build_schema(assemble(config_sources()).sections)[0]
@@ -474,7 +474,7 @@ class TestPlatformSchema(unittest.TestCase):
 
         only = _declared_section()
         with (
-            patch("bot._managers._config_sources.PLATFORM", Platform.QQ),
+            patch("bot._managers._config_sources.PLATFORM", PlatformCode("qq")),
             fake_adapter_parts(sections=(only,)),
         ):
             plan = assemble(config_sources())

@@ -4,7 +4,7 @@
 - 保存插件选择后按全局清单补缺，只加不删
 """
 
-from finshin_sdk.domain import ManifestKey, StateKey, is_enabled
+from finshin_sdk.domain import PluginManifestKeys, StateKeys, is_plugin_enabled
 from system.plugin_state import load_instance_enabled
 
 from .deps_keep import keep_union
@@ -36,11 +36,11 @@ def target_manifests(code: str) -> list[dict]:
     roots = plugins_roots()
     if not roots:
         return []
-    enabled = load_instance_enabled(state_path_of(code), StateKey.ENABLED)
+    enabled = load_instance_enabled(state_path_of(code), StateKeys.ENABLED)
     return [
         manifest
         for manifest in load_manifests(roots)
-        if is_enabled(manifest[ManifestKey.NAME], enabled)
+        if is_plugin_enabled(manifest[PluginManifestKeys.NAME], enabled)
     ]
 
 
@@ -54,7 +54,7 @@ def disable_failed(code: str, failed: list[str]) -> list[str]:
     roots = plugins_roots()
     if not roots:
         return []
-    enabled = load_instance_enabled(state_path_of(code), StateKey.ENABLED)
+    enabled = load_instance_enabled(state_path_of(code), StateKeys.ENABLED)
     if not enabled:
         return []
 
@@ -63,12 +63,12 @@ def disable_failed(code: str, failed: list[str]) -> list[str]:
     ordered: list[str] = []
     dropped: list[str] = []
     for manifest in manifests:
-        name = manifest[ManifestKey.NAME]
+        name = manifest[PluginManifestKeys.NAME]
         if name not in enabled:
             continue
         ordered.append(name)
-        deps = {top_package_name(pin) for pin in manifest[ManifestKey.DEPS]}
-        assets = set(manifest[ManifestKey.ASSETS])
+        deps = {top_package_name(pin) for pin in manifest[PluginManifestKeys.DEPS]}
+        assets = set(manifest[PluginManifestKeys.ASSETS])
         if deps & tops or assets & set(failed):
             dropped.append(name)
     if not dropped:

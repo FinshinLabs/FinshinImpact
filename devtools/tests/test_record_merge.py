@@ -21,12 +21,12 @@ set_profile("tg.000000")
 
 from bundled.AI.services import worker  # noqa: E402
 from bundled.AI.utils import make_session_key  # noqa: E402
-from finshin_sdk.domain import ChatScope, Platform  # noqa: E402
-from finshin_sdk.domain.ids import ContainerKey, MessageId, UserId  # noqa: E402
+from finshin_sdk.domain import ChatScope, PlatformCode  # noqa: E402
+from finshin_sdk.domain.ids import ContainerCode, MessageId, UserId  # noqa: E402
 from finshin_sdk.dto import (  # noqa: E402
     ContentDTO,
     InboundEventDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     PrincipalDTO,
 )
 
@@ -40,12 +40,12 @@ def _event(
     reply_to_bot: bool = False,
 ) -> InboundEventDTO:
     """构造一条带引用的入站事件"""
-    container = ContainerKey("g100123" if scope == ChatScope.GROUP else f"u{user}")
+    container = ContainerCode("g100123" if scope == ChatScope.GROUP else f"u{user}")
     principal = PrincipalDTO(
-        platform=Platform.TELEGRAM, container=container, user=UserId(user)
+        platform=PlatformCode("tg"), container=container, user=UserId(user)
     )
-    ref = MsgReferenceDTO(
-        platform=Platform.TELEGRAM, container=container, message_id=MessageId("7")
+    ref = MessageRefDTO(
+        platform=PlatformCode("tg"), container=container, message_id=MessageId("7")
     )
     return InboundEventDTO(
         ref=ref,

@@ -30,13 +30,13 @@ from exceptions import (  # noqa: E402
     describe_error,
 )
 from finshin_sdk.domain import (  # noqa: E402
-    INSTALLED_PLUGINS_NAME,
+    BUNDLED_PLUGINS_PKG,
+    INSTALLED_PLUGINS_DIR,
     INSTALLED_PLUGINS_PKG,
-    PLUGINS_PKG,
-    HelpKey,
-    ManifestKey,
+    HelpKeys,
     PlatformMoment,
     PluginClaim,
+    PluginManifestKeys,
     resolve_claims,
 )
 from services.env_setup import deps_manifest  # noqa: E402
@@ -213,9 +213,9 @@ class ExternalRootCase(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         base = Path(self._tmp.name)
-        self.bundled = base / PLUGINS_PKG
+        self.bundled = base / BUNDLED_PLUGINS_PKG
         self.bundled.mkdir()
-        self.installed = base / INSTALLED_PLUGINS_NAME
+        self.installed = base / INSTALLED_PLUGINS_DIR
         self.installed.mkdir(parents=True)
         self.state = base / "plugins.toml"
         self.addCleanup(self._forget_modules)
@@ -304,7 +304,8 @@ class TestExternalRootReads(ExternalRootCase):
         picked = _manifest.enabled_manifests(self.state)
 
         self.assertEqual(
-            [(m.title, m.module) for m in picked], [("随包", f"{PLUGINS_PKG}.dup")]
+            [(m.title, m.module) for m in picked],
+            [("随包", f"{BUNDLED_PLUGINS_PKG}.dup")],
         )
 
     def test_installed_name_clashing_bundled_table_never_loads(self) -> None:
@@ -319,8 +320,8 @@ class TestExternalRootReads(ExternalRootCase):
             _manifest,
             "_plugins_roots",
             lambda: [
-                (self.installed, INSTALLED_PLUGINS_NAME),
-                (self.bundled, PLUGINS_PKG),
+                (self.installed, INSTALLED_PLUGINS_DIR),
+                (self.bundled, BUNDLED_PLUGINS_PKG),
             ],
         )
         patcher.start()
@@ -329,7 +330,8 @@ class TestExternalRootReads(ExternalRootCase):
         picked = _manifest.enabled_manifests(self.state)
 
         self.assertEqual(
-            [(m.title, m.module) for m in picked], [("随包", f"{PLUGINS_PKG}.help")]
+            [(m.title, m.module) for m in picked],
+            [("随包", f"{BUNDLED_PLUGINS_PKG}.help")],
         )
 
     def test_name_clash_leaves_command_claim_out_of_play(self) -> None:
@@ -345,8 +347,8 @@ class TestExternalRootReads(ExternalRootCase):
             _manifest,
             "_plugins_roots",
             lambda: [
-                (self.installed, INSTALLED_PLUGINS_NAME),
-                (self.bundled, PLUGINS_PKG),
+                (self.installed, INSTALLED_PLUGINS_DIR),
+                (self.bundled, BUNDLED_PLUGINS_PKG),
             ],
         )
         patcher.start()
@@ -355,16 +357,20 @@ class TestExternalRootReads(ExternalRootCase):
         picked = _manifest.enabled_manifests(self.state)
 
         self.assertEqual(
-            [(m.title, m.module) for m in picked], [("随包", f"{PLUGINS_PKG}.help")]
+            [(m.title, m.module) for m in picked],
+            [("随包", f"{BUNDLED_PLUGINS_PKG}.help")],
         )
 
         rows = deps_manifest.load_manifests(
-            [(self.bundled, PLUGINS_PKG), (self.installed, INSTALLED_PLUGINS_PKG)]
+            [
+                (self.bundled, BUNDLED_PLUGINS_PKG),
+                (self.installed, INSTALLED_PLUGINS_PKG),
+            ]
         )
         claims = [
             PluginClaim(
-                name=row[ManifestKey.NAME],
-                commands=tuple(cmd for cmd, _ in row[HelpKey.COMMANDS]),
+                name=row[PluginManifestKeys.NAME],
+                commands=tuple(cmd for cmd, _ in row[HelpKeys.COMMANDS]),
             )
             for row in rows
         ]
@@ -541,8 +547,8 @@ class TestExternalScope(ExternalRootCase):
 
         - 这条红了说明放行按恒启用表挑人，新加的随包件会被误拦
         """
-        module = f"{PLUGINS_PKG}.inner"
-        check_external_imports("inner", module, PluginImportError, PLUGINS_PKG)
+        module = f"{BUNDLED_PLUGINS_PKG}.inner"
+        check_external_imports("inner", module, PluginImportError, BUNDLED_PLUGINS_PKG)
 
 
 if __name__ == "__main__":

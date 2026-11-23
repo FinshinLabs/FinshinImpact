@@ -4,7 +4,7 @@
 """
 
 from exceptions import PluginManifestError
-from finshin_sdk.domain import ArgsValue, CommandRole, HelpKey, is_flag_name
+from finshin_sdk.domain import CommandRole, FlagValue, HelpKeys, is_flag_name
 from finshin_sdk.dto import HelpCommandDTO, HelpFlagDTO, HelpSectionDTO
 
 from ..logger import get_logger
@@ -12,10 +12,10 @@ from ..logger import get_logger
 _logger = get_logger("Plugin")
 
 # 帮助贡献键名白名单
-_HELP_SECTION_KEYS = frozenset({HelpKey.SECTION, HelpKey.NOTE, HelpKey.COMMANDS})
-_HELP_COMMAND_KEYS = frozenset({HelpKey.CMD, HelpKey.DESC})
+_HELP_SECTION_KEYS = frozenset({HelpKeys.SECTION, HelpKeys.NOTE, HelpKeys.COMMANDS})
+_HELP_COMMAND_KEYS = frozenset({HelpKeys.CMD, HelpKeys.DESC})
 _HELP_COMMAND_ALLOWED = _HELP_COMMAND_KEYS | frozenset(
-    {HelpKey.FLAGS, HelpKey.ARGS, HelpKey.ROLE}
+    {HelpKeys.FLAGS, HelpKeys.ARGS, HelpKeys.ROLE}
 )
 
 # 清单权限档词表，只认这三个词
@@ -49,9 +49,9 @@ def read_help_sections(
         if not isinstance(raw_section, dict):
             continue
 
-        section = raw_section.get(HelpKey.SECTION, "")
-        note = raw_section.get(HelpKey.NOTE, "")
-        raw_commands = raw_section.get(HelpKey.COMMANDS, [])
+        section = raw_section.get(HelpKeys.SECTION, "")
+        note = raw_section.get(HelpKeys.NOTE, "")
+        raw_commands = raw_section.get(HelpKeys.COMMANDS, [])
         if not isinstance(section, str) or not isinstance(note, str):
             continue
         if not isinstance(raw_commands, list):
@@ -101,10 +101,10 @@ def _parse_help_command(
     unknown = sorted(set(raw) - _HELP_COMMAND_ALLOWED)
     if unknown:
         _logger.debug(
-            f"插件 {plugin_name} 帮助段 {section} 的 {raw[HelpKey.CMD]} 忽略未知键 {'、'.join(unknown)}"
+            f"插件 {plugin_name} 帮助段 {section} 的 {raw[HelpKeys.CMD]} 忽略未知键 {'、'.join(unknown)}"
         )
 
-    raw_flags = raw.get(HelpKey.FLAGS, [])
+    raw_flags = raw.get(HelpKeys.FLAGS, [])
     if not isinstance(raw_flags, list):
         return None
     flags: list[HelpFlagDTO] = []
@@ -114,24 +114,24 @@ def _parse_help_command(
             return None
         flags.append(HelpFlagDTO(name=parts[0], desc=parts[1], default=parts[2]))
 
-    raw_role = raw.get(HelpKey.ROLE, "")
+    raw_role = raw.get(HelpKeys.ROLE, "")
     if not isinstance(raw_role, str) or (raw_role and raw_role not in _ROLE_WORDS):
         return None
 
-    raw_args = raw.get(HelpKey.ARGS, "")
+    raw_args = raw.get(HelpKeys.ARGS, "")
     if not isinstance(raw_args, str):
         return None
 
     return HelpCommandDTO(
-        cmd=raw[HelpKey.CMD],
-        desc=raw[HelpKey.DESC],
+        cmd=raw[HelpKeys.CMD],
+        desc=raw[HelpKeys.DESC],
         flags=tuple(flags),
         args=raw_args,
         role=_ROLE_WORDS.get(raw_role, CommandRole.MEMBER),
     )
 
 
-def _checked_default(raw_default: object, plugin_name: str, name: str) -> ArgsValue:
+def _checked_default(raw_default: object, plugin_name: str, name: str) -> FlagValue:
     """核清单写的默认值是哪一种
 
     - 只认整数、小数、文本三种，其余类型当场报错，报的是类型本名
@@ -150,7 +150,7 @@ def _checked_default(raw_default: object, plugin_name: str, name: str) -> ArgsVa
 
 def _flag_parts(
     raw_flag: object, plugin_name: str
-) -> tuple[str, str, ArgsValue | None] | None:
+) -> tuple[str, str, FlagValue | None] | None:
     """拆开关项的三段
 
     - 前两段是「开关 说明」，都须是非空文本

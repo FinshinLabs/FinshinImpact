@@ -14,6 +14,7 @@ _SYMBOL_MODULES = {
     "LinkStatus": "._link",
     "link_report": "._link",
     "detect_system_proxy": "._proxy",
+    "CHECKING": "._probe",
     "FrameKey": "._probe",
     "RowId": "._probe",
     "RowStatus": "._probe",
@@ -31,7 +32,8 @@ __all__ = [
     "link_report",
     # 系统代理
     "detect_system_proxy",
-    # 通道与协议键
+    # 行状态与协议键
+    "CHECKING",
     "FrameKey",
     "RowId",
     "RowStatus",
@@ -46,6 +48,7 @@ if TYPE_CHECKING:
     from ._github import GitClient
     from ._link import LinkStatus, link_report
     from ._probe import (
+        CHECKING,
         FrameKey,
         RowId,
         RowStatus,

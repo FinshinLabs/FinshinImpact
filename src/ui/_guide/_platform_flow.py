@@ -9,6 +9,7 @@ from collections.abc import Callable, Sequence
 
 from PySide6.QtWidgets import QWidget
 
+from finshin_sdk.domain import PlatformCode
 from services.adapter_catalog import ReleaseRow
 from services.env_setup.deps_install import remove_distributions
 from services.env_setup.platform_apply import (
@@ -57,7 +58,9 @@ def install_flow(on_done: Callable[[], None], releases: Sequence[ReleaseRow]) ->
     on_done()
 
 
-def uninstall_flow(parent: QWidget, on_done: Callable[[], None], platform: str) -> None:
+def uninstall_flow(
+    parent: QWidget, on_done: Callable[[], None], platform: PlatformCode
+) -> None:
     """在进度窗里卸一只平台的包装
 
     - 还有实例即只弹那一句拦路话

@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from finshin_sdk.domain import PlatformCode
 from services.adapter_catalog import ReleaseRow
 from services.env_setup.platform_rows import (
     ComponentBucket,
@@ -236,7 +237,9 @@ class ComponentBlock(QFrame):
         """卸掉这只适配器的那颗"""
         button = make_button(PlatformMessage.BTN_UNINSTALL, ButtonStyle.DANGER)
         button.clicked.connect(
-            lambda: uninstall_flow(self.window(), self._on_done, self._row.platform)
+            lambda: uninstall_flow(
+                self.window(), self._on_done, PlatformCode(self._row.platform)
+            )
         )
 
         return button

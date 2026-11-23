@@ -30,8 +30,8 @@ from finshin_sdk import (
     RouterBuilder,
 )
 from finshin_sdk.domain import (
-    BUNDLED_PLUGIN_PRIORITY,
-    PLUGINS_PKG,
+    BUNDLED_PLUGINS,
+    BUNDLED_PLUGINS_PKG,
     CommandRole,
     MomentRun,
     PluginFileName,
@@ -79,7 +79,7 @@ def register_plugins(
     success_count = 0
 
     for manifest in _resolve_plugins():
-        bundled = manifest.name in BUNDLED_PLUGIN_PRIORITY
+        bundled = manifest.name in BUNDLED_PLUGINS
         try:
             plugin = load_plugin(manifest)
 
@@ -137,7 +137,7 @@ def load_plugin(manifest: PluginManifestDTO) -> BasePlugin:
         manifest.name,
         manifest.module,
         PluginImportError,
-        PLUGINS_PKG,
+        BUNDLED_PLUGINS_PKG,
         # 平台框架只许适配器引
         extra_forbidden=("aiogram",),
     )

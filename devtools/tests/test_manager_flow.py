@@ -28,6 +28,7 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
+from adapter_presence import adapter_present  # noqa: E402
 from aiogram.exceptions import TelegramNetworkError  # noqa: E402
 from aiogram.methods import GetMe  # noqa: E402
 
@@ -35,16 +36,25 @@ from bot._managers import BotManager, _apply  # noqa: E402
 from bot._service import AdapterRuntime  # noqa: E402
 from finshin_sdk import CapabilityCall  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
-    ConfigKey,
     ConfigPath,
-    FieldKey,
-    Platform,
+    PlatformCode,
     PlatformMoment,
+    SourceCode,
 )
 from skin.messages import DialogMessage  # noqa: E402
 from ui import gui_bridge  # noqa: E402
 
+_ADAPTER_LOADED = adapter_present()
+
 PROXY_ITEM = ConfigPath(source="adapter.tg", section="proxy", key="proxy")
+OWNER_ITEM = ConfigPath(source=SourceCode("plugin.AI"), section="chore", key="owner")
+
+
+def _token_item() -> ConfigPath:
+    """凭证项身份由适配器交出"""
+    from finshin_adapter_tg._credential import CREDENTIAL
+
+    return CREDENTIAL.item
 
 
 async def _say(principal: object, text: str) -> None:
@@ -113,12 +123,10 @@ class ManagerFlowTestBase(unittest.IsolatedAsyncioTestCase):
         ]
 
         # 对话身份只读主人一项，其余身份按取不到走原降级分支
-        def _read_config(item: ConfigPath, expected_type: type) -> str:
-            if item.key == ConfigKey.OWNER:
-                return ""
-            raise KeyError(item)
-
-        patches += [patch.object(_apply.config_manager, "get", _read_config)]
+        patches += [
+            patch.object(_apply, "owner_item", lambda: OWNER_ITEM),
+            patch.object(_apply.config_manager, "get", lambda _item, _type: ""),
+        ]
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
@@ -410,6 +418,7 @@ class TestTokenFatal(ManagerFlowTestBase):
         sig.connect(_cap, f"test-token-fatal-{self.id()}")
         return notices, lambda: sig._instance.disconnect(_cap)
 
+    @unittest.skipUnless(_ADAPTER_LOADED, "适配层未装载，凭证项用例跳过")
     async def test_token_error_emits_fatal_not_setup(self) -> None:
         """proxy 通而 token 错 → 致命通知，不弹向导不启服务"""
         notices, disconnect = await self._capture_notices()
@@ -417,7 +426,7 @@ class TestTokenFatal(ManagerFlowTestBase):
             sm = self.manager._settings_manager
 
             async def _token_fail(from_candidate: bool = False) -> bool:
-                sm.last_errors = {FieldKey.TOKEN: "Token 无效"}
+                sm.last_errors = {_token_item(): "Token 无效"}
                 return False
 
             with patch.object(sm, "verify_connectivity", new=_token_fail):
@@ -430,6 +439,7 @@ class TestTokenFatal(ManagerFlowTestBase):
         finally:
             disconnect()
 
+    @unittest.skipUnless(_ADAPTER_LOADED, "适配层未装载，凭证项用例跳过")
     async def test_token_error_is_fatal_whatever_it_carries(self) -> None:
         """token 报错即致命，连带代理错也不走向导
 
@@ -442,7 +452,7 @@ class TestTokenFatal(ManagerFlowTestBase):
             async def _proxy_fail(from_candidate: bool = False) -> bool:
                 sm.last_errors = {
                     PROXY_ITEM: "代理不通",
-                    FieldKey.TOKEN: "暂未检测",
+                    _token_item(): "暂未检测",
                 }
                 return False
 
@@ -473,7 +483,7 @@ class TestIdentityReset(ManagerFlowTestBase):
 
         def _read(item: ConfigPath, expected_type: type):
             """只给主人那条身份，其余按取不到处理"""
-            if item.key == ConfigKey.OWNER:
+            if item == OWNER_ITEM:
                 return owner["v"]
             raise KeyError(item)
 
@@ -484,6 +494,7 @@ class TestIdentityReset(ManagerFlowTestBase):
                 {PlatformMoment.IDENTITY_CHANGED: (_reset,)} if with_reset else {},
             ),
             patch.object(_apply, "applied_persona_text", lambda: text["v"]),
+            patch.object(_apply, "owner_item", lambda: OWNER_ITEM),
             patch.object(_apply.config_manager, "get", _read),
         ):
             patcher.start()
@@ -773,7 +784,7 @@ class TestStopPollingIsAwaited(unittest.IsolatedAsyncioTestCase):
         """轮询协程退出即挂上收尾完成旗"""
 
         class _FakeAdapter:
-            platform = Platform.TELEGRAM
+            platform = PlatformCode("tg")
 
             async def start(self) -> None:
                 raise RuntimeError("非链路故障")

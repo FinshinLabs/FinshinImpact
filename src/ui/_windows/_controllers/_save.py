@@ -8,14 +8,15 @@
 from typing import TYPE_CHECKING
 
 from exceptions import ConfigOutputError
-from finshin_sdk.domain import ConfigKey
 from skin.messages import CheckMessage
 from skin.theme import NOTICE_DIALOG
 from utils import config_manager
 from utils.config import (
     AppConfigData,
     compare_configs,
+    owner_item,
     save_config,
+    section_name,
 )
 
 from ..._bridge import gui_bridge
@@ -55,16 +56,12 @@ class SaveCoordinator:
         )
 
         # 对话身份由主人与人设正文构成，人设走独立落盘，这里只剩主人一项
-        owner_section = next(
-            (
-                tab.section
-                for tab in config_manager.schema
-                if any(f.key == ConfigKey.OWNER for f in tab.fields)
-            ),
-            "",
+        owner = owner_item()
+        owner_section = (
+            section_name(owner.source, owner.section) if owner is not None else ""
         )
         self.identity_changed = host._config_ready and (
-            ConfigKey.OWNER in (changes.get(owner_section) or {})
+            owner is not None and owner.key in (changes.get(owner_section) or {})
         )
 
         # 向导态或有任何改动都要起校验轮，通道没变时 Manager 只跑本地校验

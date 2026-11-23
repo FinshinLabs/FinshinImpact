@@ -4,7 +4,7 @@
 """
 
 from finshin_sdk import PlatformAssembly
-from finshin_sdk.domain import Platform
+from finshin_sdk.domain import PlatformCode
 from utils.middleware import LoggingMiddleware
 from utils.plugin import register_plugins
 
@@ -12,7 +12,7 @@ from ._parts import parts_for
 
 
 def assemble_platform(
-    platform: Platform, token: str, proxy: str | None
+    platform: PlatformCode, token: str, proxy: str | None
 ) -> PlatformAssembly:
     """装配一个平台的运行时与插件清单"""
     adapter = parts_for(platform).assemble(token, proxy)

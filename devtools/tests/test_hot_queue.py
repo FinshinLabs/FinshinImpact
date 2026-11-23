@@ -17,10 +17,9 @@ from system.profile_env import set_profile  # noqa: E402
 set_profile("tg.000000")
 
 from finshin_sdk import HandlerContext, InteractionPort  # noqa: E402
-from finshin_sdk.domain import ChatScope, Platform  # noqa: E402
+from finshin_sdk.domain import ChatScope, PlatformCode  # noqa: E402
 from finshin_sdk.domain.ids import (  # noqa: E402
-    KEY_SEP,
-    ContainerKey,
+    ContainerCode,
     MessageId,
     PrincipalKey,
     SessionKey,
@@ -29,16 +28,16 @@ from finshin_sdk.domain.ids import (  # noqa: E402
 from finshin_sdk.dto import (  # noqa: E402
     ContentDTO,
     InboundEventDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     OutboundPayloadDTO,
     PrincipalDTO,
 )
 from services.tasks._queue import HotQueue, TaskItem  # noqa: E402
 
-_GROUP = SessionKey(f"tg{KEY_SEP}g100123")
-_GROUP_CONTAINER = ContainerKey("g100123")
-_OTHER = SessionKey(f"tg{KEY_SEP}g999")
-_OTHER_CONTAINER = ContainerKey("g999")
+_GROUP = SessionKey("tg.g100123")
+_GROUP_CONTAINER = ContainerCode("g100123")
+_OTHER = SessionKey("tg.g999")
+_OTHER_CONTAINER = ContainerCode("g999")
 
 
 class _NullPort(InteractionPort):
@@ -50,24 +49,24 @@ class _NullPort(InteractionPort):
         content: OutboundPayloadDTO,
         *,
         mention: bool = False,
-        reply_ref: MsgReferenceDTO | None = None,
-    ) -> MsgReferenceDTO | None:
+        reply_ref: MessageRefDTO | None = None,
+    ) -> MessageRefDTO | None:
         return None
 
-    async def probe_existence(self, target: MsgReferenceDTO) -> bool:
+    async def probe_existence(self, target: MessageRefDTO) -> bool:
         return True
 
     def mention_fragment(self, principal: PrincipalDTO) -> str:
         return "@张三"
 
 
-def _ctx(user: str, container: ContainerKey = _GROUP_CONTAINER) -> HandlerContext:
+def _ctx(user: str, container: ContainerCode = _GROUP_CONTAINER) -> HandlerContext:
     """构造一条入站事件的处理上下文"""
     principal = PrincipalDTO(
-        platform=Platform.TELEGRAM, container=container, user=UserId(user)
+        platform=PlatformCode("tg"), container=container, user=UserId(user)
     )
-    ref = MsgReferenceDTO(
-        platform=Platform.TELEGRAM, container=container, message_id=MessageId("7")
+    ref = MessageRefDTO(
+        platform=PlatformCode("tg"), container=container, message_id=MessageId("7")
     )
     event = InboundEventDTO(
         ref=ref,
@@ -80,13 +79,13 @@ def _ctx(user: str, container: ContainerKey = _GROUP_CONTAINER) -> HandlerContex
 
 def _item(
     user: str,
-    container: ContainerKey = _GROUP_CONTAINER,
+    container: ContainerCode = _GROUP_CONTAINER,
 ) -> TaskItem:
     """构造一条排队项，序号交给队列补"""
     ctx = _ctx(user, container)
     return TaskItem(
-        container_key=SessionKey(f"{ctx.event.principal.platform}{KEY_SEP}{container}"),
-        principal_key=ctx.event.principal.key,
+        container_key=SessionKey(f"{ctx.event.principal.platform}.{container}"),
+        principal_key=ctx.event.principal.dotted,
         kind="demo.chat",
         ctx=ctx,
     )

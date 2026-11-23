@@ -39,7 +39,7 @@ from finshin_sdk import HandlerContext  # noqa: E402
 from finshin_sdk.dto import (  # noqa: E402
     HelpCommandDTO,
     HelpFlagDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     OutboundPayloadDTO,
 )
 
@@ -66,7 +66,7 @@ class _RecordingInteraction:
     def __init__(self) -> None:
         self.sent: list[str] = []
         self.payloads: list[OutboundPayloadDTO] = []
-        self.replies: list[MsgReferenceDTO | None] = []
+        self.replies: list[MessageRefDTO | None] = []
 
     async def send_message(
         self,
@@ -74,8 +74,8 @@ class _RecordingInteraction:
         payload: OutboundPayloadDTO,
         *,
         mention: bool = False,
-        reply_ref: MsgReferenceDTO | None = None,
-    ) -> MsgReferenceDTO | None:
+        reply_ref: MessageRefDTO | None = None,
+    ) -> MessageRefDTO | None:
         self.sent.append(payload.text)
         self.payloads.append(payload)
         self.replies.append(reply_ref)

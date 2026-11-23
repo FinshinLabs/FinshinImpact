@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import CommandTaken, HelpKey, ManifestKey, PluginClaim
+from finshin_sdk.domain import CommandTaken, HelpKeys, PluginClaim, PluginManifestKeys
 from skin.messages import PluginMessage
 from skin.theme import PANEL, ButtonStyle
 
@@ -91,8 +91,8 @@ def claims_of(manifests: list[dict[str, Any]]) -> list[PluginClaim]:
     """交出各插件声明的命令名"""
     return [
         PluginClaim(
-            name=manifest[ManifestKey.NAME],
-            commands=tuple(cmd for cmd, _ in manifest[HelpKey.COMMANDS]),
+            name=manifest[PluginManifestKeys.NAME],
+            commands=tuple(cmd for cmd, _ in manifest[HelpKeys.COMMANDS]),
         )
         for manifest in manifests
     ]
@@ -106,7 +106,7 @@ def _command_lines(manifest: dict[str, Any]) -> list[str]:
     """
     lines = [
         PluginMessage.COMMAND_LINE.format(cmd=cmd, desc=desc)
-        for cmd, desc in manifest[HelpKey.COMMANDS]
+        for cmd, desc in manifest[HelpKeys.COMMANDS]
     ]
     return lines or [PluginMessage.COMMAND_NONE]
 

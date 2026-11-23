@@ -23,12 +23,11 @@ set_profile("tg.000000")
 from finshin_sdk import HandlerContext, InteractionPort  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
     ChatScope,
-    Platform,
+    PlatformCode,
     QueuedAction,
 )
 from finshin_sdk.domain.ids import (  # noqa: E402
-    KEY_SEP,
-    ContainerKey,
+    ContainerCode,
     MessageId,
     SessionKey,
     UserId,
@@ -36,15 +35,15 @@ from finshin_sdk.domain.ids import (  # noqa: E402
 from finshin_sdk.dto import (  # noqa: E402
     ContentDTO,
     InboundEventDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     OutboundPayloadDTO,
     PrincipalDTO,
 )
 from services.tasks._queue import TaskItem  # noqa: E402
 from services.tasks._service import TaskService  # noqa: E402
 
-_GROUP_CONTAINER = ContainerKey("g100123")
-_OTHER_CONTAINER = ContainerKey("g999")
+_GROUP_CONTAINER = ContainerCode("g100123")
+_OTHER_CONTAINER = ContainerCode("g999")
 
 
 class _NullPort(InteractionPort):
@@ -56,11 +55,11 @@ class _NullPort(InteractionPort):
         content: OutboundPayloadDTO,
         *,
         mention: bool = False,
-        reply_ref: MsgReferenceDTO | None = None,
-    ) -> MsgReferenceDTO | None:
+        reply_ref: MessageRefDTO | None = None,
+    ) -> MessageRefDTO | None:
         return None
 
-    async def probe_existence(self, target: MsgReferenceDTO) -> bool:
+    async def probe_existence(self, target: MessageRefDTO) -> bool:
         return True
 
     def mention_fragment(self, principal: PrincipalDTO) -> str:
@@ -88,14 +87,14 @@ class _StubLedger:
 
 def _item(
     user: str,
-    container: ContainerKey = _GROUP_CONTAINER,
+    container: ContainerCode = _GROUP_CONTAINER,
 ) -> TaskItem:
     """构造一条排队项"""
     principal = PrincipalDTO(
-        platform=Platform.TELEGRAM, container=container, user=UserId(user)
+        platform=PlatformCode("tg"), container=container, user=UserId(user)
     )
-    ref = MsgReferenceDTO(
-        platform=Platform.TELEGRAM, container=container, message_id=MessageId("7")
+    ref = MessageRefDTO(
+        platform=PlatformCode("tg"), container=container, message_id=MessageId("7")
     )
     event = InboundEventDTO(
         ref=ref,
@@ -104,8 +103,8 @@ def _item(
         scope=ChatScope.GROUP,
     )
     return TaskItem(
-        container_key=SessionKey(f"{principal.platform}{KEY_SEP}{container}"),
-        principal_key=principal.key,
+        container_key=SessionKey(f"{principal.platform}.{container}"),
+        principal_key=principal.dotted,
         kind="demo.chat",
         ctx=HandlerContext(event=event, interaction=_NullPort()),
     )

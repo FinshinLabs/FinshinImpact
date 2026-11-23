@@ -25,12 +25,13 @@ from exceptions import (  # noqa: E402
     ConfigError,
     ConfigInputError,
     ConfigMissingError,
+    ConfigPathMissingError,
     FontMissingError,
     HTTPStatusError,
     PluginsMissingError,
     describe_error,
 )
-from finshin_sdk.exceptions import BotError, ProxyAddressError  # noqa: E402
+from finshin_sdk.exceptions import BotError, ConnectivityError  # noqa: E402
 from ui import gui_bridge  # noqa: E402
 
 
@@ -75,7 +76,6 @@ class TestErrorGuard(unittest.TestCase):
 
         - 供面板按同一身份标红
         """
-        from exceptions import ConfigPathMissingError
         from finshin_sdk.domain import ConfigPath
 
         item = ConfigPath(source="plugin.AI", section="model", key="api_key")
@@ -109,9 +109,8 @@ class TestErrorGuard(unittest.TestCase):
     def test_missing_section_error_carries_identity(self) -> None:
         """整段缺失场景
 
-        - 向导错误表的键是配置项身份，不再按点路径取尾段
+        - 向导错误表的键是配置项身份
         """
-        from exceptions import ConfigPathMissingError
         from finshin_sdk.domain import ConfigPath
 
         item = ConfigPath(source="plugin.AI", section="chore", key="owner")
@@ -201,12 +200,10 @@ class TestDescribeError(unittest.TestCase):
         - 这条红了说明查找退回按类硬查，新子类只能露类名
         """
 
-        class OddProxyError(ProxyAddressError):
+        class OddConnectivityError(ConnectivityError):
             """表里没点名的临时子类"""
 
-        self.assertIn(
-            "代理地址格式无法解析", describe_error(OddProxyError("127.0.0.1:1"))
-        )
+        self.assertIn("连接失败", describe_error(OddConnectivityError()))
 
     def test_missing_field_returns_template_as_is(self) -> None:
         """模板要的字段异常上没有即退回模板原文
@@ -214,13 +211,13 @@ class TestDescribeError(unittest.TestCase):
         - 这条红了说明查表那步会把 KeyError 顶回调用方
         """
 
-        class NoFieldProxyError(ProxyAddressError):
-            """不填代理地址的临时子类"""
+        class NoFieldConfigError(ConfigPathMissingError):
+            """不填键路径的临时子类"""
 
             def __init__(self) -> None:
                 BotError.__init__(self)
 
-        self.assertIn("{proxy}", describe_error(NoFieldProxyError()))
+        self.assertIn("{key_path}", describe_error(NoFieldConfigError()))
 
     def test_unmapped_error_reports_class_name(self) -> None:
         """表外异常报类名，细节归调试日志"""

@@ -14,7 +14,7 @@ from PySide6.QtWidgets import QDialog, QWidget
 from skin.messages import CheckMessage
 from system.profile_env import get_profile, read_token
 from utils import get_logger
-from utils.network import FrameKey, RowId, RowStatus, probe_skeleton
+from utils.network import CHECKING, FrameKey, RowId, RowStatus, probe_skeleton
 
 from ..._bridge import gui_bridge
 from ..._dialogs import Round, current_check_window, open_check_window
@@ -148,7 +148,7 @@ class DiagnoseController(BaseController):
         broken = frame.get(FrameKey.BROKEN)
         if (
             frame.get("id") == RowId.ADVICE
-            and frame.get("status") != RowStatus.CHECKING
+            and frame.get("status") != CHECKING
             and isinstance(broken, dict)
             and broken
         ):

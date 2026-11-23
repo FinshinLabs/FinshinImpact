@@ -24,21 +24,24 @@ from adapter_presence import adapter_present  # noqa: E402
 from config_plan import assemble_for_case, fake_adapter_parts  # noqa: E402
 
 from finshin_sdk import ProbeResult  # noqa: E402
-from finshin_sdk.exceptions import (  # noqa: E402
-    DirectTimeoutError,
-    ProbeTimeoutError,
-    ProxyConnectionRefusedError,
-    ProxySchemeError,
-    TokenError,
-)
+from finshin_sdk.domain import ConfigPath  # noqa: E402
+from finshin_sdk.exceptions import ProbeTimeoutError  # noqa: E402
 from skin.messages import CheckMessage  # noqa: E402
 from utils.check import _verify as verify_mod  # noqa: E402
+from utils.network import CHECKING  # noqa: E402
 
 _ADAPTER_LOADED = adapter_present()
 
 
+def _errors():
+    """取已装适配器的异常族"""
+    from finshin_adapter_tg import _errors as mod
+
+    return mod
+
+
 def _plan_mod():
-    """取已装适配器的检查计划件，未装载即跳过"""
+    """取已装适配器的检查计划件"""
     from finshin_adapter_tg import _plan
 
     return _plan
@@ -56,11 +59,19 @@ def _proxy_item():
     return _probe_mod().PROXY_ITEM
 
 
+def _token_item():
+    """凭证项身份由适配器交出"""
+    from finshin_adapter_tg._credential import CREDENTIAL
+
+    return CREDENTIAL.item
+
+
 def _mode_item():
     """代理模式项身份由适配器交出"""
     return _plan_mod()._MODE_ITEM
 
 
+_TYPE_ITEM = ConfigPath(source="plugin.ai", section="model", key="temperature")
 _CFG_DEAD = "http://127.0.0.1:9999"
 _CFG_ALIVE = "http://127.0.0.1:7890"
 
@@ -132,7 +143,9 @@ class TestVerifyConnectivityAggregation(unittest.IsolatedAsyncioTestCase):
         mgr = SettingsManager(lambda: "tok")
 
         async def dead(token: str, proxy: str) -> dict:
-            return {_proxy_item(): ProxyConnectionRefusedError(proxy=_CFG_DEAD)}
+            return {
+                _proxy_item(): _errors().ProxyConnectionRefusedError(proxy=_CFG_DEAD)
+            }
 
         mod = sys.modules["bot._managers._settings"]
         with _patched(mod, dead, cfg=_CFG_DEAD):
@@ -157,7 +170,11 @@ class TestVerifyConnectivityAggregation(unittest.IsolatedAsyncioTestCase):
             return (
                 {}
                 if not proxy
-                else {_proxy_item(): ProxyConnectionRefusedError(proxy=_CFG_DEAD)}
+                else {
+                    _proxy_item(): _errors().ProxyConnectionRefusedError(
+                        proxy=_CFG_DEAD
+                    )
+                }
             )
 
         mod = sys.modules["bot._managers._settings"]
@@ -178,7 +195,7 @@ class TestVerifyConnectivityAggregation(unittest.IsolatedAsyncioTestCase):
         mgr = SettingsManager(lambda: "tok")
 
         async def token_bad(token: str, proxy: str) -> dict:
-            return {"token": TokenError()}
+            return {_token_item(): _errors().TokenError()}
 
         mod = sys.modules["bot._managers._settings"]
         with _patched(mod, token_bad, cfg="prox"):
@@ -186,7 +203,7 @@ class TestVerifyConnectivityAggregation(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(ok)
         self.assertIsNone(mgr.resolved_proxy)
-        self.assertEqual(mgr.last_errors, {"token": "Token 无效"})
+        self.assertEqual(mgr.last_errors, {_token_item(): "Token 无效"})
 
     async def test_single_candidate_keeps_original_error(self) -> None:
         """仅直连单候选不通
@@ -199,7 +216,7 @@ class TestVerifyConnectivityAggregation(unittest.IsolatedAsyncioTestCase):
         mgr = SettingsManager(lambda: "tok")
 
         async def dead_direct(token: str, proxy: str) -> dict:
-            return {_proxy_item(): DirectTimeoutError()}
+            return {_proxy_item(): _errors().DirectTimeoutError()}
 
         mod = sys.modules["bot._managers._settings"]
         with _patched(mod, dead_direct):
@@ -221,18 +238,16 @@ class TestVerifyConnectivityAggregation(unittest.IsolatedAsyncioTestCase):
         mgr = SettingsManager(lambda: "tok")
 
         async def net_fail(token: str, proxy: str) -> dict:
-            return {_proxy_item(): ProxySchemeError(scheme="https")}
+            return {_proxy_item(): _errors().ProxySchemeError(scheme="https")}
 
         mod = sys.modules["bot._managers._settings"]
-        with _patched(
-            mod, net_fail, cfg="prox", types={"temperature": "类型应为 float"}
-        ):
+        with _patched(mod, net_fail, cfg="prox", types={_TYPE_ITEM: "类型应为 float"}):
             ok = await mgr.verify_connectivity()
 
         self.assertFalse(ok)
         self.assertEqual(
             list(mgr.last_errors),
-            [_proxy_item(), "temperature"],
+            [_proxy_item(), _TYPE_ITEM],
             "错误顺序应为网络在前、类型在后",
         )
 
@@ -315,7 +330,7 @@ class TestVerifyConnectivityAggregation(unittest.IsolatedAsyncioTestCase):
             return {}
 
         mod = sys.modules["bot._managers._settings"]
-        with _patched(mod, alive, types={"temperature": "类型应为 float"}):
+        with _patched(mod, alive, types={_TYPE_ITEM: "类型应为 float"}):
             self.assertFalse(await mgr.verify_connectivity())
             self.assertTrue(probes, "首轮应联网探测")
             self.assertIsNotNone(mgr.resolved_proxy, "直连通了应记下生效通道")
@@ -341,7 +356,11 @@ class TestVerifyConnectivityAggregation(unittest.IsolatedAsyncioTestCase):
             return (
                 {}
                 if reach["ok"]
-                else {_proxy_item(): ProxyConnectionRefusedError(proxy=_CFG_DEAD)}
+                else {
+                    _proxy_item(): _errors().ProxyConnectionRefusedError(
+                        proxy=_CFG_DEAD
+                    )
+                }
             )
 
         mod = sys.modules["bot._managers._settings"]
@@ -449,7 +468,9 @@ class TestProxyModeFlow(unittest.IsolatedAsyncioTestCase):
 
         async def dead(token: str, proxy: str) -> dict:
             calls["n"] += 1
-            return {_proxy_item(): ProxyConnectionRefusedError(proxy=_CFG_DEAD)}
+            return {
+                _proxy_item(): _errors().ProxyConnectionRefusedError(proxy=_CFG_DEAD)
+            }
 
         mod = sys.modules["bot._managers._settings"]
         with _patched(mod, dead, mode="cfg", cfg=_CFG_DEAD):
@@ -472,7 +493,11 @@ class TestProxyModeFlow(unittest.IsolatedAsyncioTestCase):
                 mgr = SettingsManager(lambda: "tok")
 
                 async def dead(token: str, proxy: str) -> dict:
-                    return {_proxy_item(): ProxyConnectionRefusedError(proxy=_CFG_DEAD)}
+                    return {
+                        _proxy_item(): _errors().ProxyConnectionRefusedError(
+                            proxy=_CFG_DEAD
+                        )
+                    }
 
                 mod = sys.modules["bot._managers._settings"]
                 with _patched(mod, dead, mode=mode, cfg=_CFG_DEAD, sys_proxy=sys_proxy):
@@ -497,7 +522,7 @@ class TestProxyModeFlow(unittest.IsolatedAsyncioTestCase):
         async def cold_start(token: str, proxy: str) -> dict:
             calls["n"] += 1
             if calls["n"] == 1:
-                return {_proxy_item(): DirectTimeoutError()}
+                return {_proxy_item(): _errors().DirectTimeoutError()}
             return {}
 
         mod = sys.modules["bot._managers._settings"]
@@ -601,7 +626,7 @@ class TestProxyModeFlow(unittest.IsolatedAsyncioTestCase):
 
         async def flaky(token: str, proxy: str) -> dict:
             if not proxy:
-                return {_proxy_item(): DirectTimeoutError()}
+                return {_proxy_item(): _errors().DirectTimeoutError()}
             cfg_calls["n"] += 1
             return {_proxy_item(): ProbeTimeoutError()} if cfg_calls["n"] <= 1 else {}
 
@@ -621,7 +646,9 @@ class TestProxyModeFlow(unittest.IsolatedAsyncioTestCase):
 
         async def dead(token: str, proxy: str) -> dict:
             calls["n"] += 1
-            return {_proxy_item(): ProxyConnectionRefusedError(proxy=_CFG_DEAD)}
+            return {
+                _proxy_item(): _errors().ProxyConnectionRefusedError(proxy=_CFG_DEAD)
+            }
 
         mod = sys.modules["bot._managers._settings"]
         with _patched(mod, dead, cfg=_CFG_DEAD):
@@ -637,14 +664,14 @@ class TestProxyModeFlow(unittest.IsolatedAsyncioTestCase):
 
         from bot._managers._settings import SettingsManager
         from skin.messages import CheckMessage
-        from utils.network import FrameKey, RowStatus
+        from utils.network import FrameKey
 
         mgr = SettingsManager(lambda: "tok")
         cfg_calls = {"n": 0}
 
         async def flaky(token: str, proxy: str) -> dict:
             if not proxy:
-                return {_proxy_item(): DirectTimeoutError()}
+                return {_proxy_item(): _errors().DirectTimeoutError()}
             cfg_calls["n"] += 1
             return {_proxy_item(): ProbeTimeoutError()} if cfg_calls["n"] <= 1 else {}
 
@@ -667,7 +694,7 @@ class TestProxyModeFlow(unittest.IsolatedAsyncioTestCase):
         probed = [r for r in retry[FrameKey.ROWS] if r["id"] in ("cfg", "direct")]
         self.assertEqual(
             [r["status"] for r in probed],
-            [RowStatus.CHECKING, RowStatus.CHECKING],
+            [CHECKING, CHECKING],
             "重检整表的待测通道行应全部刷回检测中",
         )
         self.assertTrue(all("budget" in r for r in probed), "重检行应重新装上计时预算")
@@ -684,7 +711,7 @@ class TestOpeningRows(unittest.TestCase):
     def _plan(self, mode: str, cfg: str = "", sys_proxy: str | None = None):
         """按给定档位造一份计划"""
         return _plan_mod().build_connection_plan(
-            {"proxy": {"proxy_mode": mode, "proxy": cfg}}, "tok", sys_proxy
+            {"proxy": {"proxy_mode": mode, "proxy": cfg}}, "tok", system_proxy=sys_proxy
         )
 
     def test_cfg_single_rows(self) -> None:
@@ -718,7 +745,7 @@ class TestOpeningRows(unittest.TestCase):
         self.assertEqual([r["id"] for r in rows], ["cfg", "sys", "direct", "advice"])
         self.assertEqual(rows[0]["status"], RowStatus.FAIL, "空配置行缺席")
         self.assertEqual(rows[1]["status"], RowStatus.FAIL, "无系统代理行缺席")
-        self.assertEqual(rows[2]["status"], RowStatus.CHECKING, "直连行待测")
+        self.assertEqual(rows[2]["status"], CHECKING, "直连行待测")
 
 
 class TestEnumFieldValidation(unittest.TestCase):
@@ -765,7 +792,7 @@ class TestStaleFrameDrain(unittest.TestCase):
         mod = sys.modules["ui._windows._controllers._verify"]
         coord = VerifyCoordinator(MagicMock())
         with patch.object(mod, "current_check_window", return_value=None):
-            coord.on_frame({"id": "cfg", "status": RowStatus.CHECKING})
+            coord.on_frame({"id": "cfg", "status": CHECKING})
             self.assertEqual(len(coord.pre_frames), 1, "无窗轮次应先缓存行帧")
             coord.on_frame({"id": RowId.ADVICE, "status": RowStatus.FAIL})
             self.assertEqual(coord.pre_frames, [], "结论帧应作废旧行帧")

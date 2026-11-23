@@ -8,9 +8,9 @@ import time
 import aiosqlite
 
 from core import MediaRepository
-from finshin_sdk.domain import ContentKind, Platform
-from finshin_sdk.domain.ids import KEY_SEP, ContainerKey, PrincipalKey
-from finshin_sdk.dto import MediaEntryDTO, MsgReferenceDTO
+from finshin_sdk.domain import ContentKind, PlatformCode
+from finshin_sdk.domain.ids import ContainerCode, PrincipalKey
+from finshin_sdk.dto import MediaEntryDTO, MessageRefDTO
 
 
 class SqliteMediaRepository(MediaRepository):
@@ -19,7 +19,7 @@ class SqliteMediaRepository(MediaRepository):
     def __init__(self, conn: aiosqlite.Connection) -> None:
         self._conn = conn
 
-    async def register(self, ref: MsgReferenceDTO, entry: MediaEntryDTO) -> None:
+    async def register(self, ref: MessageRefDTO, entry: MediaEntryDTO) -> None:
         """登记一条媒体索引
 
         - 同定位同序号重写即覆盖路径、体积与登记时间
@@ -45,7 +45,7 @@ class SqliteMediaRepository(MediaRepository):
         )
         await self._conn.commit()
 
-    async def locate(self, ref: MsgReferenceDTO) -> tuple[MediaEntryDTO, ...]:
+    async def locate(self, ref: MessageRefDTO) -> tuple[MediaEntryDTO, ...]:
         """按三元组定位媒体
 
         - 同消息多附件按槽位升序
@@ -81,7 +81,7 @@ class SqliteMediaRepository(MediaRepository):
         return removed
 
 
-def _split_container_segment(key: PrincipalKey) -> tuple[Platform, ContainerKey]:
+def _split_container_segment(key: PrincipalKey) -> tuple[PlatformCode, ContainerCode]:
     """取主体键的平台与容器段"""
-    platform, container, _ = key.split(KEY_SEP, 2)
-    return Platform(platform), ContainerKey(container)
+    platform, container, _ = key.split(".", 2)
+    return PlatformCode(platform), ContainerCode(container)

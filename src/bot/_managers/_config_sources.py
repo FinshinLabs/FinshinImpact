@@ -6,14 +6,12 @@
 """
 
 from finshin_sdk.domain import (
-    ConfigKey,
-    ConfigSection,
     FieldSpec,
     PluginFileName,
     SectionSpec,
     SourceDeclaration,
 )
-from utils.config import ConfigSource, SourceKind
+from utils.config import ConfigSource, CoreKeys, CoreSections, SourceKind
 from utils.logger import get_logger
 from utils.paths import PLATFORM, PROFILE_DIR
 from utils.plugin import enabled_manifests, load_plugin
@@ -26,12 +24,12 @@ _logger = get_logger("Config")
 _CORE_TITLE = "Bot 设置"
 
 _DATA_SECTION = SectionSpec(
-    section=ConfigSection.DATA,
+    section=CoreSections.DATA,
     title="记录与运维",
     fields=(
         FieldSpec(
-            section=ConfigSection.DATA,
-            key=ConfigKey.RECORD_KEEP,
+            section=CoreSections.DATA,
+            key=CoreKeys.RECORD_KEEP,
             value_type=float,
             default=30.0,
             label="记录保留（天）",
@@ -39,8 +37,8 @@ _DATA_SECTION = SectionSpec(
             bounds=(1.0, 3650.0),
         ),
         FieldSpec(
-            section=ConfigSection.DATA,
-            key=ConfigKey.WAITING,
+            section=CoreSections.DATA,
+            key=CoreKeys.WAITING,
             value_type=float,
             default=0.5,
             label="检测间隔（小时）",
@@ -65,7 +63,7 @@ def _adapter_source() -> ConfigSource:
     parts = parts_for(PLATFORM)
     return ConfigSource(
         kind=SourceKind.ADAPTER,
-        code=str(PLATFORM),
+        code=PLATFORM,
         title=parts.title,
         sections=parts.sections,
     )

@@ -24,37 +24,36 @@ from data import (  # noqa: E402
 from finshin_sdk import HandlerContext  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
     ChatScope,
-    Platform,
+    PlatformCode,
     TaskStatus,
 )
 from finshin_sdk.domain.ids import (  # noqa: E402
-    KEY_SEP,
-    ContainerKey,
+    ContainerCode,
     MessageId,
     SessionKey,
-    TaskId,
+    TaskKey,
     UserId,
 )
 from finshin_sdk.dto import (  # noqa: E402
     ContentDTO,
     InboundEventDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     PrincipalDTO,
     TaskDTO,
 )
 from services.tasks import TaskItem, TaskLedger  # noqa: E402
 
-_CONTAINER = ContainerKey("g100123")
+_CONTAINER = ContainerCode("g100123")
 
 
 def _item(user: str, message_id: str = "7") -> TaskItem:
     """构造一条排队项"""
     principal = PrincipalDTO(
-        platform=Platform.TELEGRAM, container=_CONTAINER, user=UserId(user)
+        platform=PlatformCode("tg"), container=_CONTAINER, user=UserId(user)
     )
     event = InboundEventDTO(
-        ref=MsgReferenceDTO(
-            platform=Platform.TELEGRAM,
+        ref=MessageRefDTO(
+            platform=PlatformCode("tg"),
             container=_CONTAINER,
             message_id=MessageId(message_id),
         ),
@@ -64,8 +63,8 @@ def _item(user: str, message_id: str = "7") -> TaskItem:
         display_name="张三",
     )
     return TaskItem(
-        container_key=SessionKey(f"{principal.platform}{KEY_SEP}{_CONTAINER}"),
-        principal_key=principal.key,
+        container_key=SessionKey(f"{principal.platform}.{_CONTAINER}"),
+        principal_key=principal.dotted,
         kind="demo.chat",
         ctx=HandlerContext(event=event, interaction=SimpleNamespace()),  # type: ignore[arg-type]
     )
@@ -93,8 +92,8 @@ class TestTaskLedger(unittest.IsolatedAsyncioTestCase):
 
     async def _row(self, user: str) -> TaskDTO | None:
         """取出该主体的任务行"""
-        key = f"{Platform.TELEGRAM}{KEY_SEP}{_CONTAINER}{KEY_SEP}{user}"
-        return await self.repos.task.find(TaskId(f"{key}{KEY_SEP}demo.chat"))
+        key = f"tg.{_CONTAINER}.{user}"
+        return await self.repos.task.find(TaskKey(f"{key}.demo.chat"))
 
     async def test_first_of_a_run_inserts_one_row(self) -> None:
         """头一条入队即落行，主体行一并写上"""

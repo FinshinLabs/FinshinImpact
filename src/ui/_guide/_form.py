@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from finshin_sdk import CredentialSpec
-from finshin_sdk.domain import Platform, platform_of_profile
+from finshin_sdk.domain import PlatformCode, ProfileKey, platform_of_key
 from services.adapter_credential import credential_of
 from services.env_setup.platform_rows import present_platforms
 from services.profile_store import create_profile, update_profile
@@ -27,13 +27,13 @@ from ._platform import open_platform_dialog
 from ._popup import show_popup
 
 
-def _platform_items() -> list[tuple[Platform, str]]:
+def _platform_items() -> list[tuple[PlatformCode, str]]:
     """本机装着适配器包的平台下拉项
 
     - 按平台码升序
     """
     return [
-        (Platform(code), PickerMessage.PLATFORM_NAMES.get(code, code))
+        (PlatformCode(code), PickerMessage.PLATFORM_NAMES.get(code, code))
         for code in sorted(present_platforms())
     ]
 
@@ -131,7 +131,7 @@ class NewProfileDialog(_ProfileFormDialog):
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        self._chosen: Platform | None = None
+        self._chosen: PlatformCode | None = None
         super().__init__(PickerMessage.NEW_TITLE, parent)
         self._hide_credential()
         self._platform.currentIndexChanged.connect(self._on_platform_changed)
@@ -175,12 +175,12 @@ class NewProfileDialog(_ProfileFormDialog):
         self._platform.blockSignals(False)
         self._on_platform_changed(self._platform.currentIndex())
 
-    def _index_of(self, platform: Platform | None) -> int:
+    def _index_of(self, platform: PlatformCode | None) -> int:
         """按平台找下拉项的位置"""
         if platform is None:
             return -1
         for index in range(self._platform.count()):
-            if Platform(self._platform.itemData(index)) == platform:
+            if PlatformCode(self._platform.itemData(index)) == platform:
                 return index
         return -1
 
@@ -196,7 +196,7 @@ class NewProfileDialog(_ProfileFormDialog):
             self._hide_credential()
             return
 
-        platform = Platform(data)
+        platform = PlatformCode(data)
         changed = platform != self._chosen
         if changed:
             self._credential.clear()
@@ -254,7 +254,7 @@ class EditProfileDialog(_ProfileFormDialog):
         self._remark.setText(remark)
         self._credential.setText(read_token(code))
 
-        platform = platform_of_profile(code)
+        platform = platform_of_key(ProfileKey(code))
         spec = credential_of(platform) if platform is not None else None
         if spec is None:
             self._hide_credential()
@@ -264,7 +264,7 @@ class EditProfileDialog(_ProfileFormDialog):
 
     def _on_ok(self) -> None:
         """推导身份码与实例一致才改写"""
-        if platform_of_profile(self._code) is None:
+        if platform_of_key(ProfileKey(self._code)) is None:
             self._warn(PickerMessage.EDIT_PLATFORM_UNKNOWN)
             return
 

@@ -74,7 +74,7 @@ def _stubbed_round(
         patch.object(plan_mod, "run_channel", fake),
         patch.object(verify_mod, "_RETRY_WARMUP", 0.0),
     ):
-        plan = plan_mod.build_connection_plan(values, "123:abc", sys_proxy)
+        plan = plan_mod.build_connection_plan(values, "123:abc", system_proxy=sys_proxy)
         yield frames, seen, plan
 
 

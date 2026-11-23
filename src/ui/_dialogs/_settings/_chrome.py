@@ -21,9 +21,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import ConfigKey, ConfigPath
+from finshin_sdk.domain import ConfigPath
 from skin.theme import GLOBAL, SETTINGS_DIALOG, ButtonStyle, ObjectName
-from utils.config import AppSchema, FieldErrors
+from utils.config import AppSchema, FieldErrors, owner_field
 from utils.config.models import TabSchema
 
 from ..._primitives import (
@@ -237,7 +237,7 @@ class ChromeBuilder:
 
         - 本页取不到主人输入控件即不挂载
         """
-        owner = next((f for f in tab.fields if f.key == ConfigKey.OWNER), None)
+        owner = owner_field(tab.fields)
         if owner is None:
             return
         owner_input = self._fields.inputs.get(tab.path_of(owner))

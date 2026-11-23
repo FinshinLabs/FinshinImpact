@@ -1,7 +1,6 @@
 """适配器在线目录读取
 
 - 拉 Pages 上生成的适配器目录文本并逐行验字段
-- 平台码只认表里写的那一值，认不出的整行不进表
 - 行内嵌的版本清单逐条验形态，坏条目只丢那一条
 - 坏行与坏段收成说明列表交出
 """
@@ -11,7 +10,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
-from finshin_sdk.domain import Platform
+from finshin_sdk.domain import PlatformCode
 from skin.messages import CatalogMessage
 from system.links import CATALOG_PATH, HTTPS_SCHEME
 from utils.network import GitClient
@@ -73,7 +72,7 @@ class Catalog:
     """
 
     sdk: ReleaseRow | None
-    adapters: dict[Platform, ReleaseRow]
+    adapters: dict[PlatformCode, ReleaseRow]
     rejects: tuple[str, ...]
 
 
@@ -167,14 +166,12 @@ def _version_row(item: Any, distribution: str) -> ReleaseRow | None:
     )
 
 
-def _platform_of(raw: Any) -> Platform | None:
-    """认平台码"""
-    if not isinstance(raw, str):
-        return None
-    try:
-        return Platform(raw)
-    except ValueError:
-        return None
+def _platform_of(raw: Any) -> PlatformCode | None:
+    """取行里自报的平台码
+
+    - 非字符串或空串交出 None
+    """
+    return PlatformCode(raw) if isinstance(raw, str) and raw else None
 
 
 def _read_sdk(data: dict[str, Any]) -> tuple[ReleaseRow | None, list[str]]:
@@ -191,7 +188,7 @@ def _read_sdk(data: dict[str, Any]) -> tuple[ReleaseRow | None, list[str]]:
 
 def _read_adapters(
     data: dict[str, Any],
-) -> tuple[dict[Platform, ReleaseRow], list[str]]:
+) -> tuple[dict[PlatformCode, ReleaseRow], list[str]]:
     """逐行读适配器条目
 
     - 交出按平台码归的表与拒收说明
@@ -200,7 +197,7 @@ def _read_adapters(
     if not isinstance(rows, list):
         return {}, []
 
-    table: dict[Platform, ReleaseRow] = {}
+    table: dict[PlatformCode, ReleaseRow] = {}
     notes: list[str] = []
     for values in rows:
         if not isinstance(values, dict):
@@ -219,7 +216,7 @@ def _read_adapters(
             )
             continue
         if platform in table:
-            notes.append(CatalogMessage.PLATFORM_DUP.format(code=str(platform)))
+            notes.append(CatalogMessage.PLATFORM_DUP.format(code=platform))
             continue
         table[platform] = _build_row(values)
 

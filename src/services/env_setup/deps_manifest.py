@@ -11,15 +11,15 @@ from pathlib import Path
 from typing import Any
 
 from finshin_sdk.domain import (
-    BUNDLED_PLUGIN_PRIORITY,
-    INSTALLED_PLUGINS_NAME,
+    BUNDLED_PLUGINS,
+    BUNDLED_PLUGINS_PKG,
+    INSTALLED_PLUGINS_DIR,
     INSTALLED_PLUGINS_PKG,
-    MANIFEST_FIELDS,
-    PLUGINS_PKG,
-    HelpKey,
-    ManifestKey,
+    PLUGIN_MANIFEST_TABLE,
+    HelpKeys,
     PluginFileName,
-    StateKey,
+    PluginManifestKeys,
+    StateKeys,
 )
 from system.atomic_write import write_text_atomic
 from system.digest import lines_digest
@@ -32,15 +32,15 @@ from system.tool_settings import declared_dependencies
 _PIN_SPLIT = re.compile(r"[<>=!~\[;\s]+")
 
 # 面板与裁决所需的最小字段集，help 段只取命令名
-_MINIMAL_KEYS = frozenset(spec.key for spec in MANIFEST_FIELDS)
+_MINIMAL_KEYS = frozenset(spec.key for spec in PLUGIN_MANIFEST_TABLE)
 
-_DEFAULTS: dict[str, Any] = {spec.key: spec.default for spec in MANIFEST_FIELDS}
+_DEFAULTS: dict[str, Any] = {spec.key: spec.default for spec in PLUGIN_MANIFEST_TABLE}
 
 # 插件根：目录与这棵树的顶层包名
 _PluginRoot = tuple[Path, str]
 
 # 单条命令的必填两键，缺任一的条目不算命令名
-_COMMAND_KEYS = frozenset({HelpKey.CMD, HelpKey.DESC})
+_COMMAND_KEYS = frozenset({HelpKeys.CMD, HelpKeys.DESC})
 
 
 def plugins_roots() -> list[_PluginRoot]:
@@ -51,11 +51,13 @@ def plugins_roots() -> list[_PluginRoot]:
     """
     roots: list[_PluginRoot] = []
 
-    spec = importlib.util.find_spec(PLUGINS_PKG)
+    spec = importlib.util.find_spec(BUNDLED_PLUGINS_PKG)
     if spec is not None and spec.submodule_search_locations:
-        roots.append((Path(next(iter(spec.submodule_search_locations))), PLUGINS_PKG))
+        roots.append(
+            (Path(next(iter(spec.submodule_search_locations))), BUNDLED_PLUGINS_PKG)
+        )
 
-    installed = ROOT_DIR / INSTALLED_PLUGINS_NAME
+    installed = ROOT_DIR / INSTALLED_PLUGINS_DIR
     if installed.is_dir():
         roots.append((installed, INSTALLED_PLUGINS_PKG))
 
@@ -76,15 +78,15 @@ def _scan_rows(roots: Sequence[_PluginRoot]) -> list[dict[str, Any]]:
 
         for path in sorted(plugins_path.iterdir()):
             data = read_toml(path / PluginFileName.MANIFEST)
-            if not data or not isinstance(data.get(ManifestKey.NAME), str):
+            if not data or not isinstance(data.get(PluginManifestKeys.NAME), str):
                 continue
             deps = _deps_of(path, pkg)
             if deps is None:
                 continue
-            row: dict[str, Any] = {ManifestKey.DEPS: deps}
+            row: dict[str, Any] = {PluginManifestKeys.DEPS: deps}
             for key in _MINIMAL_KEYS:
                 row[key] = data.get(key, _DEFAULTS[key])
-            row[HelpKey.COMMANDS] = _command_pairs(data)
+            row[HelpKeys.COMMANDS] = _command_pairs(data)
             rows.append(row)
 
     return rows
@@ -96,7 +98,7 @@ def _deps_of(plugin_dir: Path, pkg: str) -> tuple[str, ...] | None:
     - 随包插件交出空表
     - 外部那份交出 None 即自家声明的依赖表读不出，整份不认
     """
-    if pkg == PLUGINS_PKG:
+    if pkg == BUNDLED_PLUGINS_PKG:
         return ()
 
     return declared_dependencies(plugin_dir / DECLARATION_FILE_NAME)
@@ -110,7 +112,7 @@ def load_manifests(roots: Sequence[_PluginRoot]) -> list[dict[str, Any]]:
     """
     found: dict[str, dict[str, Any]] = {}
     for row in _scan_rows(roots):
-        found.setdefault(row[ManifestKey.NAME], row)
+        found.setdefault(row[PluginManifestKeys.NAME], row)
 
     return sorted(found.values(), key=_sort_key)
 
@@ -126,7 +128,7 @@ def shadowed_manifests(
     claimed: set[str] = set()
     shadowed: list[tuple[dict[str, Any], str]] = []
     for row in _scan_rows(roots):
-        name = row[ManifestKey.NAME]
+        name = row[PluginManifestKeys.NAME]
         if name in claimed:
             shadowed.append((row, name))
             continue
@@ -142,9 +144,9 @@ def catalog_digest(manifests: list[dict[str, Any]]) -> str:
     - 行序与扫描顺序无关，同集合必同摘要
     """
     items = sorted(
-        f"{m[ManifestKey.NAME]}"
-        f"|{'|'.join(m[ManifestKey.DEPS])}"
-        f"|{'|'.join(m[ManifestKey.ASSETS])}"
+        f"{m[PluginManifestKeys.NAME]}"
+        f"|{'|'.join(m[PluginManifestKeys.DEPS])}"
+        f"|{'|'.join(m[PluginManifestKeys.ASSETS])}"
         for m in manifests
     )
     return lines_digest(items)
@@ -157,12 +159,12 @@ def _sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
     - 显示名取标题列，没填标题时退化成目录名
     - 拼音相同再比显示名整串，仍相同比目录名
     """
-    display = row[ManifestKey.TITLE] or row[ManifestKey.NAME]
+    display = row[PluginManifestKeys.TITLE] or row[PluginManifestKeys.NAME]
     return (
-        row[ManifestKey.NAME] not in BUNDLED_PLUGIN_PRIORITY,
+        row[PluginManifestKeys.NAME] not in BUNDLED_PLUGINS,
         _pinyin_key(display),
         display.lower(),
-        row[ManifestKey.NAME],
+        row[PluginManifestKeys.NAME],
     )
 
 
@@ -182,7 +184,7 @@ def _command_pairs(data: dict[str, Any]) -> tuple[tuple[str, str], ...]:
     - 段与条目的形状不符即跳过该项
     - 必填两键齐了才算一条
     """
-    sections = data.get(ManifestKey.HELP)
+    sections = data.get(PluginManifestKeys.HELP)
     if not isinstance(sections, list):
         return ()
 
@@ -190,11 +192,11 @@ def _command_pairs(data: dict[str, Any]) -> tuple[tuple[str, str], ...]:
     for section in sections:
         if not isinstance(section, dict):
             continue
-        for command in section.get(HelpKey.COMMANDS, []):
+        for command in section.get(HelpKeys.COMMANDS, []):
             if not isinstance(command, dict):
                 continue
             if all(isinstance(command.get(key), str) for key in _COMMAND_KEYS):
-                commands.append((command[HelpKey.CMD], command[HelpKey.DESC]))
+                commands.append((command[HelpKeys.CMD], command[HelpKeys.DESC]))
 
     return tuple(commands)
 
@@ -209,7 +211,7 @@ def panel_needed(code: str) -> bool:
 
     - 状态缺失、缺目录指纹或指纹与现目录不符，任一为真
     """
-    catalog = load_instance_catalog(state_path_of(code), StateKey.CATALOG)
+    catalog = load_instance_catalog(state_path_of(code), StateKeys.CATALOG)
     if not catalog:
         return True
     roots = plugins_roots()
@@ -230,7 +232,7 @@ def save_state(code: str, enabled: list[str], catalog: str) -> None:
     # 两项取值是目录名与摘要串，都不含要转义的字符
     write_text_atomic(
         target,
-        f'{StateKey.ENABLED} = [{names}]\n{StateKey.CATALOG} = "{catalog}"\n',
+        f'{StateKeys.ENABLED} = [{names}]\n{StateKeys.CATALOG} = "{catalog}"\n',
     )
 
 

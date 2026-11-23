@@ -23,9 +23,9 @@ from bundled._shared.filters import CommandMatch  # noqa: E402
 from bundled.help import _services  # noqa: E402
 from exceptions import PluginRoleError  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
-    PLUGINS_PKG,
+    BUNDLED_PLUGINS_PKG,
     CommandRole,
-    HelpKey,
+    HelpKeys,
     MessageRoute,
 )
 from finshin_sdk.dto import (  # noqa: E402
@@ -39,7 +39,7 @@ from utils.plugin import _manifest, _manifest_help, _register  # noqa: E402
 def _section(raw_command: dict[str, Any]) -> list[dict[str, Any]]:
     """把单条命令包成一段帮助贡献"""
     return [
-        {HelpKey.SECTION: "工具", HelpKey.NOTE: "", HelpKey.COMMANDS: [raw_command]}
+        {HelpKeys.SECTION: "工具", HelpKeys.NOTE: "", HelpKeys.COMMANDS: [raw_command]}
     ]
 
 
@@ -53,7 +53,7 @@ def _manifest_of(cmd: str, role: CommandRole) -> PluginManifestDTO:
     command = HelpCommandDTO(cmd=cmd, desc="演示命令", role=role)
     return PluginManifestDTO(
         name="demo",
-        module=f"{PLUGINS_PKG}.demo",
+        module=f"{BUNDLED_PLUGINS_PKG}.demo",
         title="演示",
         summary="演示",
         help_section=(HelpSectionDTO(commands=(command,)),),
@@ -75,19 +75,19 @@ class TestRoleParse(unittest.TestCase):
 
     def test_owner_word_parsed(self) -> None:
         command = _read(
-            _section({HelpKey.CMD: "wipe", HelpKey.DESC: "清空", "role": "owner"})
+            _section({HelpKeys.CMD: "wipe", HelpKeys.DESC: "清空", "role": "owner"})
         )[0].commands[0]
         self.assertEqual(command.role, CommandRole.OWNER)
 
     def test_missing_role_defaults_to_member(self) -> None:
-        command = _read(_section({HelpKey.CMD: "say", HelpKey.DESC: "说话"}))[
+        command = _read(_section({HelpKeys.CMD: "say", HelpKeys.DESC: "说话"}))[
             0
         ].commands[0]
         self.assertEqual(command.role, CommandRole.MEMBER)
 
     def test_word_out_of_table_drops_the_command(self) -> None:
         sections = _read(
-            _section({HelpKey.CMD: "say", HelpKey.DESC: "说话", "role": "boss"})
+            _section({HelpKeys.CMD: "say", HelpKeys.DESC: "说话", "role": "boss"})
         )
         self.assertEqual(sections[0].commands, ())
 
@@ -99,7 +99,7 @@ class TestMenuRoleNote(unittest.TestCase):
         command = HelpCommandDTO(cmd="md", desc="图片输出", role=role)
         manifest = PluginManifestDTO(
             name="demo",
-            module=f"{PLUGINS_PKG}.demo",
+            module=f"{BUNDLED_PLUGINS_PKG}.demo",
             title="演示",
             summary="演示",
             help_section=(HelpSectionDTO(commands=(command,)),),

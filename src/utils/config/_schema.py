@@ -41,6 +41,7 @@ def _build_field(spec: FieldSpec) -> FieldSchema:
         required=spec.required,
         bounds=spec.bounds,
         visible_when=spec.visible_when,
+        tags=spec.tags,
     )
 
 

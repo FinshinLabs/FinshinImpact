@@ -7,17 +7,11 @@
 from typing import Any
 
 from finshin_sdk import ConnectionPlan
+from finshin_sdk.domain import RowStatus
 from skin.messages import CheckMessage
 
-
-class RowStatus:
-    """表格行五态"""
-
-    PENDING = "pending"
-    CHECKING = "checking"
-    OK = "ok"
-    FAIL = "fail"
-    SKIP = "skip"
+# 进度帧专有态，接口包的终态里没有这一档
+CHECKING = "checking"
 
 
 class RowId:
@@ -58,7 +52,7 @@ def opening_rows(
         }
         channel = channels.get(row.row_id)
         if channel is not None:
-            item["status"] = RowStatus.CHECKING
+            item["status"] = CHECKING
             item["budget"] = int(channel.budget)
         rows.append(item)
     if local_frame is not None:

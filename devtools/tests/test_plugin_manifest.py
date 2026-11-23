@@ -19,9 +19,9 @@ from system.profile_env import set_profile  # noqa: E402
 set_profile("tg.000000")
 
 from finshin_sdk.domain import (  # noqa: E402
-    INSTALLED_PLUGINS_NAME,
+    BUNDLED_PLUGINS_PKG,
+    INSTALLED_PLUGINS_DIR,
     INSTALLED_PLUGINS_PKG,
-    PLUGINS_PKG,
 )
 from services.env_setup import deps_manifest  # noqa: E402
 from utils.plugin import _manifest  # noqa: E402
@@ -128,7 +128,7 @@ class TestGuideRead(unittest.TestCase):
             for name in ("extra", "help", "AI"):
                 _write(root, name)
 
-            rows = deps_manifest.load_manifests([(root, PLUGINS_PKG)])
+            rows = deps_manifest.load_manifests([(root, BUNDLED_PLUGINS_PKG)])
 
             self.assertEqual([row["name"] for row in rows], ["AI", "help", "extra"])
             self.assertFalse({"always", "weight"} & set(rows[0]))
@@ -140,7 +140,7 @@ class TestGuideRead(unittest.TestCase):
             for name in ("aardvark", "help", "grant", "AI"):
                 _write(root, name)
 
-            rows = deps_manifest.load_manifests([(root, PLUGINS_PKG)])
+            rows = deps_manifest.load_manifests([(root, BUNDLED_PLUGINS_PKG)])
 
             self.assertEqual(
                 [row["name"] for row in rows], ["AI", "grant", "help", "aardvark"]
@@ -162,7 +162,7 @@ class TestGuideRead(unittest.TestCase):
             for name, title in titled:
                 _write_titled(root, name, title)
 
-            rows = deps_manifest.load_manifests([(root, PLUGINS_PKG)])
+            rows = deps_manifest.load_manifests([(root, BUNDLED_PLUGINS_PKG)])
 
             self.assertEqual(
                 [row["title"] for row in rows],
@@ -180,16 +180,16 @@ class TestGuideRoots(unittest.TestCase):
         """
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            installed = base / INSTALLED_PLUGINS_NAME
+            installed = base / INSTALLED_PLUGINS_DIR
 
             with patch.object(deps_manifest, "ROOT_DIR", base):
                 names = [pkg for _, pkg in deps_manifest.plugins_roots()]
-                self.assertEqual(names, [PLUGINS_PKG])
+                self.assertEqual(names, [BUNDLED_PLUGINS_PKG])
 
                 installed.mkdir(parents=True)
                 names = [pkg for _, pkg in deps_manifest.plugins_roots()]
 
-            self.assertEqual(names, [PLUGINS_PKG, INSTALLED_PLUGINS_PKG])
+            self.assertEqual(names, [BUNDLED_PLUGINS_PKG, INSTALLED_PLUGINS_PKG])
 
     def test_bundled_row_wins_same_name(self) -> None:
         """两根目录同名时精简清单只留随包那一行
@@ -197,8 +197,8 @@ class TestGuideRoots(unittest.TestCase):
         - 这条红了说明外部同名插件会顶掉随包件的那一行
         """
         with tempfile.TemporaryDirectory() as tmp:
-            bundled = Path(tmp) / PLUGINS_PKG
-            installed = Path(tmp) / INSTALLED_PLUGINS_NAME
+            bundled = Path(tmp) / BUNDLED_PLUGINS_PKG
+            installed = Path(tmp) / INSTALLED_PLUGINS_DIR
             for root, title in ((bundled, "随包"), (installed, "外部")):
                 target = root / "dup" / "plugin.toml"
                 target.parent.mkdir(parents=True)
@@ -210,7 +210,7 @@ class TestGuideRoots(unittest.TestCase):
             _write_dependency(installed, "dup")
 
             rows = deps_manifest.load_manifests(
-                [(bundled, PLUGINS_PKG), (installed, INSTALLED_PLUGINS_PKG)]
+                [(bundled, BUNDLED_PLUGINS_PKG), (installed, INSTALLED_PLUGINS_PKG)]
             )
 
             self.assertEqual([row["title"] for row in rows], ["随包"])
@@ -222,8 +222,8 @@ class TestGuideRoots(unittest.TestCase):
         - 各根目录名字不撞时交空表，面板不多出行
         """
         with tempfile.TemporaryDirectory() as tmp:
-            bundled = Path(tmp) / PLUGINS_PKG
-            installed = Path(tmp) / INSTALLED_PLUGINS_NAME
+            bundled = Path(tmp) / BUNDLED_PLUGINS_PKG
+            installed = Path(tmp) / INSTALLED_PLUGINS_DIR
             for root, title in ((bundled, "随包"), (installed, "外部")):
                 target = root / "dup" / "plugin.toml"
                 target.parent.mkdir(parents=True)
@@ -235,7 +235,7 @@ class TestGuideRoots(unittest.TestCase):
             _write_dependency(installed, "dup")
 
             losers = deps_manifest.shadowed_manifests(
-                [(bundled, PLUGINS_PKG), (installed, INSTALLED_PLUGINS_PKG)]
+                [(bundled, BUNDLED_PLUGINS_PKG), (installed, INSTALLED_PLUGINS_PKG)]
             )
 
             self.assertEqual(
@@ -248,7 +248,7 @@ class TestGuideRoots(unittest.TestCase):
 
             self.assertEqual(
                 deps_manifest.shadowed_manifests(
-                    [(bundled, PLUGINS_PKG), (quiet, INSTALLED_PLUGINS_PKG)]
+                    [(bundled, BUNDLED_PLUGINS_PKG), (quiet, INSTALLED_PLUGINS_PKG)]
                 ),
                 [],
             )
@@ -260,7 +260,7 @@ class TestExternalDependencies(unittest.TestCase):
     def test_libs_come_from_the_own_declaration(self) -> None:
         """两份读取侧都取依赖表那一条，清单里多写的 deps 不算"""
         with tempfile.TemporaryDirectory() as tmp:
-            installed = Path(tmp) / INSTALLED_PLUGINS_NAME
+            installed = Path(tmp) / INSTALLED_PLUGINS_DIR
             target = installed / "echo" / "plugin.toml"
             target.parent.mkdir(parents=True)
             target.write_text(_ECHO_MANIFEST, encoding="utf-8")
@@ -275,7 +275,7 @@ class TestExternalDependencies(unittest.TestCase):
     def test_missing_own_declaration_is_refused(self) -> None:
         """只有清单、没写自家依赖声明，两份读取侧都整份不放行"""
         with tempfile.TemporaryDirectory() as tmp:
-            installed = Path(tmp) / INSTALLED_PLUGINS_NAME
+            installed = Path(tmp) / INSTALLED_PLUGINS_DIR
             target = installed / "echo" / "plugin.toml"
             target.parent.mkdir(parents=True)
             target.write_text(_ECHO_MANIFEST, encoding="utf-8")
@@ -290,10 +290,10 @@ class TestExternalDependencies(unittest.TestCase):
     def test_bundled_needs_no_own_declaration(self) -> None:
         """随包那档的库在根声明里，目录里没有依赖声明照样进表"""
         with tempfile.TemporaryDirectory() as tmp:
-            bundled = Path(tmp) / PLUGINS_PKG
+            bundled = Path(tmp) / BUNDLED_PLUGINS_PKG
             _write(bundled, "help")
 
-            rows = deps_manifest.load_manifests([(bundled, PLUGINS_PKG)])
+            rows = deps_manifest.load_manifests([(bundled, BUNDLED_PLUGINS_PKG)])
 
             self.assertEqual([row["deps"] for row in rows], [()])
 

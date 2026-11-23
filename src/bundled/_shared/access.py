@@ -10,9 +10,10 @@ from typing import ParamSpec, cast
 
 from bot.error_guard import error_guard
 from finshin_sdk import HandlerContext
-from finshin_sdk.domain import CommandRole, ConfigKey, PluginMark
+from finshin_sdk.domain import CommandRole, PluginMark
 from finshin_sdk.dto import PrincipalDTO
 from utils import config_manager, get_logger
+from utils.config import owner_item
 
 from .grants import is_admin
 from .messages import BotMessage
@@ -29,7 +30,8 @@ def _owner_id() -> str:
 
     - 主人配置值去空白后交出
     """
-    return config_manager.get(ConfigKey.OWNER.path("plugin.AI", "chore"), str).strip()
+    item = owner_item()
+    return config_manager.get(item, str).strip() if item is not None else ""
 
 
 async def role_of(principal: PrincipalDTO) -> CommandRole:
@@ -61,7 +63,7 @@ def require_role(
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
             ctx = cast(HandlerContext, kwargs["ctx"])
             if await role_of(ctx.event.principal) > limit:
-                _logger.info(f"{ctx.event.principal.key} 无权执行命令")
+                _logger.info(f"{ctx.event.principal.dotted} 无权执行命令")
                 await ctx.respond(BotMessage.CMD_NO_PERMISSION)
                 return
             await func(*args, **kwargs)

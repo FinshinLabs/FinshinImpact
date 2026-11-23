@@ -54,9 +54,12 @@ def _rejected() -> set[tuple[str, str]]:
     return _rejected_pairs
 
 
-def _remember_rejected() -> None:
+def _remember_rejected(base_url: str | None = None, model: str | None = None) -> None:
     """去字段重发通过后写进实例缓存，下次不再带"""
-    key = (ai_config.base_url, ai_config.model_name)
+    key = (
+        base_url or ai_config.base_url,
+        model or ai_config.model_name,
+    )
     known = _rejected()
     if key in known:
         return
@@ -85,9 +88,10 @@ class AIClient(BaseClient):
     """鉴权与禁代理客户端"""
 
     @classmethod
-    def _headers(cls) -> dict[str, str]:
+    def _headers(cls, api_key: str | None = None) -> dict[str, str]:
+        key = ai_config.api_key if api_key is None else api_key
         return {
-            "Authorization": f"Bearer {ai_config.api_key}",
+            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
         }
 
@@ -98,17 +102,21 @@ class AIClient(BaseClient):
         *,
         stream: bool,
         max_tokens: int | None = None,
+        model: str | None = None,
+        base_url: str | None = None,
     ) -> dict[str, Any]:
-        """按当前配置拼请求体"""
+        """按点名值或当前配置拼请求体"""
+        model_name = ai_config.model_name if model is None else model
+        url = ai_config.base_url if base_url is None else base_url
         payload: dict[str, Any] = {
-            "model": ai_config.model_name,
+            "model": model_name,
             "messages": msg,
             "stream": stream,
             "temperature": ai_config.temperature,
         }
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
-        if (ai_config.base_url, ai_config.model_name) not in _rejected():
+        if (url, model_name) not in _rejected():
             payload[_REASONING_FIELD] = "none"
         return payload
 
@@ -178,23 +186,33 @@ class AIClient(BaseClient):
         cls,
         msg: list[dict[str, str]],
         max_tokens: int,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        model: str | None = None,
     ) -> Any:
-        """AI 非流式请求"""
-        payload = cls._payload(msg, stream=False, max_tokens=max_tokens)
+        """AI 非流式请求
+
+        - 传入的地址、密钥与模型名优先于配置值，探测值不必先落盘
+        """
+        url = ai_config.base_url if base_url is None else base_url
+        payload = cls._payload(
+            msg, stream=False, max_tokens=max_tokens, model=model, base_url=url
+        )
         try:
             return await super().post_json(
-                base_url=ai_config.base_url,
+                base_url=url,
                 request_path=ai_config.request_path,
-                headers=cls._headers(),
+                headers=cls._headers(api_key),
                 payload=payload,
             )
         except HTTPStatusError as e:
             retry_payload = cls._without_reasoning(e, payload)
             result = await super().post_json(
-                base_url=ai_config.base_url,
+                base_url=url,
                 request_path=ai_config.request_path,
-                headers=cls._headers(),
+                headers=cls._headers(api_key),
                 payload=retry_payload,
             )
-            _remember_rejected()
+            _remember_rejected(base_url=url, model=model)
             return result

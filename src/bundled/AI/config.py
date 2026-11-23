@@ -11,21 +11,24 @@ from typing import Any, TypeVar
 from bot.error_guard import error_guard
 from finshin_sdk import ConnectionPlan
 from finshin_sdk.domain import (
-    ConfigKey,
     ConfigPath,
-    ConfigSection,
+    ConfigValues,
     FieldCondition,
     FieldSpec,
     SectionSpec,
+    SourceCode,
     SourceDeclaration,
 )
 from utils import config_manager
+from utils.config import OWNER_TAG, CoreKeys, core_item
 from utils.paths import RECORDS_DIR
 from utils.persona import build_persona
 
 from .utils import build_message
 
 T = TypeVar("T")
+
+SOURCE = SourceCode("plugin.AI")
 
 # 配置中心按天/按小时填，运行期换算成秒
 _HOUR_SECONDS = 60 * 60
@@ -36,20 +39,20 @@ _K_TOKENS = 1024
 _CUSTOM_K = "custom"
 
 
-class AISection(StrEnum):
+class PluginSections(StrEnum):
     """本插件自己认的段名
 
-    - 段名照盘上旧值，不做数据迁移
+    - 成员值即盘上段名
     """
 
     MODEL = "model"
     CHORE = "chore"
 
 
-class AIKey(StrEnum):
+class PluginKeys(StrEnum):
     """本插件自己认的键名
 
-    - 键名照盘上旧值，不做数据迁移
+    - 成员值即盘上键名
     """
 
     BASE_URL = "base_url"
@@ -62,18 +65,18 @@ class AIKey(StrEnum):
     LOST_LINES = "lost_lines"
 
 
-def _path(key: AIKey, section: AISection) -> ConfigPath:
+def _path(key: PluginKeys, section: PluginSections) -> ConfigPath:
     """拼出本插件配置项的完整身份"""
-    return ConfigPath(source="plugin.AI", section=section, key=key)
+    return ConfigPath(source=SOURCE, section=section, key=key)
 
 
 _MODEL_SECTION = SectionSpec(
-    section=AISection.MODEL,
+    section=PluginSections.MODEL,
     title="模型",
     fields=(
         FieldSpec(
-            section=AISection.MODEL,
-            key=AIKey.BASE_URL,
+            section=PluginSections.MODEL,
+            key=PluginKeys.BASE_URL,
             value_type=str,
             default="",
             label="接口地址（OpenAI 兼容）",
@@ -81,8 +84,8 @@ _MODEL_SECTION = SectionSpec(
             required=True,
         ),
         FieldSpec(
-            section=AISection.MODEL,
-            key=AIKey.API_KEY,
+            section=PluginSections.MODEL,
+            key=PluginKeys.API_KEY,
             value_type=str,
             default="",
             label="API Key",
@@ -90,8 +93,8 @@ _MODEL_SECTION = SectionSpec(
             required=True,
         ),
         FieldSpec(
-            section=AISection.MODEL,
-            key=AIKey.MODEL,
+            section=PluginSections.MODEL,
+            key=PluginKeys.MODEL,
             value_type=str,
             default="",
             label="模型名",
@@ -99,8 +102,8 @@ _MODEL_SECTION = SectionSpec(
             required=True,
         ),
         FieldSpec(
-            section=AISection.MODEL,
-            key=AIKey.CONTEXT_K,
+            section=PluginSections.MODEL,
+            key=PluginKeys.CONTEXT_K,
             value_type=str,
             default="16",
             label="上下文上限（K）",
@@ -109,34 +112,35 @@ _MODEL_SECTION = SectionSpec(
             option_labels=("8K", "16K", "32K", "64K", "自定义"),
         ),
         FieldSpec(
-            section=AISection.MODEL,
-            key=AIKey.CONTEXT_CUSTOM_K,
+            section=PluginSections.MODEL,
+            key=PluginKeys.CONTEXT_CUSTOM_K,
             value_type=float,
             default=16.0,
             label="自定义上限（K）",
             desc="取值范围 1~64",
             bounds=(1.0, 64.0),
-            visible_when=(FieldCondition(AIKey.CONTEXT_K, (_CUSTOM_K,)),),
+            visible_when=(FieldCondition(PluginKeys.CONTEXT_K, (_CUSTOM_K,)),),
         ),
     ),
 )
 
 _CHORE_SECTION = SectionSpec(
-    section=AISection.CHORE,
+    section=PluginSections.CHORE,
     title="主人与触发",
     fields=(
         FieldSpec(
-            section=AISection.CHORE,
-            key=AIKey.OWNER,
+            section=PluginSections.CHORE,
+            key=PluginKeys.OWNER,
             value_type=str,
             default="",
             label="主人",
             desc="具有最高权限的用户 ID（注意实例对应的平台）",
             required=True,
+            tags=(OWNER_TAG,),
         ),
         FieldSpec(
-            section=AISection.CHORE,
-            key=AIKey.TRIGGERS,
+            section=PluginSections.CHORE,
+            key=PluginKeys.TRIGGERS,
             value_type=list,
             default=[],
             label="触发词",
@@ -144,8 +148,8 @@ _CHORE_SECTION = SectionSpec(
             required=True,
         ),
         FieldSpec(
-            section=AISection.CHORE,
-            key=AIKey.LOST_LINES,
+            section=PluginSections.CHORE,
+            key=PluginKeys.LOST_LINES,
             value_type=list,
             default=[],
             label="停机交代话术",
@@ -155,14 +159,12 @@ _CHORE_SECTION = SectionSpec(
 )
 
 
-def _probe_plan() -> ConnectionPlan | None:
-    """交出保存轮那次接口探测的计划
-
-    - 插件探测件要读本模块的配置单例，调用时才导入，避免循环
-    """
+def _probe_plan(values: ConfigValues) -> ConnectionPlan:
+    """交出保存轮那次接口探测的计划"""
+    # 探测件反向依赖本模块，调用时才导入，避免导入期循环
     from .probe import build_probe
 
-    return build_probe()
+    return build_probe(values)
 
 
 CONFIG_SOURCE = SourceDeclaration(
@@ -197,24 +199,24 @@ class _DynamicAIConfig:
     @property
     def base_url(self) -> str:
         """OpenAI 兼容接口的 base URL"""
-        return self._read(_path(AIKey.BASE_URL, AISection.MODEL), str)
+        return self._read(_path(PluginKeys.BASE_URL, PluginSections.MODEL), str)
 
     @property
     def api_key(self) -> str:
         """模型密钥"""
-        return self._read(_path(AIKey.API_KEY, AISection.MODEL), str)
+        return self._read(_path(PluginKeys.API_KEY, PluginSections.MODEL), str)
 
     @property
     def model_name(self) -> str:
         """模型名"""
-        return self._read(_path(AIKey.MODEL, AISection.MODEL), str)
+        return self._read(_path(PluginKeys.MODEL, PluginSections.MODEL), str)
 
     @property
     def context_tokens(self) -> int:
         """上下文上限的 token 数"""
-        mode = self._read(_path(AIKey.CONTEXT_K, AISection.MODEL), str)
+        mode = self._read(_path(PluginKeys.CONTEXT_K, PluginSections.MODEL), str)
         k = (
-            self._read(_path(AIKey.CONTEXT_CUSTOM_K, AISection.MODEL), float)
+            self._read(_path(PluginKeys.CONTEXT_CUSTOM_K, PluginSections.MODEL), float)
             if mode == _CUSTOM_K
             else float(mode)
         )
@@ -223,30 +225,30 @@ class _DynamicAIConfig:
     @property
     def group_triggers(self) -> tuple[str, ...]:
         """群聊触发词"""
-        return tuple(self._read(_path(AIKey.TRIGGERS, AISection.CHORE), list))
+        return tuple(self._read(_path(PluginKeys.TRIGGERS, PluginSections.CHORE), list))
 
     @property
     def lost_lines(self) -> tuple[str, ...]:
         """停机交代话术"""
-        lines = self._read(_path(AIKey.LOST_LINES, AISection.CHORE), list)
+        lines = self._read(_path(PluginKeys.LOST_LINES, PluginSections.CHORE), list)
         return tuple(line for line in lines if line.strip())
 
     @property
     def keep_seconds(self) -> float:
         """记录保留时长"""
-        days = self._read(ConfigKey.RECORD_KEEP.path("core", ConfigSection.DATA), float)
+        days = self._read(core_item(CoreKeys.RECORD_KEEP), float)
         return days * _DAY_SECONDS
 
     @property
     def waiting_time(self) -> float:
         """清理轮间隔"""
-        hours = self._read(ConfigKey.WAITING.path("core", ConfigSection.DATA), float)
+        hours = self._read(core_item(CoreKeys.WAITING), float)
         return hours * _HOUR_SECONDS
 
     @property
     def init(self) -> tuple[dict[str, str], ...]:
         """当前人设那条系统轮"""
-        owner = self._read(_path(AIKey.OWNER, AISection.CHORE), str)
+        owner = self._read(_path(PluginKeys.OWNER, PluginSections.CHORE), str)
         return (build_message("system", build_persona(owner)),)
 
 

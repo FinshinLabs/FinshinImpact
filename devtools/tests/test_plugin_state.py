@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
-from finshin_sdk.domain import StateKey  # noqa: E402
+from finshin_sdk.domain import StateKeys  # noqa: E402
 from system.plugin_state import (  # noqa: E402
     load_instance_catalog,
     load_instance_enabled,
@@ -34,28 +34,28 @@ class TestPluginState(unittest.TestCase):
 
     def test_missing_file_reads_none(self) -> None:
         """没有状态文件即从没保存过选择，读回的不是空集"""
-        self.assertIsNone(load_instance_enabled(self.state, StateKey.ENABLED))
+        self.assertIsNone(load_instance_enabled(self.state, StateKeys.ENABLED))
 
     def test_missing_key_reads_empty_set(self) -> None:
         """文件里没启用那一键时读回空集，与没有文件是两种盘面"""
         self._write('catalog = "dig"\n')
 
         self.assertEqual(
-            load_instance_enabled(self.state, StateKey.ENABLED), frozenset()
+            load_instance_enabled(self.state, StateKeys.ENABLED), frozenset()
         )
 
     def test_broken_file_reads_none(self) -> None:
         """语法坏的文件读不出，按从没保存过处理"""
         self._write("enabled = [")
 
-        self.assertIsNone(load_instance_enabled(self.state, StateKey.ENABLED))
+        self.assertIsNone(load_instance_enabled(self.state, StateKeys.ENABLED))
 
     def test_names_are_kept_as_text(self) -> None:
         """名单成员一律收成文本，数字与串写成同一种时算同一只插件"""
         self._write('enabled = ["help", 3]\n')
 
         self.assertEqual(
-            load_instance_enabled(self.state, StateKey.ENABLED),
+            load_instance_enabled(self.state, StateKeys.ENABLED),
             frozenset({"help", "3"}),
         )
 
@@ -69,14 +69,14 @@ class TestPluginState(unittest.TestCase):
                     self._write(text)
 
                 self.assertEqual(
-                    load_instance_catalog(self.state, StateKey.CATALOG), ""
+                    load_instance_catalog(self.state, StateKeys.CATALOG), ""
                 )
 
     def test_catalog_reads_the_written_value(self) -> None:
         """盘上写了指纹即原样读出"""
         self._write('catalog = "abc123"\n')
 
-        self.assertEqual(load_instance_catalog(self.state, StateKey.CATALOG), "abc123")
+        self.assertEqual(load_instance_catalog(self.state, StateKeys.CATALOG), "abc123")
 
 
 if __name__ == "__main__":

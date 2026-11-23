@@ -10,7 +10,7 @@ import re
 from data import build_repositories, get_connection, purge_dead_tasks
 from finshin_sdk import CapabilityCall
 from finshin_sdk.domain import ChatRole
-from finshin_sdk.domain.ids import ContainerKey
+from finshin_sdk.domain.ids import ContainerCode
 from finshin_sdk.dto import PrincipalDTO, TaskDTO
 from utils import get_logger
 from utils.paths import DB_FILE
@@ -68,11 +68,11 @@ async def report_lost_tasks(call: CapabilityCall) -> None:
         try:
             text = random.choice(lines) if lines else await _compose_line(used)
             if not text:
-                _logger.error(f"{principal.key} 交代现写为空，本条不补说")
+                _logger.error(f"{principal.dotted} 交代现写为空，本条不补说")
                 continue
             await call.say(principal, text)
         except Exception as e:
-            _logger.send_error(f"停机交代失败: {principal.key}", e)
+            _logger.send_error(f"停机交代失败: {principal.dotted}", e)
 
     dead = await purge_dead_tasks(conn)
     _logger.info(f"停机交代 {len(rows)} 串、{len(targets)} 个会话，判死 {dead} 条")
@@ -80,7 +80,7 @@ async def report_lost_tasks(call: CapabilityCall) -> None:
 
 def _one_per_container(rows: tuple[TaskDTO, ...]) -> list[PrincipalDTO]:
     """取各会话的首个欠答者"""
-    targets: dict[ContainerKey, PrincipalDTO] = {}
+    targets: dict[ContainerCode, PrincipalDTO] = {}
     for row in rows:
         targets.setdefault(row.principal.container, row.principal)
     return list(targets.values())

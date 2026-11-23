@@ -25,7 +25,7 @@ set_profile("tg.000000")
 from adapter_presence import adapter_present  # noqa: E402
 
 from exceptions import AdapterImportError, PluginImportError  # noqa: E402
-from finshin_sdk.domain import PLUGINS_PKG, Platform  # noqa: E402
+from finshin_sdk.domain import BUNDLED_PLUGINS_PKG, PlatformCode  # noqa: E402
 from services.adapter_manifest import load_adapter_manifests  # noqa: E402
 from utils.external_scope import check_external_imports  # noqa: E402
 
@@ -37,7 +37,7 @@ def _adapter_package() -> str:
 
     - 表里写谁就查谁，测试不自己记适配器的模块名
     """
-    entry = load_adapter_manifests()[Platform.TELEGRAM].entry
+    entry = load_adapter_manifests()[PlatformCode("tg")].entry
     return entry.rpartition(".")[0]
 
 
@@ -70,8 +70,8 @@ class TestExternalImports(_TempPackage):
 
         - 这条红了说明放行按恒启用表挑人，新加的随包件会被误拦
         """
-        module = f"{PLUGINS_PKG}.inner"
-        check_external_imports("inner", module, PluginImportError, PLUGINS_PKG)
+        module = f"{BUNDLED_PLUGINS_PKG}.inner"
+        check_external_imports("inner", module, PluginImportError, BUNDLED_PLUGINS_PKG)
 
     def test_clean_package_passes(self) -> None:
         """只引接口包与标准库的外部件放行"""
@@ -129,7 +129,7 @@ class TestExternalImports(_TempPackage):
             {"__init__.py": "import json\n\nfrom PySide6 import QtCore\n"},
         )
         with self.assertRaises(PluginImportError) as ctx:
-            check_external_imports("gui", name, PluginImportError, PLUGINS_PKG)
+            check_external_imports("gui", name, PluginImportError, BUNDLED_PLUGINS_PKG)
         self.assertEqual(ctx.exception.where, "__init__.py:3")
 
     def test_platform_framework_is_forbidden_for_plugin_only(self) -> None:
@@ -147,7 +147,7 @@ class TestExternalImports(_TempPackage):
                 "plug",
                 name,
                 PluginImportError,
-                PLUGINS_PKG,
+                BUNDLED_PLUGINS_PKG,
                 extra_forbidden=("aiogram",),
             )
         self.assertEqual(ctx.exception.target, "aiogram")

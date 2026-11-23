@@ -37,11 +37,11 @@ from exceptions import (  # noqa: E402
 )
 from finshin_sdk import CapabilityCall  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
-    PLUGINS_PKG,
+    BUNDLED_PLUGINS_PKG,
     BasePlugin,
     MessageRoute,
     MomentSubscription,
-    Platform,
+    PlatformCode,
     PlatformMoment,
     QueuedAction,
 )
@@ -85,7 +85,9 @@ def _register_modules(modules: dict[str, object], names: list[str]):
 
     dispatcher = _FakeDispatcher()
     manifests = [
-        SimpleNamespace(name=name, module=f"{PLUGINS_PKG}.{name}", help_section=())
+        SimpleNamespace(
+            name=name, module=f"{BUNDLED_PLUGINS_PKG}.{name}", help_section=()
+        )
         for name in names
     ]
 
@@ -208,7 +210,9 @@ class TestCollectBackgrounds(unittest.TestCase):
     def test_module_missing_kinds(self) -> None:
         """插件本身缺席与内部缺依赖记成两种异常"""
         modules = {
-            "gone": ModuleNotFoundError(f"No module named '{PLUGINS_PKG}.gone'"),
+            "gone": ModuleNotFoundError(
+                f"No module named '{BUNDLED_PLUGINS_PKG}.gone'"
+            ),
             "deps": ModuleNotFoundError("No module named 'numpy'"),
             "good": _plugin(),
         }
@@ -321,7 +325,7 @@ class _FakeAdapter:
     def __init__(self) -> None:
         self.closed = 0
         self.interaction = SimpleNamespace(name="外发端口")
-        self.platform = Platform.TELEGRAM
+        self.platform = PlatformCode("tg")
 
     async def start(self) -> None:
         """让出一轮调度后结束本轮轮询"""

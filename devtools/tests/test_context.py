@@ -16,12 +16,12 @@ from system.profile_env import set_profile  # noqa: E402
 set_profile("tg.000000")
 
 from finshin_sdk import HandlerContext, InteractionPort  # noqa: E402
-from finshin_sdk.domain import ChatScope, ContentKind, Platform  # noqa: E402
-from finshin_sdk.domain.ids import ContainerKey, MessageId, UserId  # noqa: E402
+from finshin_sdk.domain import ChatScope, ContentKind, PlatformCode  # noqa: E402
+from finshin_sdk.domain.ids import ContainerCode, MessageId, UserId  # noqa: E402
 from finshin_sdk.dto import (  # noqa: E402
     ContentDTO,
     InboundEventDTO,
-    MsgReferenceDTO,
+    MessageRefDTO,
     OutboundPayloadDTO,
     PrincipalDTO,
 )
@@ -29,12 +29,12 @@ from finshin_sdk.dto import (  # noqa: E402
 
 def _event() -> InboundEventDTO:
     """构造一条私聊文字事件"""
-    container = ContainerKey("u456")
+    container = ContainerCode("u456")
     principal = PrincipalDTO(
-        platform=Platform.TELEGRAM, container=container, user=UserId("456")
+        platform=PlatformCode("tg"), container=container, user=UserId("456")
     )
-    ref = MsgReferenceDTO(
-        platform=Platform.TELEGRAM, container=container, message_id=MessageId("7")
+    ref = MessageRefDTO(
+        platform=PlatformCode("tg"), container=container, message_id=MessageId("7")
     )
     return InboundEventDTO(
         ref=ref,
@@ -61,12 +61,12 @@ class _RecordingPort(InteractionPort):
         content: OutboundPayloadDTO,
         *,
         mention: bool = False,
-        reply_ref: MsgReferenceDTO | None = None,
-    ) -> MsgReferenceDTO | None:
+        reply_ref: MessageRefDTO | None = None,
+    ) -> MessageRefDTO | None:
         self.calls.append(_Call(content=content, mention=mention, reply_ref=reply_ref))
         return None
 
-    async def probe_existence(self, target: MsgReferenceDTO) -> bool:
+    async def probe_existence(self, target: MessageRefDTO) -> bool:
         return True
 
     def mention_fragment(self, principal: PrincipalDTO) -> str:

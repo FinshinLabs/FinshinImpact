@@ -8,7 +8,7 @@ import shutil
 import time
 from typing import Any
 
-from finshin_sdk.domain import platform_of_profile
+from finshin_sdk.domain import ProfileKey, platform_of_key
 from system.atomic_write import write_bytes_atomic
 from system.profile_env import (
     ASSET_PERSONA_EXAMPLE_NAME,
@@ -22,6 +22,8 @@ from system.profile_env import (
     read_profile_data,
     write_profile_data,
 )
+
+from .adapter_manifest import load_adapter_manifests
 
 # 引导期身份码未定，路径常量所在的通用包一导入即按空身份码冻结，故模板路径就地拼
 _PERSONA_TEMPLATE = ASSETS_DIR / ASSET_PERSONA_EXAMPLE_NAME
@@ -41,9 +43,10 @@ def list_profiles() -> list[tuple[str, str]]:
 
     - 扫实例根目录下一级身份文件夹，返回 (身份码, 备注名) 列表
     - 目录不存在时返回空列表
-    - 身份码解析不出平台的目录跳过
+    - 身份码前缀不是已装适配器平台码的目录跳过
     - 按最近使用时间降序，时间缺失或相同时按身份码降序
     """
+    known = frozenset(load_adapter_manifests())
     profiles: list[tuple[float, str, str]] = []
 
     if not INSTANCES_DIR.is_dir():
@@ -52,7 +55,7 @@ def list_profiles() -> list[tuple[str, str]]:
     for path in sorted(INSTANCES_DIR.iterdir()):
         if not path.is_dir() or not (path / _INSTANCE_MARK).is_file():
             continue
-        if platform_of_profile(path.name) is None:
+        if platform_of_key(ProfileKey(path.name)) not in known:
             continue
         data = read_profile_data(path.name)
         last_used = data.get(_LAST_USED_KEY)

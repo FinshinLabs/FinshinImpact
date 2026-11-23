@@ -23,7 +23,7 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import HelpKey, ManifestKey  # noqa: E402
+from finshin_sdk.domain import HelpKeys, PluginManifestKeys  # noqa: E402
 from skin.messages import PluginMessage  # noqa: E402
 from ui._guide._conflict import _command_lines  # noqa: E402
 from ui._guide._search import (  # noqa: E402
@@ -39,9 +39,9 @@ from ui._guide._search import (  # noqa: E402
 def _manifest(title: str, cmds: tuple[tuple[str, str], ...]) -> dict[str, object]:
     """造一份搜索与明细要读的三列最小清单"""
     return {
-        ManifestKey.NAME: "ping_a",
-        ManifestKey.TITLE: title,
-        HelpKey.COMMANDS: cmds,
+        PluginManifestKeys.NAME: "ping_a",
+        PluginManifestKeys.TITLE: title,
+        HelpKeys.COMMANDS: cmds,
     }
 
 

@@ -13,7 +13,7 @@ from skin.messages import CheckMessage
 
 from ..config import AppConfigData, AppSchema, FieldErrors, validate_types
 from ..logger import get_logger
-from ..network import RowId, RowStatus
+from ..network import CHECKING, RowId, RowStatus
 
 _logger = get_logger("Check")
 
@@ -96,7 +96,7 @@ async def _run_channels(
     if not order:
         return ProbeOutcome()
     for channel in order:
-        emit({"id": channel.row_id, "status": RowStatus.CHECKING, "detail": ""})
+        emit({"id": channel.row_id, "status": CHECKING, "detail": ""})
 
     tasks = {
         asyncio.ensure_future(_probe_safe(channel, round_no)): channel

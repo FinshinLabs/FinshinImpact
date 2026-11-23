@@ -12,7 +12,7 @@ from finshin_sdk import AdapterParts, ConnectionPlan
 from skin.messages import CheckMessage
 
 from .._config_manager import config_manager
-from ..config import source_values
+from ..config import SourceKind, source_identity, source_values
 from ..logger import get_logger
 from ..network import (
     FrameKey,
@@ -47,9 +47,11 @@ def bind_diagnose(parts: AdapterParts) -> Callable[..., Coroutine[Any, Any, None
         stop_check: Callable[[], bool] | None = None,
     ) -> None:
         values = source_values(
-            f"adapter.{PLATFORM}", parts.sections, config_manager.get_all()
+            source_identity(SourceKind.ADAPTER, str(PLATFORM)),
+            parts.sections,
+            config_manager.get_all(),
         )
-        plan = parts.plan_for(values, token, detect_system_proxy())
+        plan = parts.plan_for(values, token, system_proxy=detect_system_proxy())
         await diagnose_flow(
             plan,
             emit,
