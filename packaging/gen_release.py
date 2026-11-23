@@ -16,8 +16,8 @@ import pack_spec
 
 _TIMEOUT = 20.0  # 单次请求超时 20 秒
 _PER_PAGE = 100  # 列仓与列 release 的单页条数
+_RELEASE_MAX_PAGES = 10  # 翻页保护，与本体版本比对那侧同值，两处改名必须同步
 _ACCEPT = "application/vnd.github+json"  # 取件要的响应格式
-_VERSIONS_MAX = 10  # 一只发行件进目录的版本条数
 _WHEEL_PARTS = 5  # wheel 文件名的段数，版本是第二段
 
 # 分发名口径与开发工具清单里那两条一致，改名要一起改
@@ -89,14 +89,25 @@ def _release(name: str) -> dict[str, Any] | None:
 
 
 def _releases(name: str) -> list[dict[str, Any]]:
-    """列指定仓的 release，草稿与预发布不进目录"""
-    data = _get(f"{pack_spec.API_HOST}/repos/{name}/releases?per_page={_PER_PAGE}")
-    if not isinstance(data, list):
-        return []
+    """列指定仓的 release，草稿与预发布不进目录
+
+    - 每页取满一页即接着取下一页，短页即到底
+    """
+    found: list[dict[str, Any]] = []
+    for page in range(1, _RELEASE_MAX_PAGES + 1):
+        data = _get(
+            f"{pack_spec.API_HOST}/repos/{name}/releases"
+            f"?per_page={_PER_PAGE}&page={page}"
+        )
+        if not isinstance(data, list):
+            raise RuntimeError(f"取不到 {name} 的 release 清单")
+        found.extend(data)
+        if len(data) < _PER_PAGE:
+            break
 
     return [
         item
-        for item in data
+        for item in found
         if isinstance(item, dict)
         and not item.get("draft")
         and not item.get("prerelease")
@@ -196,8 +207,6 @@ def _versions(
     ]
     seen = {str(newest[KEY_VERSION])}
     for release in _releases(name):
-        if len(listed) >= _VERSIONS_MAX:
-            break
         if str(release.get("tag_name") or "") == newest_tag:
             continue
         older = _older_row(name, distribution, release)

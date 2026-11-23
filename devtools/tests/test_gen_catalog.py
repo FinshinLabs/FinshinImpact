@@ -248,16 +248,45 @@ class TestGenCatalog(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self._build(table, self._two())
 
-    def test_version_list_is_capped(self) -> None:
-        """一只发行件最多列十版，多发的不进取目录"""
+    def test_version_list_not_capped(self) -> None:
+        """一只发行件的版本清单不截断，多发的尽数进目录"""
         listed = [
             _release("finshin-adapter-tg", _TG_URL),
             *(_older("finshin-adapter-tg", f"0.{n}.0") for n in range(1, 15)),
         ]
         text = self._build(self._both(listed), self._two())
 
-        self.assertEqual(text.count("[[adapter.versions]]"), 10)
-        self.assertNotIn("0.14.0", text)
+        self.assertEqual(text.count("[[adapter.versions]]"), 15)
+        self.assertIn('version = "0.14.0"', text)
+
+    def test_release_list_reads_next_page(self) -> None:
+        """首页取满一页即翻页接着取，第二页的版本也进清单"""
+        first = [
+            _release("finshin-sdk", _SDK_URL),
+            *(_older("finshin-sdk", f"8.{n}.0") for n in range(1, 100)),
+        ]
+        table = self._both()
+        table[f"{_SDK_REPO}/releases?per_page=100&page=1"] = first
+        table[f"{_SDK_REPO}/releases?per_page=100&page=2"] = [
+            _older("finshin-sdk", "7.0.0")
+        ]
+        text = self._build(table, self._two())
+
+        self.assertEqual(text.count("[[sdk.versions]]"), 101)
+        self.assertIn('version = "7.0.0"', text)
+
+    def test_release_page_failure_fails_build(self) -> None:
+        """翻页取不到即整次生成失败，不出一份悄悄截断的目录"""
+        first = [
+            _release("finshin-sdk", _SDK_URL),
+            *(_older("finshin-sdk", f"8.{n}.0") for n in range(1, 100)),
+        ]
+        table = self._both()
+        table[f"{_SDK_REPO}/releases?per_page=100&page=1"] = first
+        table[f"{_SDK_REPO}/releases?per_page=100&page=2"] = None
+
+        with self.assertRaises(RuntimeError):
+            self._build(table, self._two())
 
     def test_draft_and_prerelease_not_listed(self) -> None:
         """草稿与预发布的 release 不进版本清单"""
