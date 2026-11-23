@@ -132,6 +132,7 @@ _COMBOS = (
     (ButtonStyle.NEUTRAL, ButtonSize.COMPACT, _COMPACT_NEUTRAL),
     (ButtonStyle.DANGER, ButtonSize.COMPACT, _COMPACT_DANGER),
     (ButtonStyle.OUTLINE, ButtonSize.STANDARD, _OUTLINE),
+    (ButtonStyle.OUTLINE, ButtonSize.SMALL, _OUTLINE),
     (ButtonStyle.DELETE, ButtonSize.SMALL, _DELETE),
 )
 

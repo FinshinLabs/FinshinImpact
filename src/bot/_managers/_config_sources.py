@@ -75,7 +75,7 @@ def _core_source() -> ConfigSource:
     )
 
 
-def enabled_plugin_declarations() -> tuple[tuple[str, SourceDeclaration], ...]:
+def _enabled_plugin_declarations() -> tuple[tuple[str, SourceDeclaration], ...]:
     """已启用插件交出的来源声明
 
     - 按启用序列排，交出插件名与整份声明
@@ -105,6 +105,7 @@ def _plugin_sources() -> tuple[ConfigSource, ...]:
             code=name,
             title=declared.title,
             sections=declared.sections,
+            probe=declared.probe,
         )
-        for name, declared in enabled_plugin_declarations()
+        for name, declared in _enabled_plugin_declarations()
     )

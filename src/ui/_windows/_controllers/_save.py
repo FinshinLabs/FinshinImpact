@@ -1,26 +1,27 @@
-"""保存与落盘
+"""按来源保存与完成判定
 
-- 面板的保存请求在这里算变更、起校验轮并暂存候选
-- 候选先只进内存，校验通过那一次才写磁盘
-- 记下对话身份是否变动，收尾按它选文案
+- 先确认本类变更，再本地校验与本类检测，通过才写盘
+- 完成时拦住未存改动，丢弃只退回本场磁盘快照
 """
 
 from typing import TYPE_CHECKING
 
-from exceptions import ConfigOutputError
-from skin.messages import CheckMessage
-from skin.theme import NOTICE_DIALOG
+from skin.messages import CheckMessage, DialogMessage
 from utils import config_manager
 from utils.config import (
     AppConfigData,
+    FieldErrors,
+    ProbeRecord,
+    SourceSaveRequest,
     compare_configs,
+    merge_source_config,
     owner_item,
-    save_config,
     section_name,
+    validate_types,
 )
 
 from ..._bridge import gui_bridge
-from ..._dialogs import ChangeConfirmDialog, ConfigMode, NoticeDialog, SettingsDialog
+from ..._dialogs import ChangeConfirmDialog, NoticeDialog, SettingsDialog
 
 if TYPE_CHECKING:
     from ._settings import SettingsController
@@ -29,127 +30,200 @@ if TYPE_CHECKING:
 class SaveCoordinator:
     """保存流程协调器
 
-    - 读宿主的面板、模式与就绪缓存
-    - 落盘失败只解锁面板，候选原样留着待下次保存
+    - 一次只处理一个大类，检测与写盘共用同一忙位
     """
 
     def __init__(self, host: "SettingsController") -> None:
         self._host = host
+        self._busy = False
+        self._pending_group = ""
+        self._candidate: AppConfigData = {}
+        self.wrote = False
+        self.identity_changed = False
+        self._pending_apply = False
 
-        # 本次保存是否动过对话身份，面板收尾据此选文案
-        self.identity_changed: bool = False
+    @property
+    def busy(self) -> bool:
+        """是否有保存或检测在途"""
+        return self._busy
 
-    def requested(self, dialog: SettingsDialog | None) -> None:
-        """处理面板保存请求
+    def reset_pending(self) -> None:
+        """清零本次开窗的待应用状态"""
+        self._pending_apply = False
 
-        - 校验通过才关窗
-        - 取消路径面板与已填内容原样保留
-        """
+    def requested(self, dialog: SettingsDialog | None, group: str) -> None:
+        """按来源走确认、本地校验、检测与写盘"""
         host = self._host
-        if dialog is None:
+        if dialog is None or self._busy or dialog is not host._panel:
             return
 
-        new_config = dialog.get_modified_config()
+        candidate = dialog.get_modified_config()
+        dirty = group in dialog.dirty_groups
+        warning = group in dialog.warning_groups
+        if not dirty and not warning:
+            NoticeDialog.notify(DialogMessage.SETUP_NO_CHANGE, parent=dialog)
+            return
 
-        changes, logs = compare_configs(
-            config_manager.schema, config_manager.get_all(), new_config
+        disk = dialog.disk_values()
+        if dirty:
+            changes, logs = compare_configs(
+                config_manager.schema, disk, candidate, group=group
+            )
+            if not ChangeConfirmDialog.confirm(logs, parent=dialog):
+                return
+            self.log_changes(logs)
+            self._remember_identity(changes)
+
+        errors = validate_types(config_manager.schema, candidate, group=group)
+        if errors:
+            dialog.mark_source_failed(group, errors)
+            return
+
+        source_candidate = merge_source_config(
+            config_manager.schema, disk, group, candidate
+        )
+        self._busy = True
+        self._pending_group = group
+        dialog.set_busy(True)
+        host._verify.validating = True
+        host._verify.pending_aborts = True
+        host.logger.debug(
+            CheckMessage.VERIFY_START.format(reason=CheckMessage.REASON_SAVE)
         )
 
-        # 对话身份由主人与人设正文构成，人设走独立落盘，这里只剩主人一项
+        try:
+            plan = dialog.probe_plan(group, source_candidate)
+        except Exception as exc:
+            host.logger.send_error(f"来源 {group} 的检测计划造不出来", exc)
+            self._failed(dialog, group, {})
+            return
+        if plan is None:
+            self._dispatch(dialog, group, source_candidate, dirty)
+            return
+
+        def passed(record: ProbeRecord | None, errors: FieldErrors) -> None:
+            if not self._owns(dialog, group):
+                return
+            if record is None:
+                self._failed(dialog, group, errors)
+                return
+            self._dispatch(dialog, group, source_candidate, dirty)
+
+        started = host._probe.start(group, plan, passed, lambda: self.cancelled())
+        if not started:
+            self.cancelled()
+
+    def finish(self, dialog: SettingsDialog | None) -> None:
+        """处理完成、未存清单与丢弃"""
+        if dialog is None or self._busy or dialog is not self._host._panel:
+            return
+        dirty = dialog.dirty_groups
+        if dirty:
+            titles = "、".join(dialog.group_title(group) for group in dirty)
+            tip = DialogMessage.SETUP_UNSAVED.format(n=len(dirty), groups=titles)
+            accepted = ChangeConfirmDialog.confirm(
+                [],
+                parent=dialog,
+                title=DialogMessage.SETUP_TITLE,
+                tip=tip,
+                cancel_text=DialogMessage.BTN_RETURN,
+                confirm_text=DialogMessage.BTN_DISCARD,
+            )
+            if not accepted:
+                return
+            dialog.restore_disk()
+
+        if self._pending_apply:
+            gui_bridge.config_sources_verified.emit(dict(self._host._probe.verified))
+            self._pending_apply = False
+        dialog.accept()
+
+    def source_done(
+        self,
+        dialog: SettingsDialog | None,
+        group: str,
+        ok: bool,
+        errors: FieldErrors,
+        record: ProbeRecord | None,
+    ) -> None:
+        """接 Manager 结果，成功清标记，失败原地转向导"""
+        if dialog is None or not self._owns(dialog, group):
+            return
+        self._busy = False
+        self._pending_group = ""
+        self._host._verify.validating = False
+        self._host._verify.pending_aborts = None
+        dialog.set_busy(False)
+        if not ok:
+            self._failed(dialog, group, errors)
+            return
+        if record is not None:
+            self._host._probe.verified[group] = record
+        dialog.source_saved(group, self._candidate)
+        self._candidate = {}
+        if self.wrote:
+            self._pending_apply = True
+
+    def cancelled(self) -> None:
+        """中止在途保存并解锁，不挂失败标记"""
+        self._busy = False
+        self._pending_group = ""
+        self._candidate = {}
+        self._host._verify.validating = False
+        self._host._verify.pending_aborts = None
+        if self._host._panel is not None:
+            self._host._panel.set_busy(False)
+
+    def close(self) -> None:
+        """关窗时中止后台保存"""
+        if self._busy:
+            self._host._verify.save_pending = True
+            self._host._verify.abort_pending()
+        self.cancelled()
+
+    def _dispatch(
+        self,
+        dialog: SettingsDialog,
+        group: str,
+        candidate: AppConfigData,
+        write: bool,
+    ) -> None:
+        """把本类候选与本场检测记录交 Manager"""
+        self._candidate = candidate
+        self.wrote = write
+        self._host._verify.save_pending = True
+        gui_bridge.config_source.emit(
+            SourceSaveRequest(
+                group=group,
+                candidate=candidate,
+                write=write,
+                probes=dict(self._host._probe.verified),
+            )
+        )
+
+    def _failed(self, dialog: SettingsDialog, group: str, errors: FieldErrors) -> None:
+        """保存失败保留表单并原地转向导"""
+        self._busy = False
+        self._pending_group = ""
+        self._candidate = {}
+        self._host._verify.drop_pending()
+        dialog.mark_source_failed(group, errors)
+
+    def _owns(self, dialog: SettingsDialog, group: str) -> bool:
+        """迟到结论只准收当前窗口的当前来源"""
+        return (
+            self._busy and self._pending_group == group and dialog is self._host._panel
+        )
+
+    def _remember_identity(self, changes: AppConfigData) -> None:
+        """记录本类是否改过主人身份"""
         owner = owner_item()
         owner_section = (
             section_name(owner.source, owner.section) if owner is not None else ""
         )
-        self.identity_changed = host._config_ready and (
-            owner is not None and owner.key in (changes.get(owner_section) or {})
+        self.identity_changed = owner is not None and owner.key in (
+            changes.get(owner_section) or {}
         )
-
-        # 向导态或有任何改动都要起校验轮，通道没变时 Manager 只跑本地校验
-        in_setup = host._current_mode == ConfigMode.SETUP
-        if not changes:
-            if not in_setup:
-                NoticeDialog.notify(NOTICE_DIALOG.not_changed, parent=dialog)
-                host.logger.debug("配置未修改")
-                return
-            self.start_recheck(dialog)
-            return
-
-        # 二次确认以面板为父级，取消后面板仍在
-        if not ChangeConfirmDialog.confirm(logs, parent=dialog):
-            return
-
-        self.log_changes(logs)
-
-        # 先验后存，候选只进内存，通过才落盘，取消即回退
-        self.start_verify(dialog, new_config)
-
-    def start_recheck(self, dialog: SettingsDialog) -> None:
-        """向导态下未改动仍起复验
-
-        - 复验不落盘，通过后只收检测窗
-        """
-        verify = self._host._verify
-        if verify.validating:
-            return
-        verify.validating = True
-        dialog.set_busy(True)
-        self._host.logger.debug(
-            CheckMessage.VERIFY_START.format(reason=CheckMessage.REASON_RECHECK)
-        )
-        if not verify.start_round(aborts=True):
-            verify.validating = False
-            dialog.set_busy(False)
-            return
-
-        # 复验走候选通道：校验对象必须是面板上屏值，禁走磁盘重载
-        gui_bridge.config_candidate.emit()
-
-    def start_verify(self, dialog: SettingsDialog, new_config: AppConfigData) -> None:
-        """候选进内存并起保存校验轮
-
-        - 起轮失败即撤候选，面板解除忙碌
-        """
-        verify = self._host._verify
-        verify.pending_candidate = new_config
-        verify.save_pending = True
-        dialog.set_busy(True)
-        self._host.logger.debug(
-            CheckMessage.VERIFY_START.format(reason=CheckMessage.REASON_SAVE)
-        )
-        if not verify.start_round(aborts=True):
-            verify.pending_candidate = None
-            verify.save_pending = False
-            dialog.set_busy(False)
-            return
-        config_manager.load(new_config)
-        gui_bridge.config_candidate.emit()
-
-    def write_pending(self, candidate: AppConfigData) -> bool:
-        """落盘本次校验通过的候选
-
-        - 只把校验通过的候选写入磁盘
-        """
-        verify = self._host._verify
-        verify.pending_candidate = None
-        try:
-            save_config(candidate)
-            self._host.logger.info(CheckMessage.WRITTEN)
-        except ConfigOutputError as e:
-            return self.write_failed(CheckMessage.WRITE_FAILED.format(err=e))
-        return True
-
-    def write_failed(self, reason: str, notice: bool = False) -> bool:
-        """落盘失败收尾
-
-        - 记错误、按需弹提示、解除面板忙碌，恒交未落盘
-        """
-        panel = self._host._panel
-        self._host.logger.error(reason)
-        if notice:
-            NoticeDialog.notify(reason, parent=panel or self._host.gui)
-        if panel is not None:
-            panel.set_busy(False)
-        return False
 
     def log_changes(self, logs: list) -> None:
         """分级记录变更日志"""

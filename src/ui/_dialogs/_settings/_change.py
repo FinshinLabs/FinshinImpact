@@ -29,22 +29,28 @@ class ChangeConfirmDialog(BaseDialog):
         self,
         logs: list[tuple[str, ConfigValue, ConfigValue]],
         parent: QWidget | None = None,
+        *,
+        title: str = CHANGE_DIALOG.title,
+        tip: str = CHANGE_DIALOG.tip_text,
+        cancel_text: str = CHANGE_DIALOG.cancel_text,
+        confirm_text: str = CHANGE_DIALOG.confirm_text,
     ) -> None:
-        super().__init__(parent=parent, title=CHANGE_DIALOG.title)
+        super().__init__(parent=parent, title=title)
         self.setStyleSheet(build_change_dialog_qss())
         self.setMinimumSize(CHANGE_DIALOG.min_width, CHANGE_DIALOG.min_height)
+        self._tip = tip
+        self._cancel_text = cancel_text
+        self._confirm_text = confirm_text
         self._build_ui(logs)
 
     @staticmethod
     def confirm(
         logs: list[tuple[str, ConfigValue, ConfigValue]],
         parent: QWidget | None = None,
+        **options: str,
     ) -> bool:
-        """模态展示
-
-        - 返回是否确认保存
-        """
-        dialog = ChangeConfirmDialog(logs, parent=parent)
+        """模态展示，返回是否确认"""
+        dialog = ChangeConfirmDialog(logs, parent=parent, **options)
         return dialog.exec() == dialog.DialogCode.Accepted
 
     def _build_ui(self, logs: list[tuple[str, ConfigValue, ConfigValue]]) -> None:
@@ -55,7 +61,7 @@ class ChangeConfirmDialog(BaseDialog):
         """
         layout = QVBoxLayout(self)
         layout.setSpacing(SETTINGS_DIALOG.tab_spacing)
-        tip = QLabel(CHANGE_DIALOG.tip_text)
+        tip = QLabel(self._tip)
         layout.addWidget(tip)
         if logs:
             layout.addWidget(self._make_table(logs))
@@ -103,9 +109,9 @@ class ChangeConfirmDialog(BaseDialog):
         """建底部两颗按钮"""
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        btn_cancel = make_button(CHANGE_DIALOG.cancel_text, ButtonStyle.OUTLINE)
+        btn_cancel = make_button(self._cancel_text, ButtonStyle.OUTLINE)
         btn_cancel.clicked.connect(self.reject)
-        btn_ok = make_button(CHANGE_DIALOG.confirm_text, ButtonStyle.PRIMARY)
+        btn_ok = make_button(self._confirm_text, ButtonStyle.PRIMARY)
         btn_ok.clicked.connect(self.accept)
         btn_layout.addWidget(btn_cancel)
         btn_layout.addWidget(btn_ok)

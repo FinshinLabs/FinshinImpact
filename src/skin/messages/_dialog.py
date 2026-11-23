@@ -14,10 +14,21 @@ class DialogMessage:
     SETUP_TITLE = MiscMessage.ENTRY_SETTINGS
     SETUP_TIP = "检测到配置有误，请在带 ⚠ 的标签页，修正标题标红的出错字段"
     SETUP_VERIFIED_OK = "新配置已生效"
+    SETUP_ALL_PASSED = '全部检测通过，点 "完成" 生效，或继续修改其他来源'
     SETUP_RECHECK_OK = "没改动，只重验了一遍"
     SETUP_HISTORY_RESET = "主人已变更，全部对话历史与记录文件已清空"
     SETUP_RESET = "恢复默认"
     SETUP_RESET_ICON = "↺"
+    SETUP_SAVE_SOURCE = "保存本类"
+    SETUP_SOURCE_SAVED = "本类配置已保存"
+
+    # 用：保存与关闭流程直读的提示
+    SETTINGS_SIGNAL_SOURCE_DONE = "单类保存结果"
+    SETUP_NO_CHANGE = "这一类没有改动"
+    SETUP_UNSAVED = "还有 {n} 类改了没存：\n{groups}"
+    SETUP_EXIT_UNFINISHED = "配置未完成，下次启动会再进向导"
+    BTN_RETURN = "返回"
+    BTN_DISCARD = "丢弃"
 
     # 用：人设入口行、预览窗与正文编辑窗
     SETUP_PERSONA_TITLE = "人设预览"
@@ -62,7 +73,7 @@ class DialogMessage:
     BTN_CANCEL = "取消"
     BTN_SAVE = "保存"
     BTN_EXIT = "退出程序"
-    BTN_FINISH = "完成并保存"
+    BTN_DONE = "完成"
     BTN_CONFIRM = "确认"
     BTN_VALIDATING = "校验中..."
 
@@ -76,7 +87,6 @@ class DialogMessage:
     NOTICE_FATAL_TITLE = "致命错误"
     NOTICE_FATAL_HEAD = "程序遇到无法恢复的错误，即将退出"
     NOTICE_FATAL_OK = "确认并退出"
-    NOTICE_NOT_CHANGED = "您未修改任何配置"
 
     # 用：ui._guide._popup 二次确认窗的两只按钮
     CONFIRM_YES = "是"
@@ -105,6 +115,12 @@ class DialogMessage:
     CHECK_DIAG_HEAD = "正在网络诊断..."
     CHECK_DIAG_HEAD_PASS = "网络诊断完成"
     CHECK_DIAG_HEAD_FAIL = "网络诊断未通过"
+
+    # 用：skin/theme/_dialogs.py 检查进度窗的来源检测轮字段
+    CHECK_PROBE_TITLE = "来源检测"
+    CHECK_PROBE_HEAD = "正在检测该来源..."
+    CHECK_PROBE_HEAD_PASS = "来源检测通过"
+    CHECK_PROBE_HEAD_FAIL = "来源检测未通过"
 
     # 用：skin/theme/_dialogs.py 诊断窗与校验窗共用基类的符号字段
     MARK_PENDING = "•"

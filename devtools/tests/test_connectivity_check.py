@@ -28,6 +28,7 @@ from finshin_sdk.domain import ConfigPath  # noqa: E402
 from finshin_sdk.exceptions import ProbeTimeoutError  # noqa: E402
 from skin.messages import CheckMessage  # noqa: E402
 from utils.check import _verify as verify_mod  # noqa: E402
+from utils.config import ProbeRecord  # noqa: E402
 from utils.network import CHECKING  # noqa: E402
 
 _ADAPTER_LOADED = adapter_present()
@@ -131,6 +132,68 @@ class TestVerifyConnectivityAggregation(unittest.IsolatedAsyncioTestCase):
     - 自动档按配置→系统→直连解析与错误聚合
     - 免测判据由连通结论、引擎断线与计划输入共同把关
     """
+
+    async def test_source_save_reruns_same_record(self) -> None:
+        """单类保存不拿启动指纹跳过本类检测"""
+        from bot._managers._settings import SettingsManager
+
+        calls = 0
+
+        async def good(_token: str, _proxy: str) -> dict:
+            nonlocal calls
+            calls += 1
+            return {}
+
+        manager = SettingsManager(lambda: "tok")
+        record = ProbeRecord(("auto", "", ""), "http://proxy")
+        mod = sys.modules["bot._managers._settings"]
+        with _patched(mod, good):
+            passed = await manager.verify_connectivity(
+                group="adapter.tg", probes={"adapter.tg": record}
+            )
+        self.assertTrue(passed)
+        self.assertEqual(calls, 1)
+        self.assertEqual(manager.resolved_proxy, "")
+        self.assertIsNotNone(manager.last_probe)
+
+    async def test_startup_reuses_record_without_network(self) -> None:
+        """向导完成交来的同指纹记录只恢复通道，不发探测"""
+        from bot._managers._settings import SettingsManager
+
+        calls = 0
+
+        async def dead(_token: str, _proxy: str) -> dict:
+            nonlocal calls
+            calls += 1
+            return {
+                _proxy_item(): _errors().ProxyConnectionRefusedError(proxy=_CFG_DEAD)
+            }
+
+        manager = SettingsManager(lambda: "tok")
+        record = ProbeRecord(("auto", "", ""), "http://proxy")
+        mod = sys.modules["bot._managers._settings"]
+        with _patched(mod, dead):
+            passed = await manager.verify_connectivity(probes={"adapter.tg": record})
+        self.assertTrue(passed)
+        self.assertEqual(calls, 0)
+        self.assertEqual(manager.resolved_proxy, "http://proxy")
+
+    async def test_startup_checks_all_local_fields(self) -> None:
+        """普通启动的本地校验覆盖全部来源"""
+        from bot._managers._settings import SettingsManager
+
+        async def good(_token: str, _proxy: str) -> dict:
+            return {}
+
+        manager = SettingsManager(lambda: "tok")
+        mod = sys.modules["bot._managers._settings"]
+        errors = {_TYPE_ITEM: "类型错误"}
+        with _patched(mod, good, types=errors):
+            passed = await manager.verify_connectivity()
+            group = mod.local_row.call_args.kwargs["group"]
+        self.assertFalse(passed)
+        self.assertEqual(manager.last_errors, errors)
+        self.assertIsNone(group)
 
     async def test_all_channels_fail_aggregates(self) -> None:
         """自动档三路全不通

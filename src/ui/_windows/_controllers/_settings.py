@@ -1,15 +1,14 @@
 """配置控制器
 
-- 向导调度、二次确认与热重载
-- 面板与业务弹窗同为窗口模态：EDIT/SETUP 同实例原地切换
-- 重启等待窗原地换成结果
-- 保存与落盘、校验轮各交一只协调器
+- 向导调度、按来源保存与完成判定
+- EDIT/SETUP 同实例原地切换，失败不丢已填内容
+- 保存、检测与启动校验各交一只协调器
 """
 
-from skin.messages import CheckMessage
+from skin.messages import CheckMessage, DialogMessage
 from skin.theme import SETTINGS_DIALOG
 from utils import config_manager
-from utils.config import FieldErrors
+from utils.config import FieldErrors, ProbeRecord, validate_types
 
 from ..._bridge import gui_bridge
 from ..._dialogs import (
@@ -24,43 +23,29 @@ from ..._dialogs import (
 from ..._lifecycle import Ticker
 from ._base import BaseController
 from ._save import SaveCoordinator
+from ._source_probe import SourceProbeCoordinator
 from ._verify import VerifyCoordinator
 
-_STARTUP_WAIT_DELAY = 1200  # 启动校验迟滞弹窗阈值（毫秒）
+_STARTUP_WAIT_DELAY = 1200  # 启动校验 1.2 秒后才弹等待窗
 
 
 class SettingsController(BaseController):
     """配置控制器"""
 
-    # 契约声明
     LOGGER_NAME = "GUI.Settings"
     BTN_KEY = "settings"
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
-        # 记录当前打开弹窗的原因（默认为正常编辑）
         self._current_mode: ConfigMode = ConfigMode.EDIT
-
-        # 用于标记弹窗是否已打开（防重入）
-        self._is_dialog_open: bool = False
-
-        # 上次验证失败的字段级错误：{配置项身份: 文案}（强制向导标注用）
+        self._is_dialog_open = False
         self._field_errors: FieldErrors = {}
-
-        # 当前打开的面板实例（EDIT/SETUP 同实例切换，防 GC 销毁 C++ 窗口）
         self._panel: SettingsDialog | None = None
-
-        # 配置就绪缓存：仅在 Qt 线程由信号回调更新，默认未就绪
-        self._config_ready: bool = False
-
-        # 校验轮协调器：持有在途标志、待落盘候选与迟滞帧缓存
+        self._config_ready = False
         self._verify = VerifyCoordinator(self)
-
-        # 保存流程协调器：算变更、起校验轮并落盘候选
         self._save = SaveCoordinator(self)
+        self._probe = SourceProbeCoordinator(self)
 
-        # 信号携带最新状态，经 Queued 投递后在本线程写入私有字段
         gui_bridge.config_ready_changed.connect(
             self._on_config_ready_changed, "配置就绪", queued=True
         )
@@ -70,100 +55,91 @@ class SettingsController(BaseController):
         gui_bridge.service_restarting.connect(
             self._on_service_restarting, "服务重启", queued=True
         )
+        gui_bridge.config_source_done.connect(
+            self.source_done, DialogMessage.SETTINGS_SIGNAL_SOURCE_DONE, queued=True
+        )
 
     def _on_service_restarting(self, restarting: bool) -> None:
-        """起收热重启等待窗
-
-        - 窗全程不给用户出口
-        - 成功不收窗，结果由就绪那条写进同一只窗
-        """
+        """起收热重启等待窗"""
         if restarting:
             show_restart_wait(self.gui)
-            return
-        close_restart_wait()
+        else:
+            close_restart_wait()
 
     def _on_config_ready_changed(self, ready: bool) -> None:
-        """就绪后收尾本轮校验
-
-        - 未就绪时按需起启动等待窗
-        - 就绪后写盘候选、收检测窗并按结果关面板
-        """
+        """收启动校验，按类保存的结果另走 source_done"""
         self._config_ready = ready
         if not ready:
-            # 裸启动无面板无窗：1.2 秒后校验未完才弹等待窗，快路径不闪窗
             if not (self._panel or current_check_window()):
                 Ticker.after(_STARTUP_WAIT_DELAY, self._verify.open_startup_wait)
             return
-        was_validating = self._verify.validating
-        was_pending = self._verify.save_pending
+        if self._save.busy:
+            return
+
         self._verify.validating = False
-        self._verify.save_pending = False
+        self._verify.pending_aborts = None
         wait = self._verify.window()
         if wait is not None:
-            wait.accept()  # 通过即全绿：结果无保留价值，静默收窗
-        candidate = self._verify.pending_candidate
-        if (
-            was_pending
-            and candidate is not None
-            and not self._save.write_pending(candidate)
-        ):
-            close_restart_wait()  # 落盘没成：重启窗不收，成功话术也不能说
-            return
-        if was_validating and not was_pending:
-            # 复验轮一个字节也没落盘，值仍是文件里那份
-            outcome = SETTINGS_DIALOG.recheck_ok
-        elif self._save.identity_changed:
-            outcome = SETTINGS_DIALOG.history_reset
-        else:
-            outcome = SETTINGS_DIALOG.verified_ok
+            wait.accept()
+        finish_restart_wait(SETTINGS_DIALOG.verified_ok)
 
-        # 重启过就把结果写进那只等待窗，收场交给用户点确定
-        landed = finish_restart_wait(outcome)
-        if self._panel is not None:
-            if was_pending or was_validating:
-                self._close_panel_verified(outcome, landed)
+    def source_done(
+        self,
+        group: str,
+        ok: bool,
+        errors: object,
+        record: object,
+    ) -> None:
+        """收 Manager 的单类保存结果并刷新本窗口"""
+        panel = self._panel
+        if panel is None:
+            return
+        was_setup = panel.is_setup
+        self._save.source_done(
+            panel,
+            group,
+            ok,
+            dict(errors) if isinstance(errors, dict) else {},
+            record if isinstance(record, ProbeRecord) else None,
+        )
+        if ok:
+            # 保存期间 config_ready 那条路被 busy 挡下，校验窗的绿结论由这里替用户收掉
+            wait = self._verify.window()
+            if wait is not None and wait.settled and wait.isVisible():
+                wait.accept()
+            if was_setup and not panel.is_setup:
+                outcome = SETTINGS_DIALOG.setup_all_passed
+            elif not self._save.wrote:
+                outcome = SETTINGS_DIALOG.recheck_ok
+            elif panel.is_setup:
+                outcome = SETTINGS_DIALOG.source_saved
+            elif self._save.identity_changed:
+                outcome = SETTINGS_DIALOG.history_reset
             else:
-                # 取消回退引发的重验轮：与本次编辑无关，解除忙碌即可
-                self._panel.set_busy(False)
-        elif was_pending:
-            self._is_dialog_open = False  # 面板已被用户关掉：复位防卡死
-
-    def _close_panel_verified(self, text: str, landed: bool) -> None:
-        """关闭面板并报出结果
-
-        - 先关窗再提示，标红残留随窗消失
-        - 结果已落在重启那只窗上即不另跳提示窗
-        """
-        if self._panel is None:
-            return
-        self._panel.accept()
-        if not landed:
-            NoticeDialog.notify(text, parent=self.gui)
+                outcome = SETTINGS_DIALOG.verified_ok
+            self._save.identity_changed = False
+            if not finish_restart_wait(outcome):
+                NoticeDialog.notify(outcome, parent=panel)
+        else:
+            close_restart_wait()
 
     def _execute(self) -> None:
         """用户点击按钮进入编辑模式"""
-        # 重验期间禁编辑：半新配置一旦保存会覆盖用户真实配置
         if not self._config_ready:
             self.logger.info(CheckMessage.NOT_READY)
             return
-
         self._current_mode = ConfigMode.EDIT
         self._field_errors = {}
         self._show_dialog()
 
     def show_setup_dialog(self, field_errors: FieldErrors | None = None) -> None:
-        """外部信号启动强制向导
-
-        - 面板已打开则原地切换为 SETUP 模式
-        """
-        # 关闭流程进行中，跳过强制配置向导
+        """强制向导进场只按盘上值算一遍字段错"""
         if gui_bridge.is_shutdown_pending():
             self.logger.info("关闭流程进行中，跳过强制配置向导")
             return
 
-        self._field_errors = dict(field_errors or {})
-
-        # 面板在前台（EDIT 或 SETUP）：原地刷标红，检测窗继续浮顶
+        local_errors = validate_types(config_manager.schema, config_manager.get_all())
+        self._field_errors = {**local_errors, **dict(field_errors or {})}
         if self._panel is not None:
             self._verify.drop_pending()
             self._panel.set_busy(False)
@@ -173,7 +149,6 @@ class SettingsController(BaseController):
                 self.logger.info("校验未过，面板已原地转强制向导")
             else:
                 self._panel.apply_errors(self._field_errors)
-                self.logger.debug("强制向导已打开，原地刷新校验结果")
             self._verify.follow_panel()
             return
 
@@ -183,7 +158,6 @@ class SettingsController(BaseController):
     def _show_dialog(self) -> None:
         """打开配置弹窗"""
         if self._is_dialog_open:
-            # 面板已在前台时再点按钮应聚焦它而不是无响应
             if self._panel is not None:
                 self._panel.raise_()
                 self._panel.activateWindow()
@@ -191,16 +165,13 @@ class SettingsController(BaseController):
             return
         self._is_dialog_open = True
         self.logger.info("正在打开配置面板...")
-
         self._panel = self._create_dialog()
+        self._save.reset_pending()
         dialog = self._panel
-        dialog.save_requested.connect(lambda: self._save.requested(dialog))
+        dialog.save_requested.connect(lambda group: self._save.requested(dialog, group))
+        dialog.finish_requested.connect(lambda: self._save.finish(dialog))
         dialog.finished.connect(self._on_panel_finished)
-
-        # 用 show 打开，不靠 exec 挡调用方，模态范围仍照基类那一份
-        self._panel.show()
-
-        # 先面板后跟随窗：面板后出场会反压检测窗，顺序不可颠倒
+        dialog.show()
         self._verify.follow_panel()
 
     def _create_dialog(self) -> SettingsDialog:
@@ -214,14 +185,13 @@ class SettingsController(BaseController):
         )
 
     def _on_panel_finished(self, result: int) -> None:
-        """面板关闭后复位状态并交还窗口对象"""
+        """面板关闭后撤销本场状态"""
         if self._panel is None:
             return
         if result == self._panel.DialogCode.Rejected:
             self.logger.info("用户取消配置修改")
-
-            # 校验在途时关面板即放弃本次操作，候选与后台轮一并掐掉
-            self._verify.abort_pending()
+        self._save.close()
+        self._probe.reset()
         self._panel.deleteLater()
         self._panel = None
         self._is_dialog_open = False

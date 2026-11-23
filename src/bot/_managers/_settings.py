@@ -1,12 +1,11 @@
 """配置管理器
 
 - 配置加载与连通性双重校验
-- 保存轮加跑插件自己交的探测计划
 - 字段级错误文案供向导标红
 """
 
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 
 from finshin_sdk import ConnectionPlan, PlanVerdict
 from finshin_sdk.domain import ConfigPath
@@ -17,6 +16,7 @@ from utils.check import local_row, run_probe_round
 from utils.config import (
     AppSchema,
     FieldErrors,
+    ProbeRecord,
     SourceKind,
     ensure_config,
     get_schema,
@@ -24,6 +24,7 @@ from utils.config import (
     owner_item,
     source_identity,
     source_values,
+    validate_types,
 )
 from utils.network import (
     FrameKey,
@@ -31,13 +32,13 @@ from utils.network import (
     RowStatus,
     detect_system_proxy,
     link_report,
+    opening_rows,
 )
 from utils.paths import PLATFORM
 
 from .._adapter_host import parts_for
 from ._base import BaseManager
-from ._config_sources import config_sources, enabled_plugin_declarations
-from ._probe_frame import pending_rows, settled_rows, skipped_plan
+from ._config_sources import config_sources
 
 
 def _label_of(schema: AppSchema, item: ConfigPath) -> str:
@@ -78,9 +79,7 @@ class SettingsManager(BaseManager):
         # 上次验证时的计划输入，变化判定基准
         self._net_key: object = None
 
-        # 插件探测的免测基准：上次免测键与上轮是否通过
-        self._plugin_keys: dict[str, object] = {}
-        self._plugin_ok: set[str] = set()
+        self.last_probe: ProbeRecord | None = None
 
     async def _execute(self) -> None:
         """加载配置进内存"""
@@ -89,158 +88,104 @@ class SettingsManager(BaseManager):
         if owner_item() is None:
             self.logger.info("配置里没有标 owner 的字段，主人档保持空白")
 
-    async def verify_connectivity(self, from_candidate: bool = False) -> bool:
+    async def verify_connectivity(
+        self,
+        *,
+        group: str | None = None,
+        probes: dict[str, ProbeRecord] | None = None,
+    ) -> bool:
         """按字段变化分流的连通校验
 
         - 网络参数全未变、上轮连通通过且引擎不在断连周期时只跑本地校验
-        - 保存轮再跑插件交的探测，启动轮一律不跑，平台那轮先于插件那轮，行并进同一张表
+        - 给了来源即只校验本来源，适配器按本类计划单独检测
         """
         t0 = time.monotonic()
         self.last_failure_detail = ""
         self.last_fatal = False
+        self.last_probe = None
+        records = probes or {}
         schema = get_schema()
         parts = parts_for(PLATFORM)
         identity = source_identity(SourceKind.ADAPTER, str(PLATFORM))
+        if group is not None and group != identity:
+            return self._local_round(schema, group)
+
         values = source_values(identity, parts.sections, config_manager.get_all())
         plan = parts.plan_for(
             values, self._get_token(), system_proxy=detect_system_proxy()
         )
-        local_frame, type_errors = local_row(schema, config_manager.get_all())
-        rounds = self._plugin_rounds(type_errors) if from_candidate else ()
-        runnable = tuple((name, item) for name, item in rounds if item.channels)
+        record = records.get(identity)
+        if group is None and record is not None and record.reuse_key == plan.reuse_key:
+            return self._reuse_probe(schema, identity, plan, record)
 
-        # 免测只认连通结论：计划输入一变旧结论就不作数，引擎正断线时更得重探
-        down = link_report.snapshot().down
-        free = plan.reuse_key == self._net_key and self.link_verified and not down
-        if free and not runnable:
-            return self._local_round(schema)
-        if not free:
-            self._net_key = plan.reuse_key
-            self.link_verified = False
-
-        plans: list[ConnectionPlan] = [item for _, item in rounds]
-        if not free:
-            plans.insert(0, plan)
-        self._emit_frame(plans, local_frame)
-
-        verdict = PlanVerdict()
-        settled: dict[str, tuple[str, str]] = {}
-        if not free:
-            outcome = await run_probe_round(
-                plan.channels,
-                gui_bridge.verify_progress.emit,
-                lambda: self._emit_frame(
-                    plans, local_frame, head=CheckMessage.RETRY_HEAD
-                ),
-            )
-            verdict = plan.finish(outcome)
-            resolved = outcome.accepted.effective if outcome.accepted else None
-            self.resolved_proxy = resolved
-            self.link_verified = resolved is not None
-            settled = settled_rows(plan, outcome)
-            self._remember_verdict(verdict)
-            self._log_verdict(verdict)
-
-        plugin_errors = await self._run_plugin_rounds(
-            runnable, plans, local_frame, settled
+        local_frame, type_errors = local_row(
+            schema,
+            config_manager.get_all(),
+            group=identity if group is not None else None,
         )
-        self.last_errors = {**verdict.field_errors, **plugin_errors, **type_errors}
+
+        # 单类保存与复验必须重跑本类检测，整份启动才允许复用上次连通结论
+        down = link_report.snapshot().down
+        free = (
+            group is None
+            and plan.reuse_key == self._net_key
+            and self.link_verified
+            and not down
+        )
+        if free:
+            return self._local_round(schema)
+        self._net_key = plan.reuse_key
+        self.link_verified = False
+
+        self._emit_frame(plan, local_frame)
+
+        outcome = await run_probe_round(
+            plan.channels,
+            gui_bridge.verify_progress.emit,
+            lambda: self._emit_frame(plan, local_frame, head=CheckMessage.RETRY_HEAD),
+        )
+        verdict = plan.finish(outcome)
+        resolved = outcome.accepted.effective if outcome.accepted else None
+        self.resolved_proxy = resolved
+        self.link_verified = resolved is not None
+        self.last_probe = ProbeRecord(plan.reuse_key, resolved)
+        self._remember_verdict(verdict)
+        self._log_verdict(verdict)
+
+        self.last_errors = {**verdict.field_errors, **type_errors}
         self.logger.info(CheckMessage.ROUND_COST.format(cost=time.monotonic() - t0))
         return self._emit_advice(schema)
 
-    async def _run_plugin_rounds(
+    def _reuse_probe(
         self,
-        runnable: Sequence[tuple[str, ConnectionPlan]],
-        plans: list[ConnectionPlan],
-        local_frame: dict,
-        settled: dict[str, tuple[str, str]],
-    ) -> FieldErrors:
-        """逐个跑插件交的探测并记下结论"""
-        plugin_errors: FieldErrors = {}
-        for name, item in runnable:
-            outcome = await run_probe_round(
-                item.channels,
-                gui_bridge.verify_progress.emit,
-                lambda: self._emit_frame(
-                    plans,
-                    local_frame,
-                    head=CheckMessage.RETRY_HEAD,
-                    settled={**settled},
-                ),
-            )
-            plugin_verdict = item.finish(outcome)
-            plugin_errors.update(plugin_verdict.field_errors)
-            self._remember_verdict(plugin_verdict)
-            self._log_verdict(plugin_verdict)
-            self._plugin_keys[name] = item.reuse_key
-            if outcome.accepted is not None:
-                self._plugin_ok.add(name)
-            else:
-                self._plugin_ok.discard(name)
-            settled.update(settled_rows(item, outcome))
-        return plugin_errors
-
-    def _plugin_rounds(
-        self, type_errors: FieldErrors
-    ) -> tuple[tuple[str, ConnectionPlan], ...]:
-        """按保存轮候选值装配插件探测计划
-
-        - 本地已有类型错、不交计划或计划为空的来源都不探测
-        - 值没变且上轮通过的直接给绿灯行，不发请求
-        """
-        rounds: list[tuple[str, ConnectionPlan]] = []
-        for name, declared in enabled_plugin_declarations():
-            if declared.probe is None:
-                continue
-            source = source_identity(SourceKind.PLUGIN, name)
-            if any(item.source == source for item in type_errors):
-                continue
-            try:
-                plan = declared.probe(
-                    source_values(source, declared.sections, config_manager.get_all())
-                )
-            except Exception as e:
-                self.logger.send_error(f"插件 {name} 探测计划造不出来", e)
-                continue
-            if plan is None:
-                continue
-            if (
-                plan.reuse_key == self._plugin_keys.get(name)
-                and name in self._plugin_ok
-            ):
-                plan = skipped_plan(plan)
-            rounds.append((name, plan))
-        return tuple(rounds)
+        schema: AppSchema,
+        identity: str,
+        plan: ConnectionPlan,
+        record: ProbeRecord,
+    ) -> bool:
+        """复用指纹一致的检测记录，只校验适配器本类"""
+        self._net_key = plan.reuse_key
+        self.resolved_proxy = record.resolved_proxy
+        self.link_verified = record.resolved_proxy is not None
+        self.last_probe = record
+        self.last_errors = validate_types(
+            schema, config_manager.get_all(), group=identity
+        )
+        self.logger.info(f"来源 {identity} 复用本场检测记录")
+        return self._emit_advice(schema)
 
     def _emit_frame(
         self,
-        plans: Sequence[ConnectionPlan],
+        plan: ConnectionPlan,
         local_frame: dict,
         *,
         head: str = "",
-        settled: dict[str, tuple[str, str]] | None = None,
     ) -> None:
         """发送首帧进度整表
 
         - 本地校验结果随首帧先行显示，不等网络探测
-        - settled 里的行按已有终态上屏，供后续探针重发整表清场
         """
-        rows: list[dict] = []
-        for plan in plans:
-            rows.extend(pending_rows(plan))
-        for item in rows:
-            if settled and item["id"] in settled:
-                item["status"], item["detail"] = settled[item["id"]]
-        rows.append(local_frame)
-        rows.append(
-            {
-                "id": RowId.ADVICE,
-                "title": CheckMessage.ROW_ADVICE,
-                "status": RowStatus.PENDING,
-                "detail": "",
-            }
-        )
-        frame: dict = {FrameKey.ROWS: rows}
+        frame: dict = {FrameKey.ROWS: opening_rows(plan, local_frame)}
         if head:
             frame[FrameKey.HEAD] = head
             self.logger.debug(head)
@@ -262,13 +207,13 @@ class SettingsManager(BaseManager):
         if verdict.warning:
             self.logger.error(verdict.warning)
 
-    def _local_round(self, schema: AppSchema) -> bool:
+    def _local_round(self, schema: AppSchema, group: str | None = None) -> bool:
         """只跑本地校验的免测轮
 
         - 不发进度帧，秒过的轮次不占等待窗
         - 一个探测包都没发，只报免测不报用时
         """
-        _, type_errors = local_row(schema, config_manager.get_all())
+        _, type_errors = local_row(schema, config_manager.get_all(), group=group)
         self.last_errors = type_errors
         self.last_failure_detail = ""
         self.last_fatal = False

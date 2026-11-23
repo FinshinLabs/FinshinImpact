@@ -26,6 +26,7 @@ def _build_tab(item: AssembledSection) -> TabSchema:
         group_title=item.source_title,
         section_id=tab.section,
         fields=[_build_field(spec) for spec in tab.fields],
+        probe=item.probe,
     )
 
 

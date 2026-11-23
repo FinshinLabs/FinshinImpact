@@ -160,7 +160,7 @@ _CHORE_SECTION = SectionSpec(
 
 
 def _probe_plan(values: ConfigValues) -> ConnectionPlan:
-    """交出保存轮那次接口探测的计划"""
+    """按给定值造一份接口检测计划"""
     # 探测件反向依赖本模块，调用时才导入，避免导入期循环
     from .probe import build_probe
 

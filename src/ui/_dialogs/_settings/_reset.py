@@ -28,11 +28,11 @@ _InputWidget: TypeAlias = ConfigListRow | QLineEdit | QTextEdit | QComboBox
 Inputs: TypeAlias = dict[ConfigPath, _InputWidget]
 
 
-def _value_signal(widget: _InputWidget) -> SignalInstance | None:
+def value_signal(widget: _InputWidget) -> SignalInstance | None:
     """取控件的值变化信号源
 
     - 入口行只在弹窗确认时广播一次
-    - 枚举下拉不登记恢复钮，无信号可挂
+    - 枚举下拉用当前选项变化信号
     """
     match widget:
         case ConfigListRow():
@@ -41,6 +41,8 @@ def _value_signal(widget: _InputWidget) -> SignalInstance | None:
             return widget.textChanged
         case QLineEdit():
             return widget.textChanged
+        case QComboBox():
+            return widget.currentIndexChanged
     return None
 
 
@@ -95,7 +97,7 @@ class ResetRegistry:
         btn.setVisible(False)
         self._rows[item] = (btn, field, restore_target)
         widget = self._inputs.get(item)
-        if widget is not None and (sig := _value_signal(widget)) is not None:
+        if widget is not None and (sig := value_signal(widget)) is not None:
             sig.connect(self.refresh)
 
     def refresh(self) -> None:

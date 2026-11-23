@@ -55,18 +55,20 @@ class SettingsDialogTheme:
 
     # 提示文案
     verified_ok: str = DialogMessage.SETUP_VERIFIED_OK
+    setup_all_passed: str = DialogMessage.SETUP_ALL_PASSED
     recheck_ok: str = DialogMessage.SETUP_RECHECK_OK
     history_reset: str = DialogMessage.SETUP_HISTORY_RESET
 
     # 按钮文案
     cancel_text: str = DialogMessage.BTN_CANCEL
-    save_text: str = DialogMessage.BTN_SAVE
     confirm_text: str = DialogMessage.BTN_CONFIRM
     exit_text: str = DialogMessage.BTN_EXIT
-    finish_text: str = DialogMessage.BTN_FINISH
+    finish_text: str = DialogMessage.BTN_DONE
     validating_text: str = DialogMessage.BTN_VALIDATING
     reset_text: str = DialogMessage.SETUP_RESET
     reset_icon: str = DialogMessage.SETUP_RESET_ICON
+    save_source_text: str = DialogMessage.SETUP_SAVE_SOURCE
+    source_saved: str = DialogMessage.SETUP_SOURCE_SAVED
 
     # 人设正文文案
     persona_title: str = DialogMessage.SETUP_PERSONA_TITLE

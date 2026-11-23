@@ -1,5 +1,7 @@
 """插件设置面板文案"""
 
+from ._dialog import DialogMessage
+
 
 class PluginMessage:
     """插件设置面板文案
@@ -116,4 +118,4 @@ class PluginMessage:
 
     # 用：ui._guide._progress 进度窗底栏按钮两态
     BTN_RUNNING = "进行中…"
-    BTN_DONE = "完成"
+    BTN_DONE = DialogMessage.BTN_DONE

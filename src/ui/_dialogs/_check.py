@@ -1,6 +1,6 @@
 """检查进度窗
 
-- 校验轮与诊断轮共用一只表格窗
+- 校验轮、诊断轮与来源检测轮共用一只表格窗
 - 窗口可关性在首显前定死，进行中只留「取消」出口
 - 启动轮进行中无按钮并屏蔽 Esc，跑完才结束
 """
@@ -28,11 +28,12 @@ from ._table import RowTable
 class Round:
     """检查窗轮次协议串
 
-    - 装校验轮与诊断轮两个轮次名
+    - 装校验轮、诊断轮与来源检测轮三个轮次名
     """
 
     VERIFY = "verify"
     DIAGNOSE = "diagnose"
+    PROBE = "probe"
 
 
 _window: "CheckDialog | None" = None  # 进程级唯一实例：谁开轮谁取，物理杜绝双窗
@@ -63,6 +64,7 @@ class CheckDialog(BaseDialog):
     - 单实例按轮次续用，进度帧由发起方传入
     - 中断轮进行中只有「取消」，点击即中断当轮
     - 启动轮进行中无按钮并屏蔽 Esc，跑完显示「知道了」
+    - 来源检测轮通过即收窗，失败保留结果与「知道了」
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -177,6 +179,13 @@ class CheckDialog(BaseDialog):
                 CHECK_DIALOG.diagnose_head_pass,
                 CHECK_DIALOG.diagnose_head_fail,
             )
+        if round_id == Round.PROBE:
+            return (
+                CHECK_DIALOG.probe_title,
+                CHECK_DIALOG.probe_head,
+                CHECK_DIALOG.probe_head_pass,
+                CHECK_DIALOG.probe_head_fail,
+            )
         return (
             CHECK_DIALOG.verify_title,
             CHECK_DIALOG.verify_head,
@@ -256,6 +265,11 @@ class CheckDialog(BaseDialog):
         self._btn.setVisible(True)
         self._btn.clicked.disconnect()
         self._btn.clicked.connect(self.accept)
+
+    def settle_and_close(self, passed: bool) -> None:
+        """结束检测并关闭检查窗"""
+        self._finish(passed)
+        self.accept()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
         """结果未出时屏蔽 Esc

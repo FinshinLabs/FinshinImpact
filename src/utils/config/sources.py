@@ -5,11 +5,12 @@
 - 交出各段的默认值与说明子表
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from finshin_sdk.domain import FieldSpec, SectionSpec
+from finshin_sdk import ConnectionPlan
+from finshin_sdk.domain import ConfigValues, FieldSpec, SectionSpec
 
 from ..logger import get_logger
 from .models import AppConfigData, NotesBySection, TabData
@@ -35,12 +36,14 @@ class ConfigSource:
     - 身份码为平台码或插件名，本体侧不带
     - 标题随声明交出，定面板左列那一行
     - 交出顺序即面板页签顺序
+    - 检测件照声明原样带进面板
     """
 
     kind: SourceKind
     code: str
     title: str
     sections: tuple[SectionSpec, ...]
+    probe: Callable[[ConfigValues], ConnectionPlan] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,12 +52,14 @@ class AssembledSection:
 
     - name 为带来源前缀的段名
     - identity 为来源身份串，source_title 为该来源交出的标题，两者定面板左列
+    - 检测件随来源带到面板，同来源各段带同一份
     """
 
     name: str
     identity: str
     source_title: str
     spec: SectionSpec
+    probe: Callable[[ConfigValues], ConnectionPlan] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +113,7 @@ def assemble(sources: Sequence[ConfigSource]) -> ConfigPlan:
                 identity=identity,
                 source_title=source.title,
                 spec=_unique_fields(identity, sec),
+                probe=source.probe,
             )
             for sec in source.sections
         )

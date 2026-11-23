@@ -99,6 +99,12 @@ class CheckDialogTheme(FiveStateDialogTheme):
     diagnose_head_pass: str = DialogMessage.CHECK_DIAG_HEAD_PASS
     diagnose_head_fail: str = DialogMessage.CHECK_DIAG_HEAD_FAIL
 
+    # 来源检测轮文案
+    probe_title: str = DialogMessage.CHECK_PROBE_TITLE
+    probe_head: str = DialogMessage.CHECK_PROBE_HEAD
+    probe_head_pass: str = DialogMessage.CHECK_PROBE_HEAD_PASS
+    probe_head_fail: str = DialogMessage.CHECK_PROBE_HEAD_FAIL
+
 
 @dataclass(frozen=True)
 class WaitDialogTheme:
@@ -146,7 +152,6 @@ class NoticeDialogTheme:
     fatal_title: str = DialogMessage.NOTICE_FATAL_TITLE
     fatal_head: str = DialogMessage.NOTICE_FATAL_HEAD
     fatal_ok: str = DialogMessage.NOTICE_FATAL_OK
-    not_changed: str = DialogMessage.NOTICE_NOT_CHANGED
 
     # 人设对账弹窗文案
     persona_title: str = DialogMessage.NOTICE_TITLE

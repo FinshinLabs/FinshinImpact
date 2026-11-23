@@ -165,9 +165,10 @@ class Main:
             settings_controller.show_setup_dialog, "强制配置", queued=True
         )
 
-        # 候选校验信号：候选已在内存，通过才落盘
-        gui_bridge.config_candidate.connect(
-            self._manager.on_config_candidate, "候选唤醒"
+        # 单类保存信号：请求带来源与候选值，结果由控制器自收
+        gui_bridge.config_source.connect(self._manager.on_config_source, "单类保存")
+        gui_bridge.config_sources_verified.connect(
+            self._manager.on_config_sources_verified, "向导检测记录"
         )
 
         # 取消校验信号：中止在途校验并回退候选

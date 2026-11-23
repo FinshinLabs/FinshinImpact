@@ -1,16 +1,26 @@
 """配置应用
 
 - 校验当前配置并决定是否重启引擎
+- 按类保存单个来源的校验与写盘
 """
 
 from typing import TYPE_CHECKING
 
+from exceptions import ConfigOutputError
 from finshin_sdk import PlatformMoment
 from skin.messages import CheckMessage, DialogMessage
 from system.profile_env import get_profile, read_token
 from ui import gui_bridge
 from utils import config_manager
-from utils.config import FieldErrors, owner_item
+from utils.config import (
+    FieldErrors,
+    ProbeRecord,
+    SourceSaveRequest,
+    load_config,
+    merge_source_config,
+    owner_item,
+    save_config,
+)
 from utils.init_files import save_persona_text
 from utils.network import link_report
 from utils.paths import PLATFORM
@@ -23,14 +33,24 @@ if TYPE_CHECKING:
     from ._manager import BotManager
 
 
+def get_token_func() -> str:
+    """读取校验用的凭证"""
+    return read_token(get_profile())
+
+
+def _is_token_fatal(errors: FieldErrors) -> bool:
+    """判定是否凭证致命错
+
+    - 面板改不了凭证，报错即致命
+    """
+    return parts_for(PLATFORM).credential.item in errors
+
+
 class ConfigApplier:
     """配置应用器"""
 
     def __init__(self, host: "BotManager") -> None:
         self._host = host
-
-        # 候选校验轮标记：内存已是候选值，本次跳过磁盘重载
-        self.skip_reload = False
 
         # 最近一次生效并重启过引擎的参数指纹：一致则跳过重启防闪断
         self._last_applied: tuple[str, str | None] | None = None
@@ -42,11 +62,17 @@ class ConfigApplier:
         self._last_identity: tuple[str, str] | None = None
 
     @error_guard("配置校验")
-    async def apply_config(self) -> None:
+    async def apply_config(
+        self,
+        probes: dict[str, ProbeRecord] | None = None,
+        *,
+        force_restart: bool = False,
+    ) -> None:
         """应用当前配置
 
         - 校验通过才重启服务
-        - 没过即把内存回退并请用户重填配置
+        - 没过即请用户重填配置
+        - 向导交来的检测记录与盘上指纹一致时直接复用
         """
         host = self._host
         if host._shutdown:
@@ -55,25 +81,26 @@ class ConfigApplier:
         # 重验期间先收回就绪，阻止 EDIT 弹窗读到半新半旧的配置
         gui_bridge.config_ready_changed.emit(False)
 
-        # 候选轮的内存已装候选值，开头从盘重载会冲掉它
-        from_candidate = self.skip_reload
-        self.skip_reload = False
-        if not from_candidate:
-            await host._settings_manager.execute()
-        if not await host._settings_manager.verify_connectivity(from_candidate):
-            await self._settle_failure(from_candidate)
+        await host._settings_manager.execute()
+        verified = await host._settings_manager.verify_connectivity(probes=probes)
+        if not verified:
+            await self._settle_failure(False)
             return
 
         # 生效通道接引擎：配置不通时自动落到系统代理/直连
         self._resolved_proxy = host._settings_manager.resolved_proxy
 
         await self._reset_stale_identity()
+        await self._restart_verified(force=force_restart)
 
+    async def _restart_verified(self, *, force: bool = False) -> None:
+        """重启已通过校验的服务"""
+        host = self._host
         try:
             fingerprint = self.get_config_func()
         except Exception:  # 参数不可得：不做跳过优化，照常重启
             fingerprint = None
-        if fingerprint is not None and self._last_applied == fingerprint:
+        if not force and fingerprint is not None and self._last_applied == fingerprint:
             # 生效通道与引擎参数未变：验证通过即保持引擎运行，不闪断重启
             host._logger.info("配置验证通过，运行参数未变，跳过重启")
             await self._announce_config_ready()
@@ -97,14 +124,61 @@ class ConfigApplier:
         # 配置已加载且引擎已就位，最后广播：结果由界面写进重启那只窗
         await self._announce_config_ready()
 
-    async def _settle_failure(self, from_candidate: bool) -> None:
+    @error_guard("单类配置校验")
+    async def apply_source(self, request: SourceSaveRequest) -> None:
+        """校验并保存单个来源
+
+        - 表外异常也回一句失败，面板不留在忙碌态
+        """
+        host = self._host
+        try:
+            if host._shutdown:
+                return
+            group = request.group
+            config_manager.load(request.candidate)
+            passed = await host._settings_manager.verify_connectivity(
+                group=group, probes=request.probes
+            )
+            if not passed:
+                host._logger.error(f"来源 {group} 未准备好，配置未写入")
+                await self._settle_failure(True)
+                gui_bridge.config_source_done.emit(
+                    group, False, dict(host._settings_manager.last_errors), None
+                )
+                return
+
+            if request.write:
+                candidate = merge_source_config(
+                    config_manager.schema, load_config(), group, request.candidate
+                )
+                try:
+                    save_config(candidate)
+                except ConfigOutputError as e:
+                    host._logger.error(CheckMessage.WRITE_FAILED.format(err=e))
+                    await host._settings_manager.execute()
+                    gui_bridge.config_ready_changed.emit(False)
+                    self._request_setup()
+                    gui_bridge.config_source_done.emit(
+                        group, False, dict(host._settings_manager.last_errors), None
+                    )
+                    return
+                config_manager.load(candidate)
+                host._logger.info(f"来源 {group} 已写入磁盘")
+
+            record = host._settings_manager.last_probe or request.probes.get(group)
+            gui_bridge.config_source_done.emit(group, True, {}, record)
+        except Exception:
+            gui_bridge.config_source_done.emit(request.group, False, {}, None)
+            raise
+
+    async def _settle_failure(self, reload_disk: bool = False) -> None:
         """校验没过的收尾
 
-        - 候选轮按盘上的值重载配置
+        - 需要时按盘上的值重载配置
         - 代理不通作废断连周期，配置问题只由向导说话
         """
         host = self._host
-        if from_candidate:
+        if reload_disk:
             await host._settings_manager.execute()
         if not host._settings_manager.link_verified:
             # 代理不通或没探成：引擎失败源于代理，作废链路账，断连窗不踩配置向导
@@ -112,7 +186,7 @@ class ConfigApplier:
         self._resolved_proxy = None
 
         errors = host._settings_manager.last_errors
-        if host._settings_manager.last_fatal or self._is_token_fatal(errors):
+        if host._settings_manager.last_fatal or _is_token_fatal(errors):
             host._logger.error("Token 探测失败，弹窗引导退出")
             gui_bridge.request_notice.emit(CheckMessage.TOKEN_FATAL, True)
             return
@@ -197,22 +271,9 @@ class ConfigApplier:
         self._host._logger.info("检测到配置有误，弹出配置向导...")
         gui_bridge.request_force_setup.emit(field_errors or {})
 
-    def _is_token_fatal(self, errors: FieldErrors) -> bool:
-        """判定是否凭证致命错"""
-        # 面板改不了凭证，拦在配置向导里出不去，故报错即致命
-        return parts_for(PLATFORM).credential.item in errors
-
     def get_config_func(self) -> tuple[str, str | None]:
         """读取 Token 与生效 Proxy
 
         - 校验通过后返回生效通道，未校验时交 None 由适配器按直连起步
         """
-        return self.get_token_func(), self._resolved_proxy
-
-    @staticmethod
-    def get_token_func() -> str:
-        """读取校验用的凭证
-
-        - 凭证从实例自描述文件读
-        """
-        return read_token(get_profile())
+        return get_token_func(), self._resolved_proxy

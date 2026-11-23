@@ -16,8 +16,12 @@ class _GUIBridge(QObject):
     """GUI 与 Bot 通信桥梁"""
 
     # GUI → Bot：配置事件与关闭指令
-    config_candidate = SafeSignal()  # 候选配置进内存待验，校验通过才落盘
-    config_abort = SafeSignal()  # 中止在途校验，候选回退不触磁盘
+    config_source = SafeSignal(object)  # 单类保存或复验请求
+    config_source_done = SafeSignal(
+        str, bool, object, object
+    )  # 单类结果：(来源, 是否通过, 字段错误, 检测记录)
+    config_sources_verified = SafeSignal(object)  # 向导完成时有写盘才交本场检测记录
+    config_abort = SafeSignal()  # 中止在途校验，内存按盘上值重载、不写盘
     request_shutdown = SafeSignal()  # 退出确认后发，Bot 停服务并清理放行
     request_shutdown_cancel = SafeSignal()  # 确认框取消，Bot 复位关闭状态
     persona_committed = SafeSignal(

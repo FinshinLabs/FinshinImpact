@@ -2,17 +2,22 @@
 
 - 驱动共享的校验进度窗，校验轮之间互斥
 - 等待窗等首个进度帧才开，免测轮全程无窗
-- 维护复验与保存状态标记、待落盘配置、开窗前的帧缓存
+- 维护复验、保存与中断三项标记和开窗前的帧缓存
 """
 
 from typing import TYPE_CHECKING
 
 from skin.messages import CheckMessage
-from utils.config import AppConfigData
 from utils.network import RowId, RowStatus, verify_skeleton
 
 from ..._bridge import gui_bridge
-from ..._dialogs import CheckDialog, Round, current_check_window, open_check_window
+from ..._dialogs import (
+    CheckDialog,
+    NoticeDialog,
+    Round,
+    current_check_window,
+    open_check_window,
+)
 from ..._primitives import follow_above
 
 if TYPE_CHECKING:
@@ -32,11 +37,8 @@ class VerifyCoordinator:
         # 复验在途标记：无落盘动作，通过只收检测窗
         self.validating: bool = False
 
-        # 保存在途标记：本次通过时由 Qt 侧落盘候选
+        # 保存在途标记：Manager 负责写盘，取消时经 abort 通道收尾
         self.save_pending: bool = False
-
-        # 待落盘候选：校验通过才写入磁盘，关面板/取消即弃
-        self.pending_candidate: AppConfigData | None = None
 
         # 开轮未开窗时的中断标记：None 表示没有在途轮，帧到达即按它开窗
         self.pending_aborts: bool | None = None
@@ -55,8 +57,8 @@ class VerifyCoordinator:
     def start_round(self, aborts: bool) -> bool:
         """开一轮校验
 
-        - 等待窗不在本轮开，留给首个进度帧
-        - 其他轮次进行中则记日志并返回 False
+        - 等待窗不在当前校验轮开，留给首个进度帧
+        - 其他轮次进行中则提示并返回 False
         - 免测轮不发进度帧，窗口一次也不会开
         - 返回是否成功起轮
         """
@@ -64,6 +66,9 @@ class VerifyCoordinator:
         busy = current_check_window()
         if busy is not None and busy.is_running:
             self._host.logger.info(CheckMessage.BUSY)
+            NoticeDialog.notify(
+                CheckMessage.BUSY, parent=self._host._panel or self._host.gui
+            )
             self.validating = False
             self.save_pending = False
             if self._host._panel is not None:
@@ -113,7 +118,7 @@ class VerifyCoordinator:
     def abort_pending(self) -> None:
         """停止保存校验
 
-        - 中止校验、丢弃待保存候选并解锁面板
+        - 中止校验，交保存协调器收尾并解锁面板
         """
         self.pending_aborts = None
 
@@ -122,6 +127,7 @@ class VerifyCoordinator:
             self.discard_pending()
             self._host.logger.info(CheckMessage.VERIFY_ABORTED)
             gui_bridge.config_abort.emit()
+            self._host._save.cancelled()
             return
 
         # 复验在途无候选，只弃在途标志，被中断的校验轮收尾必发 ready，面板收到即解除忙碌
@@ -133,18 +139,11 @@ class VerifyCoordinator:
             gui_bridge.config_abort.emit()
 
     def discard_pending(self) -> None:
-        """弃掉待落盘候选
-
-        - 保存标记一并复位，面板手上不留半截状态
-        """
-        self.pending_candidate = None
+        """复位保存在途标记"""
         self.save_pending = False
 
     def drop_pending(self) -> None:
-        """校验未过转强制向导时弃掉待落盘项
-
-        - 连复验标记一起清
-        """
+        """清复验与保存在途标记"""
         self.validating = False
         self.discard_pending()
 

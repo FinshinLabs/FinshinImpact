@@ -17,7 +17,9 @@ from .._primitives import BaseDialog, make_button, set_margins
 class ShutdownDialog(BaseDialog):
     """退出提示弹窗"""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, parent: QWidget | None = None, *, message: str = SHUTDOWN_DIALOG.message
+    ) -> None:
         super().__init__(parent=parent, title=SHUTDOWN_DIALOG.title)
 
         # 退出是全程序的事，这一只仍锁住所有窗
@@ -32,7 +34,7 @@ class ShutdownDialog(BaseDialog):
         set_margins(layout, SHUTDOWN_DIALOG.padding)
         layout.setSpacing(SHUTDOWN_DIALOG.spacing)
 
-        self._label = QLabel(SHUTDOWN_DIALOG.message)
+        self._label = QLabel(message)
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setFont(QFont(SHUTDOWN_DIALOG.font_name, SHUTDOWN_DIALOG.font_size))
         layout.addWidget(self._label)

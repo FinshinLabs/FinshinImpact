@@ -8,8 +8,11 @@ import os
 
 from PySide6.QtWidgets import QDialog, QWidget
 
+from skin.messages import DialogMessage
+from skin.theme import SHUTDOWN_DIALOG
+
 from ..._bridge import gui_bridge
-from ..._dialogs import ShutdownDialog
+from ..._dialogs import SettingsDialog, ShutdownDialog
 from ..._lifecycle import Ticker
 from ._base import BaseController
 from ._decorator import gui_guard
@@ -65,7 +68,12 @@ class ShutdownController(BaseController):
 
         # 在弹出确认框之前标记关闭意向，阻止关闭期间再弹强制配置
         gui_bridge.set_shutdown_pending(True)
-        dialog = ShutdownDialog(parent=source or self.gui)
+        message = (
+            DialogMessage.SETUP_EXIT_UNFINISHED
+            if isinstance(source, SettingsDialog) and source.is_setup
+            else SHUTDOWN_DIALOG.message
+        )
+        dialog = ShutdownDialog(parent=source or self.gui, message=message)
         reply = dialog.exec()
 
         if reply == dialog.DialogCode.Accepted:

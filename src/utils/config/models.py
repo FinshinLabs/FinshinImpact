@@ -4,9 +4,17 @@
 - 定义界面渲染用的字段与页签结构体
 """
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
-from finshin_sdk.domain import ConfigPath, ConfigValue, FieldCondition, SourceCode
+from finshin_sdk import ConnectionPlan
+from finshin_sdk.domain import (
+    ConfigPath,
+    ConfigValue,
+    ConfigValues,
+    FieldCondition,
+    SourceCode,
+)
 
 # 一个标签页的键值表，键为配置键名
 TabData = dict[str, ConfigValue]
@@ -65,6 +73,7 @@ class TabSchema:
     """一个标签页的 UI 结构
 
     - group 与 group_title 定左侧大类，同大类的页并在上排页签里
+    - probe 非空即本来源可做连通检测
     """
 
     title: str
@@ -73,6 +82,7 @@ class TabSchema:
     group_title: str  # 大类标题，随来源声明交出
     section_id: str  # 本页字段所属段名
     fields: list[FieldSchema] = field(default_factory=list)
+    probe: Callable[[ConfigValues], ConnectionPlan] | None = None
 
     def path_of(self, field: FieldSchema) -> ConfigPath:
         """字段在本来源下的完整身份"""
@@ -82,3 +92,23 @@ class TabSchema:
 
 
 AppSchema = list[TabSchema]  # 完整 UI 渲染结构树
+
+
+def tabs_by_group(schema: AppSchema) -> dict[str, list[TabSchema]]:
+    """按来源把页签归组，组序即首次出现序"""
+    groups: dict[str, list[TabSchema]] = {}
+    for tab in schema:
+        groups.setdefault(tab.group, []).append(tab)
+    return groups
+
+
+def probe_of(
+    tabs: Sequence[TabSchema],
+) -> Callable[[ConfigValues], ConnectionPlan] | None:
+    """本来源交出的检测件，同来源各段带同一份"""
+    return next((tab.probe for tab in tabs if tab.probe is not None), None)
+
+
+def group_values(tabs: Sequence[TabSchema], data: AppConfigData) -> ConfigValues:
+    """按页签取各段当前值，键为交出者声明的段名"""
+    return {tab.section_id: data.get(tab.section) or {} for tab in tabs}

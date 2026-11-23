@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from finshin_sdk.domain import ConfigPath
 from skin.theme import GLOBAL, SETTINGS_DIALOG, ButtonStyle, ObjectName
 from utils.config import AppSchema, FieldErrors, owner_field
-from utils.config.models import TabSchema
+from utils.config.models import TabSchema, tabs_by_group
 
 from ..._primitives import (
     ButtonBar,
@@ -34,13 +34,18 @@ from ..._primitives import (
 )
 from .._persona import PersonaPreviewRow
 from ._field import FieldBuilder
+from ._source_button import SourceButtons
+
+_DIRTY_MARK = "✏️"
+_WARNING_MARK = "⚠"
 
 
 class ChromeBuilder:
     """骨架装配器
 
     - 持有根布局、大类导航、按钮条引用，供弹窗跨模式续用
-    - 页签标题与大类文案按出错段原地挂 ⚠
+    - 页签标题与大类文案左挂出错标记，右挂未存改动标记
+    - 每个来源在页签条右端挂一颗保存钮
     """
 
     def __init__(
@@ -51,8 +56,8 @@ class ChromeBuilder:
         error_qss: str,
         error_font: QFont,
         on_exit: Callable[[], None],
-        on_cancel: Callable[[], None],
         on_save: Callable[[], None],
+        actions: SourceButtons,
     ) -> None:
         self._host = host
         self._fields = fields
@@ -60,8 +65,8 @@ class ChromeBuilder:
         self._error_qss = error_qss
         self._error_font = error_font
         self._on_exit = on_exit
-        self._on_cancel = on_cancel
         self._on_save = on_save
+        self._actions = actions
 
         # 根布局/按钮条引用：原地切模式只拆可再生部件，表单永不重建
         self.root_layout: QVBoxLayout | None = None
@@ -72,10 +77,12 @@ class ChromeBuilder:
         self._group_tabs: dict[str, QTabWidget] = {}
         self._tab_refs: dict[str, tuple[str, int, str]] = {}
         self._category_items: dict[str, tuple[QListWidgetItem, str]] = {}
+        self.dirty_groups: list[str] = []
+        self.dirty_sections: list[str] = []
+        self.warning_groups: set[str] = set()
         self._categories = QListWidget()
         self._pages = QStackedWidget()
         self.save_btn: QPushButton | None = None
-        self.save_text: str = ""
 
     def build(
         self, schema: AppSchema, is_setup: bool, error_sections: set[str]
@@ -89,7 +96,7 @@ class ChromeBuilder:
         root_layout.setSpacing(SETTINGS_DIALOG.tab_spacing)
 
         root_layout.addLayout(self._build_nav(schema), stretch=1)
-        self.set_error_marks(error_sections)
+        self.set_error_marks(error_sections, [], [], set())
         self.bottom_layout = self._build_bottom_buttons(is_setup)
         root_layout.addLayout(self.bottom_layout)
 
@@ -101,6 +108,9 @@ class ChromeBuilder:
             self.root_layout.removeItem(self.bottom_layout)
             clear_layout(self.bottom_layout)
         self.bottom_layout = self._build_bottom_buttons(is_setup)
+        self.set_error_marks(
+            set(), self.dirty_groups, self.dirty_sections, self.warning_groups
+        )
         self.root_layout.addLayout(self.bottom_layout)
 
     def _build_nav(self, schema: AppSchema) -> QHBoxLayout:
@@ -109,14 +119,10 @@ class ChromeBuilder:
         - 段按来源顺序归组，大类首次出现即定列表行序
         - 一个大类一本页签，切大类只换堆叠页，已填内容不重建
         """
-        groups: dict[str, list[TabSchema]] = {}
-        for tab in schema:
-            groups.setdefault(tab.group, []).append(tab)
-
         self._categories.setObjectName(ObjectName.CATEGORY_LIST)
         self._categories.setFixedWidth(SETTINGS_DIALOG.category_width)
 
-        for group, tabs in groups.items():
+        for group, tabs in tabs_by_group(schema).items():
             title = tabs[0].group_title
             item = QListWidgetItem(title)
             self._categories.addItem(item)
@@ -126,6 +132,7 @@ class ChromeBuilder:
             for index, tab in enumerate(tabs):
                 group_tabs.addTab(self._create_tab(tab), tab.title)
                 self._tab_refs[tab.section] = (group, index, tab.title)
+            self._actions.mount(group_tabs, group)
             self._group_tabs[group] = group_tabs
             self._pages.addWidget(group_tabs)
 
@@ -138,29 +145,43 @@ class ChromeBuilder:
         nav.addWidget(self._pages, stretch=1)
         return nav
 
-    def set_error_marks(self, error_sections: set[str]) -> None:
-        """按出错段增撤 ⚠ 标记
+    def set_error_marks(
+        self,
+        error_sections: set[str],
+        dirty_groups: list[str],
+        dirty_sections: list[str],
+        warning_groups: set[str],
+    ) -> None:
+        """按出错段、未存页签与未存大类增撤标记
 
-        - 出错页签挂标记，其所属大类跟着挂
-        - 只换标题文字，控件与已填内容不动
+        - 出错标记在左，未存改动标记在右，只换标题文字，控件与已填内容不动
         """
         bad_groups: set[str] = set()
+        self.dirty_groups = list(dirty_groups)
+        self.dirty_sections = list(dirty_sections)
+        self.warning_groups = set(warning_groups)
+        dirty = set(dirty_groups)
         for section, (group, index, title) in self._tab_refs.items():
-            marked = section in error_sections
-            if marked:
+            warning = f"{_WARNING_MARK} " if section in error_sections else ""
+            changed = f" {_DIRTY_MARK}" if section in self.dirty_sections else ""
+            if section in error_sections:
                 bad_groups.add(group)
-            self._group_tabs[group].setTabText(
-                index, f"{'⚠ ' if marked else ''}{title}"
-            )
+            self._group_tabs[group].setTabText(index, f"{warning}{title}{changed}")
         for group, (item, title) in self._category_items.items():
-            mark = "⚠ " if group in bad_groups else ""
-            item.setText(f"{mark}{title}")
+            warning = (
+                f"{_WARNING_MARK} "
+                if group in bad_groups or group in warning_groups
+                else ""
+            )
+            changed = f" {_DIRTY_MARK}" if group in dirty else ""
+            item.setText(f"{warning}{title}{changed}")
 
     def lock_nav(self, locked: bool) -> None:
-        """锁住两级导航"""
+        """锁住两级导航与保存钮"""
         self._categories.setEnabled(not locked)
         for group_tabs in self._group_tabs.values():
             group_tabs.setEnabled(not locked)
+        self._actions.set_enabled(not locked)
 
     def _make_tip(self) -> QLabel:
         """构造 SETUP 模式的提示行
@@ -258,31 +279,19 @@ class ChromeBuilder:
                     SETTINGS_DIALOG.exit_text,
                     ButtonStyle.OUTLINE,
                     on_click=self._on_exit,
-                ),
+                )
+            ]
+        else:
+            specs = [
                 ButtonSpec(
                     SETTINGS_DIALOG.finish_text,
                     ButtonStyle.PRIMARY,
                     on_click=self._on_save,
-                ),
+                )
             ]
-            self.save_text = SETTINGS_DIALOG.finish_text
-        else:
-            specs = [
-                ButtonSpec(
-                    SETTINGS_DIALOG.cancel_text,
-                    ButtonStyle.OUTLINE,
-                    on_click=self._on_cancel,
-                ),
-                ButtonSpec(
-                    SETTINGS_DIALOG.save_text,
-                    ButtonStyle.PRIMARY,
-                    on_click=self._on_save,
-                ),
-            ]
-            self.save_text = SETTINGS_DIALOG.save_text
 
         bar = ButtonBar(specs, self._host, spacing=GLOBAL.radius)
-        self.save_btn = bar.buttons[-1]
+        self.save_btn = None if is_setup else bar.buttons[0]
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
         if is_setup:

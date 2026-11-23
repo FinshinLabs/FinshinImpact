@@ -187,13 +187,16 @@ async def run_probe_round(
     return await _run_channels(channels, 2, emit, stop_check)
 
 
-def local_row(schema: AppSchema, config: AppConfigData) -> tuple[dict, FieldErrors]:
+def local_row(
+    schema: AppSchema, config: AppConfigData, *, group: str | None = None
+) -> tuple[dict, FieldErrors]:
     """本地配置校验
 
     - 交回本地行的终态帧与类型错误字典
     - 结果并入整表首帧先行显示，不等网络探测
+    - 给了来源即只校验本来源
     """
-    errors = validate_types(schema, config)
+    errors = validate_types(schema, config, group=group)
     frame = {
         "id": RowId.LOCAL,
         "title": CheckMessage.ROW_LOCAL,

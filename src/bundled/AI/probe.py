@@ -1,8 +1,10 @@
 """AI 接口探测
 
-- 保存轮发一次最小对话请求
-- 失败按状态码翻成字段错，连不上只红行
+- 检测一次发一次最小对话请求
+- 失败按状态码或返回内容翻成字段错，连不上只红行
 """
+
+import json
 
 from exceptions import ConnectionFailedError, HTTPStatusError, RequestTimeoutError
 from finshin_sdk import (
@@ -29,6 +31,9 @@ _ROW_TITLE = "AI 接口"
 _BUDGET = 20.0
 _DETAIL_LIMIT = 200
 
+# 2xx 却不是 JSON：多半地址指到了网页或网关
+_FORMAT_ERROR = "接口返回的内容不是预期的格式，请检查地址"
+
 
 def _item(key: PluginKeys) -> ConfigPath:
     """本插件配置项的完整身份"""
@@ -51,7 +56,8 @@ def _clip(text: str) -> str:
 async def _run(base_url: str, api_key: str, model: str) -> ProbeResult:
     """发一次最小对话请求
 
-    - 只有 200 算通过，状态码按字段归类
+    - 2xx 且正文能解析算通过，状态码按字段归类
+    - 2xx 正文不是 JSON 归接口地址错
     - 超时与连不上只红行，不指认字段
     """
     try:
@@ -64,6 +70,12 @@ async def _run(base_url: str, api_key: str, model: str) -> ProbeResult:
         )
     except HTTPStatusError as e:
         return _http_failure(e)
+    except json.JSONDecodeError:
+        return ProbeResult(
+            accepted=False,
+            detail=_FORMAT_ERROR,
+            field_errors={_item(PluginKeys.BASE_URL): _FORMAT_ERROR},
+        )
     except RequestTimeoutError:
         return ProbeResult(accepted=False, detail="请求超时")
     except ConnectionFailedError:

@@ -12,7 +12,7 @@
 - 回归点 8：起轮询撞链路故障退避重试，非链路异常仍外抛
 - 回归点 9：人设正文或主人变更后立即清掉会话与落盘记录
 - 回归点 10：真重启那一路发一对起收窗信号，跳过重启不发
-- 回归点 11：候选校验没过时内存退回盘上的可信值
+- 回归点 11：单类校验没过时内存退回盘上的可信值
 """
 
 import asyncio
@@ -34,6 +34,7 @@ from aiogram.methods import GetMe  # noqa: E402
 
 from bot._managers import BotManager, _apply  # noqa: E402
 from bot._service import AdapterRuntime  # noqa: E402
+from exceptions import ConfigOutputError  # noqa: E402
 from finshin_sdk import CapabilityCall  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
     ConfigPath,
@@ -43,6 +44,7 @@ from finshin_sdk.domain import (  # noqa: E402
 )
 from skin.messages import DialogMessage  # noqa: E402
 from ui import gui_bridge  # noqa: E402
+from utils.config import SourceSaveRequest  # noqa: E402
 
 _ADAPTER_LOADED = adapter_present()
 
@@ -107,7 +109,7 @@ class ManagerFlowTestBase(unittest.IsolatedAsyncioTestCase):
         self.verify_calls = 0
         self.service_starts = {"n": 0}
 
-        async def _fake_verify(from_candidate: bool = False) -> bool:
+        async def _fake_verify(**_kwargs) -> bool:
             self.verify_calls += 1
             ok = self.verify_results.pop(0) if self.verify_results else True
             if not ok:
@@ -143,9 +145,9 @@ class TestApplyConfig(ManagerFlowTestBase):
     - 应用-弹窗-重验闭环
     """
 
-    async def test_fail_then_save_then_pass_starts_service(self) -> None:
-        """失败弹向导 → 保存重验 → 通过启动服务"""
-        self.verify_results = [False, True]
+    async def test_fail_then_source_then_verified_starts_service(self) -> None:
+        """失败弹向导 → 单类保存 → 完成时启动服务"""
+        self.verify_results = [False, True, True]
 
         await self.manager._applier.apply_config()
 
@@ -153,37 +155,83 @@ class TestApplyConfig(ManagerFlowTestBase):
         self.assertIn(PROXY_ITEM, self.force_events[0], "向导应携带字段错误")
         self.assertEqual(self.service_starts["n"], 0, "失败时不得启动服务")
 
-        # 用户保存 → 重入校验
-        self.manager.on_config_candidate()
+        self.manager.on_config_source(SourceSaveRequest("plugin.AI", {}, write=False))
         await self._drain()
 
         self.assertEqual(self.verify_calls, 2, "保存后必须重新校验")
-        self.assertEqual(self.service_starts["n"], 1, "通过应启动服务")
+        self.assertEqual(self.service_starts["n"], 0, "单类保存不得启动服务")
         self.assertEqual(len(self.force_events), 1, "通过后不得再弹窗")
 
-    async def test_failed_candidate_round_reverts_memory(self) -> None:
-        """回归点 11：候选没过要把内存退回盘上的可信值
+        self.manager.on_config_sources_verified({})
+        await self._drain()
+        self.assertEqual(self.verify_calls, 3, "完成时必须再校验")
+        self.assertEqual(self.service_starts["n"], 1, "完成通过应启动服务")
 
-        - 候选轮开头跳过重载，失败收尾补一次
-        - 候选通过不动内存，非候选轮开头载一次即够
-        """
+    async def test_failed_source_round_reverts_memory(self) -> None:
+        """单类没过要把内存退回盘上的可信值"""
         reloads = AsyncMock()
         with patch.object(self.manager._settings_manager, "execute", new=reloads):
-            self.manager._applier.skip_reload = True
             self.verify_results = [False]
-            await self.manager._applier.apply_config()
-            self.assertEqual(reloads.await_count, 1, "候选没过要补一次重载")
+            await self.manager._applier.apply_source(
+                SourceSaveRequest("plugin.AI", {}, write=False)
+            )
+            self.assertEqual(reloads.await_count, 1, "没过要重载磁盘值")
 
-            reloads.reset_mock()
-            self.manager._applier.skip_reload = True
-            self.verify_results = [True]
-            await self.manager._applier.apply_config()
-            self.assertEqual(reloads.await_count, 0, "候选通过不该动内存")
+    async def test_source_write_does_not_restart(self) -> None:
+        """单类写盘成功只交回执，不启动服务"""
+        candidate = {"plugin.AI.model": {"url": "http://b"}}
+        with (
+            patch.object(_apply, "load_config", return_value={}),
+            patch.object(_apply, "merge_source_config", return_value=candidate),
+            patch.object(_apply, "save_config") as save,
+        ):
+            await self.manager._applier.apply_source(
+                SourceSaveRequest("plugin.AI", candidate, write=True)
+            )
+        save.assert_called_once_with(candidate)
+        self.assertEqual(self.service_starts["n"], 0, "单类保存不得重启服务")
 
-            reloads.reset_mock()
-            self.verify_results = [False]
+    async def test_verified_finish_forces_restart_with_same_fingerprint(self) -> None:
+        """完成信号强制重启，普通全量校验仍按指纹跳过"""
+        with patch.object(
+            _apply.ConfigApplier, "get_config_func", return_value=("t", "p")
+        ):
             await self.manager._applier.apply_config()
-            self.assertEqual(reloads.await_count, 1, "非候选轮只开头载一次")
+            self.assertEqual(self.service_starts["n"], 1, "首次校验应启动服务")
+
+            self.manager.on_config_sources_verified({})
+            await self._drain()
+            self.assertEqual(self.service_starts["n"], 2, "完成必须强制重启一次")
+
+            await self.manager._applier.apply_config()
+            self.assertEqual(self.service_starts["n"], 2, "普通校验按指纹跳过重启")
+
+    async def test_source_write_failure_reports_and_requests_setup(self) -> None:
+        """写盘失败要回报单类结果并回向导"""
+        done: list[tuple] = []
+        signal = gui_bridge.config_source_done
+
+        def capture(*args) -> None:
+            done.append(args)
+
+        signal.connect(capture, f"test-write-{self.id()}")
+        self.addCleanup(signal._instance.disconnect, capture)
+        candidate = {"plugin.AI.model": {"url": "http://b"}}
+        with (
+            patch.object(_apply, "load_config", return_value={}),
+            patch.object(_apply, "merge_source_config", return_value=candidate),
+            patch.object(
+                _apply,
+                "save_config",
+                side_effect=ConfigOutputError(),
+            ),
+        ):
+            await self.manager._applier.apply_source(
+                SourceSaveRequest("plugin.AI", candidate, write=True)
+            )
+        self.assertEqual(done, [("plugin.AI", False, {}, None)])
+        self.assertEqual(len(self.force_events), 1)
+        self.assertEqual(self.service_starts["n"], 0)
 
     async def test_restart_wait_opens_once_and_closes_only_on_fault(self) -> None:
         """等待窗的开与关都由这一路信号说
@@ -282,25 +330,29 @@ class TestApplyConfig(ManagerFlowTestBase):
         """
         gate = asyncio.Event()
 
-        async def _slow_verify(from_candidate: bool = False) -> bool:
+        async def _slow_verify(**_kwargs) -> bool:
             await gate.wait()
             return True
 
         with patch.object(
             self.manager._settings_manager, "verify_connectivity", new=_slow_verify
         ):
-            self.manager.on_config_candidate()
+            self.manager.on_config_source(
+                SourceSaveRequest("plugin.AI", {}, write=False)
+            )
             await self._drain(5)
-            self.manager.on_config_candidate()
-            self.manager.on_config_candidate()
+            self.manager.on_config_source(
+                SourceSaveRequest("plugin.AI", {}, write=False)
+            )
+            self.manager.on_config_source(
+                SourceSaveRequest("plugin.AI", {}, write=False)
+            )
             await self._drain(5)
 
             gate.set()
             await self._drain()
 
-        self.assertEqual(
-            self.service_starts["n"], 1, "去重后只应执行一次应用（当前可能并发多次）"
-        )
+        self.assertEqual(self.service_starts["n"], 0, "逐类保存去重后不得启动服务")
 
 
 class TestProxyFaultVoidsLinkCycle(ManagerFlowTestBase):
@@ -318,7 +370,7 @@ class TestProxyFaultVoidsLinkCycle(ManagerFlowTestBase):
         def _reset(reason: str) -> None:
             reasons.append(reason)
 
-        async def _fail_verify(from_candidate: bool = False) -> bool:
+        async def _fail_verify(**_kwargs) -> bool:
             sm.last_errors = {PROXY_ITEM: "代理不通"}
             sm.link_verified = link_verified
             return False
@@ -361,7 +413,7 @@ class TestShutdownAfterDialog(ManagerFlowTestBase):
             gui_bridge.shutdown_completed_event.is_set(), "关闭处理必须放行 GUI 退出"
         )
 
-        self.manager.on_config_candidate()
+        self.manager.on_config_source(SourceSaveRequest("plugin.AI", {}, write=False))
         await self._drain()
 
         self.assertEqual(len(self.force_events), 1, "关闭后不得再弹向导")
@@ -388,17 +440,21 @@ class TestShutdownCancel(ManagerFlowTestBase):
         await self._drain()
 
         # 取消后保存配置：应正常重入校验
-        self.manager.on_config_candidate()
+        self.manager.on_config_source(SourceSaveRequest("plugin.AI", {}, write=False))
         await self._drain()
-        self.manager.on_config_candidate()
+        self.manager.on_config_source(SourceSaveRequest("plugin.AI", {}, write=False))
         await self._drain()
-        self.manager.on_config_candidate()
+        self.manager.on_config_source(SourceSaveRequest("plugin.AI", {}, write=False))
         await self._drain()
 
         self.assertGreaterEqual(
             self.verify_calls, 1, "取消关闭后配置保存必须重新触发校验"
         )
-        self.assertEqual(self.service_starts["n"], 1, "第三次校验通过应启动服务")
+        self.assertEqual(self.service_starts["n"], 0, "逐类保存不得启动服务")
+
+        self.manager.on_config_sources_verified({})
+        await self._drain()
+        self.assertEqual(self.service_starts["n"], 1, "完成校验通过才启动服务")
 
 
 class TestTokenFatal(ManagerFlowTestBase):
@@ -425,7 +481,7 @@ class TestTokenFatal(ManagerFlowTestBase):
         try:
             sm = self.manager._settings_manager
 
-            async def _token_fail(from_candidate: bool = False) -> bool:
+            async def _token_fail(**_kwargs) -> bool:
                 sm.last_errors = {_token_item(): "Token 无效"}
                 return False
 
@@ -449,7 +505,7 @@ class TestTokenFatal(ManagerFlowTestBase):
         try:
             sm = self.manager._settings_manager
 
-            async def _proxy_fail(from_candidate: bool = False) -> bool:
+            async def _proxy_fail(**_kwargs) -> bool:
                 sm.last_errors = {
                     PROXY_ITEM: "代理不通",
                     _token_item(): "暂未检测",
@@ -716,7 +772,7 @@ class TestSignalIsolation(unittest.TestCase):
             return _slot
 
         for sig_name in (
-            "config_candidate",
+            "config_source",
             "request_shutdown",
             "request_force_setup",
             "request_exit",
@@ -727,8 +783,8 @@ class TestSignalIsolation(unittest.TestCase):
             wrapper.connect(_probe(sig_name), f"isolation-{sig_name}")
 
         try:
-            sigs["config_candidate"].emit()
-            self.assertEqual(hits, ["config_candidate"], "信号串扰（未隔离）")
+            sigs["config_source"].emit(None)
+            self.assertEqual(hits, ["config_source"], "信号串扰（未隔离）")
         finally:
             for wrapper in sigs.values():
                 try:

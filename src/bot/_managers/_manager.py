@@ -9,9 +9,10 @@ import asyncio
 from skin.messages import MiscMessage
 from ui import gui_bridge
 from utils import get_logger
+from utils.config import ProbeRecord, SourceSaveRequest
 
 from ..error_guard import error_guard
-from ._apply import ConfigApplier
+from ._apply import ConfigApplier, get_token_func
 from ._initialization import InitializationManager
 from ._service import ServiceManager
 from ._settings import SettingsManager
@@ -35,7 +36,7 @@ class BotManager:
         # 配置应用器持有生效通道与指纹，其读取函数供引擎与校验注入子管理器
         self._applier = ConfigApplier(self)
         self._service_manager = ServiceManager(self._applier.get_config_func)
-        self._settings_manager = SettingsManager(self._applier.get_token_func)
+        self._settings_manager = SettingsManager(get_token_func)
         self._signals = SignalHandler(self)
 
     @error_guard("Bot 启动", catch_all=True)
@@ -57,9 +58,13 @@ class BotManager:
             self._signals.handle_persona_committed, text, source
         )
 
-    def on_config_candidate(self) -> None:
-        """候选配置待验回调"""
-        self._loop.call_soon_threadsafe(self._signals.handle_candidate)
+    def on_config_source(self, request: SourceSaveRequest) -> None:
+        """单类配置待验回调"""
+        self._loop.call_soon_threadsafe(self._signals.handle_source, request)
+
+    def on_config_sources_verified(self, probes: dict[str, ProbeRecord]) -> None:
+        """向导检测记录回调"""
+        self._loop.call_soon_threadsafe(self._signals.handle_verified, probes)
 
     def on_config_abort(self) -> None:
         """中止进行中校验的回调"""

@@ -12,6 +12,13 @@ from ._differ import compare_configs
 from ._io import ConfigIO
 from ._owner import OWNER_TAG, owner_field, owner_item
 from ._schema import build_schema
+from ._source import (
+    ProbeRecord,
+    SourceSaveRequest,
+    changed_groups,
+    changed_sections,
+    merge_source_config,
+)
 from ._validator import validate_types
 from .models import AppConfigData, AppSchema, FieldErrors
 from .sources import (
@@ -38,6 +45,10 @@ __all__ = [
     "get_schema",
     "load_config",
     "save_config",
+    "merge_source_config",
+    "changed_groups",
+    "SourceSaveRequest",
+    "ProbeRecord",
     # 数据比对
     "compare_configs",
     # 类型校验

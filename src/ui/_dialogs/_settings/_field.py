@@ -4,6 +4,7 @@
 - 持有表单控件表与标签表
 """
 
+from collections.abc import Callable
 from copy import deepcopy
 
 from PySide6.QtCore import Qt
@@ -25,6 +26,7 @@ from utils.config.models import ConfigValue, FieldSchema, TabData, TabSchema, is
 from ..._primitives import make_combo, set_margins
 from ._list_widget import ConfigListRow
 from ._reset import Inputs, ResetRegistry
+from ._reset import value_signal as _input_value_signal
 
 # 必填项空态渲染值：按默认值类型呈现"未填写"的样子
 _BLANK_BY_TYPE: dict[type, ConfigValue] = {
@@ -116,6 +118,40 @@ class FieldBuilder:
                 tab_data[field.key] = self.value_of(tab.path_of(field), field)
             modified[tab.section] = tab_data
         return modified
+
+    def watch(self, on_change: Callable[[], None]) -> None:
+        """把所有输入控件的变化交给同一个回调"""
+        for widget in self.inputs.values():
+            if (signal := _input_value_signal(widget)) is not None:
+                signal.connect(on_change)
+
+    def restore(self, schema: AppSchema, data: AppConfigData) -> None:
+        """把整表控件退回给定值"""
+        for tab in schema:
+            section_data = data.get(tab.section) or {}
+            for field in tab.fields:
+                item = tab.path_of(field)
+                widget = self.inputs.get(item)
+                if widget is None:
+                    continue
+                value = section_data.get(field.key, field.default)
+                if field.required and is_blank(value):
+                    value = _BLANK_BY_TYPE.get(type(field.default), "")
+                match widget:
+                    case ConfigListRow():
+                        widget.set_items(list(value) if isinstance(value, list) else [])
+                    case QComboBox():
+                        index = widget.findData(value)
+                        if index < 0:
+                            widget.addItem(str(value), value)
+                            index = widget.count() - 1
+                        widget.setCurrentIndex(index)
+                    case QTextEdit():
+                        widget.setPlainText(str(value))
+                    case QLineEdit():
+                        widget.setText("" if value is None else str(value))
+                        widget.setCursorPosition(0)
+        self.refresh_resets()
 
     def refresh_resets(self) -> None:
         """重估全部恢复按钮显隐"""

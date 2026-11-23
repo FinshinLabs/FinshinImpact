@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from ui import gui_bridge
 from utils import config_manager
-from utils.config import load_config
+from utils.config import ProbeRecord, SourceSaveRequest, load_config
 
 if TYPE_CHECKING:
     from ._manager import BotManager
@@ -30,17 +30,28 @@ class SignalHandler:
         # 在途的人设落盘任务，停服时一并取消
         self._commit_task: asyncio.Task[None] | None = None
 
-    def handle_candidate(self) -> None:
-        """候选入队"""
+    def handle_source(self, request: SourceSaveRequest) -> None:
+        """单类保存请求入队"""
         host = self._host
         if host._shutdown:
-            host._logger.info("关闭流程中忽略候选校验请求")
+            host._logger.info("关闭流程中忽略单类保存请求")
             return
         if self._apply_task is not None and not self._apply_task.done():
             host._logger.debug("上一次配置应用尚未完成，跳过本次触发")
             return
-        host._applier.skip_reload = True
-        self._apply_task = host._loop.create_task(host._applier.apply_config())
+        self._apply_task = host._loop.create_task(host._applier.apply_source(request))
+
+    def handle_verified(self, probes: dict[str, ProbeRecord]) -> None:
+        """按向导交来的检测记录启动服务"""
+        host = self._host
+        if host._shutdown:
+            return
+        if self._apply_task is not None and not self._apply_task.done():
+            host._logger.debug("上一次配置应用尚未完成，跳过本次启动")
+            return
+        self._apply_task = host._loop.create_task(
+            host._applier.apply_config(probes, force_restart=True)
+        )
 
     def handle_abort(self) -> None:
         """取消校验
@@ -49,7 +60,6 @@ class SignalHandler:
         """
         if self._apply_task is not None and not self._apply_task.done():
             self._apply_task.cancel()
-        self._host._applier.skip_reload = False
         config_manager.load(load_config())
         gui_bridge.config_ready_changed.emit(True)
 

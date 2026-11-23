@@ -24,16 +24,21 @@ _TYPE_NAMES = {
 }
 
 
-def validate_types(schema: AppSchema, data: AppConfigData) -> FieldErrors:
+def validate_types(
+    schema: AppSchema, data: AppConfigData, *, group: str | None = None
+) -> FieldErrors:
     """按 schema 校验各字段类型与数值区间
 
     - 显隐条件不命中的字段不校验
     - 必填键缺键且默认值为空才报必填文案
     - 非必填键缺失静默放行，由运行期回退默认值
+    - 给了来源即只校验本来源
     """
     errors: FieldErrors = {}
 
     for tab in schema:
+        if group is not None and tab.group != group:
+            continue
         section_data = data.get(tab.section, {})
         for fld in tab.fields:
             if not _visible(tab, fld, section_data):
