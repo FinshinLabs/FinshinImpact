@@ -15,14 +15,11 @@ class AdapterError(BotError):
     fatal = True
 
 
-_PLATFORM_MISSING_TEXT = "没有可用的平台适配器\n请先装一个平台适配器，再重新打开本程序"
-
-
 class PlatformMissingError(AdapterError):
     """身份码缺平台段"""
 
     def __str__(self) -> str:
-        return _PLATFORM_MISSING_TEXT
+        return ADAPTER_MAP[PlatformMissingError]
 
 
 class AdapterMissingError(AdapterError):
@@ -63,7 +60,7 @@ class AdapterImportError(AdapterError):
 
 
 ADAPTER_MAP = {
-    PlatformMissingError: _PLATFORM_MISSING_TEXT,
+    PlatformMissingError: "没有可用的平台适配器\n请先装一个平台适配器，再重新打开本程序",
     AdapterMissingError: "{platform} 平台的适配器还没装\n装完请重新打开本程序",
     AdapterNotInstalledError: (
         "{platform} 平台的适配器没装进环境：找不到 {module}\n装完请重新打开本程序"

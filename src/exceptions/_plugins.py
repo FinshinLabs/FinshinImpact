@@ -4,6 +4,9 @@
 - 定义插件异常文案表，键为异常类
 """
 
+from typing import get_args
+
+from finshin_sdk.domain import FlagValue
 from finshin_sdk.exceptions import BotError
 
 
@@ -75,13 +78,19 @@ class PluginManifestError(PluginsError):
         super().__init__()
 
 
+# 开关默认值认的类型名
+_FLAG_KINDS = "/".join(kind.__name__ for kind in get_args(FlagValue))
+
+
 PLUGINS_MAP = {
     PluginEntryError: "插件入口不对：{detail}",
     PluginMissingError: "未找到（检查目录结构）",
     PluginDependencyError: "内部依赖缺失",
     PluginLoadError: "加载失败：{kind}",
-    PluginRoleError: "命令权限说明与实际拦截对不上",
-    PluginManifestError: "插件 {plugin} 的开关 {flag} 默认值只能写 int/float/str（收到 {got}）",
+    PluginRoleError: "命令权限说明与实际拦截对不上：{cmd}",
+    PluginManifestError: (
+        f"插件 {{plugin}} 的开关 {{flag}} 默认值只能写 {_FLAG_KINDS}（收到 {{got}}）"
+    ),
     PluginImportError: "外部插件 {plugin} 不许引本体内部、界面库或平台框架：{target}（{where}）",
     PluginsMissingError: "一只插件都没装上，程序无法运行",
 }

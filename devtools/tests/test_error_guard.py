@@ -31,7 +31,7 @@ from exceptions import (  # noqa: E402
     PluginsMissingError,
     describe_error,
 )
-from finshin_sdk.exceptions import BotError, ConnectivityError  # noqa: E402
+from finshin_sdk.exceptions import ConnectivityError  # noqa: E402
 from ui import gui_bridge  # noqa: E402
 
 
@@ -141,7 +141,7 @@ class TestErrorGuard(unittest.TestCase):
 
         @error_guard("测试")
         async def boom() -> None:
-            raise ConfigError(proxy="y")
+            raise ConfigError()
 
         try:
             loop.run_until_complete(boom())
@@ -184,7 +184,7 @@ class TestErrorGuard(unittest.TestCase):
 
         @error_guard("测试", reraise=True)
         def boom() -> None:
-            raise ConfigError(proxy="z")
+            raise ConfigError()
 
         with self.assertRaises(ConfigError):
             boom()
@@ -215,7 +215,7 @@ class TestDescribeError(unittest.TestCase):
             """不填键路径的临时子类"""
 
             def __init__(self) -> None:
-                BotError.__init__(self)
+                Exception.__init__(self)
 
         self.assertIn("{key_path}", describe_error(NoFieldConfigError()))
 

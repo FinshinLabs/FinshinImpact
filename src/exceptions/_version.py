@@ -14,8 +14,8 @@ class RemoteVersionError(VersionError):
     """远程版本检查异常"""
 
     def __init__(self, msg: str) -> None:
-        super().__init__()
         self.msg = msg
+        super().__init__()
 
 
 class LocalVersionError(VersionError):
