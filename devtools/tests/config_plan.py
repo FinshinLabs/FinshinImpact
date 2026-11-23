@@ -7,7 +7,7 @@
 import shutil
 import tempfile
 import unittest
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -33,7 +33,7 @@ def adapter_sections() -> tuple[SectionSpec, ...]:
 @contextmanager
 def fake_adapter_parts(
     title: str = "Telegram", sections: tuple[SectionSpec, ...] | None = None
-) -> Iterator[None]:
+) -> Generator[None]:
     """把适配器入口件换成只交标题与段的那一份"""
     parts = Mock(
         spec=["title", "sections"],

@@ -1,6 +1,6 @@
 """发布包入口的最后兜底"""
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from .native_dialog import describe, show_error
@@ -11,7 +11,7 @@ _GUARD_HEAD = "程序启动失败，包文件可能不完整"
 
 
 @contextmanager
-def startup_guard() -> Iterator[None]:
+def startup_guard() -> Generator[None]:
     """兜住入口异常
 
     - 弹系统消息后以失败码退出
