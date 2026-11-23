@@ -247,8 +247,8 @@ class TestInstanceEnabledUnion(unittest.TestCase):
 
     def test_empty_enabled_keeps_bundled_deps(self) -> None:
         """保存过勾选且一只表外插件都没选，同样并入随包插件的依赖"""
-        (self.instance / "plugins.toml").write_text(
-            'enabled = []\ncatalog = "dig"', encoding="utf-8"
+        (self.instance / "profile.json").write_text(
+            '{"plugins": {"enabled": [], "catalog": "dig"}}', encoding="utf-8"
         )
 
         self.assertEqual(self._union([self.help_row, self.web_row]), ["foo==1.0"])
@@ -259,8 +259,8 @@ class TestInstanceEnabledUnion(unittest.TestCase):
 
     def test_saved_choice_adds_external_deps(self) -> None:
         """勾过的表外插件依赖并进同一份清单"""
-        (self.instance / "plugins.toml").write_text(
-            'enabled = ["webshot"]\ncatalog = "dig"', encoding="utf-8"
+        (self.instance / "profile.json").write_text(
+            '{"plugins": {"enabled": ["webshot"], "catalog": "dig"}}', encoding="utf-8"
         )
 
         self.assertEqual(

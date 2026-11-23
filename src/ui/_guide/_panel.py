@@ -28,9 +28,7 @@ from services.env_setup.deps_manifest import (
     catalog_digest,
     load_manifests,
     plugins_roots,
-    save_state,
     shadowed_manifests,
-    state_path_of,
 )
 from services.env_setup.deps_startup import missing_global
 from services.env_setup.subprocess_ops import is_pin_installed
@@ -43,7 +41,12 @@ from system.plugin_roster import (
     is_plugin_enabled,
     resolve_claims,
 )
-from system.plugin_state import StateKeys, load_instance_enabled
+from system.plugin_state import (
+    StateKeys,
+    load_instance_enabled,
+    save_state,
+    state_path_of,
+)
 
 from .._lifecycle import ensure_app
 from .._primitives import BaseDialog, MarqueeLabel, TickedCheckBox, make_button
@@ -286,7 +289,7 @@ class _PluginPanelDialog(BaseDialog):
         enabled = self._checked_names()
         roots = plugins_roots()
         catalog = catalog_digest(load_manifests(roots)) if roots else ""
-        save_state(self._code, enabled, catalog)
+        save_state(state_path_of(self._code), enabled, catalog)
         if not dev_mode():
             missing = missing_global()
             if missing:

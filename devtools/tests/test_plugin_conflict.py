@@ -130,7 +130,7 @@ class TestLoaderRefusal(unittest.TestCase):
         )
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.state = self.root / "plugins.toml"
+        self.state = self.root / "profile.json"
 
     def _picked(self) -> list[str]:
         """取本次装载序列的插件名"""
@@ -138,20 +138,22 @@ class TestLoaderRefusal(unittest.TestCase):
 
     def test_clashing_pair_neither_loads(self) -> None:
         """状态文件同时勾上互斥的两只，两只都不装载"""
-        self.state.write_text('enabled = ["first", "second"]\n', encoding="utf-8")
+        self.state.write_text(
+            '{"plugins": {"enabled": ["first", "second"]}}', encoding="utf-8"
+        )
 
         self.assertEqual(self._picked(), ["help"])
 
     def test_single_side_loads(self) -> None:
         """只勾其中一只即正常装载"""
-        self.state.write_text('enabled = ["first"]\n', encoding="utf-8")
+        self.state.write_text('{"plugins": {"enabled": ["first"]}}', encoding="utf-8")
 
         self.assertEqual(self._picked(), ["help", "first"])
 
     def test_bundled_command_beats_external(self) -> None:
         """表外插件声明了随包件已拿走的命令名，勾上也不装载"""
         _write(self.root, "shadow", ("history",))
-        self.state.write_text('enabled = ["shadow"]\n', encoding="utf-8")
+        self.state.write_text('{"plugins": {"enabled": ["shadow"]}}', encoding="utf-8")
 
         self.assertEqual(self._picked(), ["help"])
 

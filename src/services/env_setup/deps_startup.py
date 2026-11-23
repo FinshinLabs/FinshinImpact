@@ -6,15 +6,18 @@
 
 from finshin_sdk.domain import PluginManifestKeys
 from system.plugin_roster import is_plugin_enabled
-from system.plugin_state import StateKeys, load_instance_enabled
+from system.plugin_state import (
+    StateKeys,
+    load_instance_enabled,
+    save_state,
+    state_path_of,
+)
 
 from .deps_keep import keep_union
 from .deps_manifest import (
     catalog_digest,
     load_manifests,
     plugins_roots,
-    save_state,
-    state_path_of,
     top_package_name,
 )
 from .subprocess_ops import is_pin_installed
@@ -76,5 +79,5 @@ def disable_failed(code: str, failed: list[str]) -> list[str]:
         dropped = ordered
 
     keep = [name for name in ordered if name not in dropped]
-    save_state(code, keep, catalog_digest(manifests))
+    save_state(state_path_of(code), keep, catalog_digest(manifests))
     return dropped

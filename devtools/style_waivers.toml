@@ -79,24 +79,12 @@ reason = "同上，校验发起原因与保存按钮文案撞字"
 
 [[waiver]]
 section = "命名与门面导出"
-path = "src/system/migrations/_0001_bare_sections.py"
-match = "FROM_RELEASE"
+path = "src/system/migrations/_0001_old_layout.py"
+match = "matches"
 reason = "迁移脚本由 runner 按文件名反射调用，导入图查不到消费方"
 
 [[waiver]]
 section = "命名与门面导出"
-path = "src/system/migrations/_0001_bare_sections.py"
-match = "TO_RELEASE"
-reason = "同上一份脚本，runner 反射读取起止版本"
-
-[[waiver]]
-section = "命名与门面导出"
-path = "src/system/migrations/_0001_bare_sections.py"
-match = "matches"
-reason = "同上一份脚本，runner 反射调用形状判定"
-
-[[waiver]]
-section = "命名与门面导出"
-path = "src/system/migrations/_0001_bare_sections.py"
+path = "src/system/migrations/_0001_old_layout.py"
 match = "apply"
 reason = "同上一份脚本，runner 反射调用迁移动作"

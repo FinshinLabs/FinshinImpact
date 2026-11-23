@@ -8,8 +8,8 @@ from finshin_sdk.domain import PlatformCode, PluginManifestKeys
 from skin.messages import PluginMessage
 from system.distributions import SDK_DISTRIBUTION, installed_version
 from system.plugin_roster import is_plugin_enabled
-from system.plugin_state import STATE_FILE_NAME, StateKeys, load_instance_enabled
-from system.profile_env import INSTANCES_DIR
+from system.plugin_state import StateKeys, load_instance_enabled
+from system.profile_env import INSTANCE_PROFILE_NAME, INSTANCES_DIR
 from system.tool_settings import DEVTOOLS_DECLARATION, declaration
 
 from ..adapter_manifest import adapter_deps_union, installed_adapter_pins
@@ -99,7 +99,7 @@ def _enabled_deps_union() -> list[str]:
 def _enabled_field_union(field: str) -> list[str]:
     """按清单字段汇总全实例的启用并集
 
-    - 实例目录逐个子目录扫状态文件，目录不存在返回空表
+    - 实例目录逐个子目录扫自描述文件，目录不存在返回空表
     """
     items: list[str] = []
     if not INSTANCES_DIR.is_dir():
@@ -109,7 +109,7 @@ def _enabled_field_union(field: str) -> list[str]:
     for path in sorted(INSTANCES_DIR.iterdir()):
         if not path.is_dir():
             continue
-        enabled = load_instance_enabled(path / STATE_FILE_NAME, StateKeys.ENABLED)
+        enabled = load_instance_enabled(path / INSTANCE_PROFILE_NAME, StateKeys.ENABLED)
         for manifest in manifests:
             if is_plugin_enabled(manifest[PluginManifestKeys.NAME], enabled):
                 items.extend(manifest[field])

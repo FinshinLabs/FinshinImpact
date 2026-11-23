@@ -94,12 +94,11 @@ def profile_dir(code: str) -> Path:
     return INSTANCES_DIR / clean
 
 
-def read_profile_data(code: str) -> dict[str, Any]:
-    """读取实例自描述数据
+def read_profile_file(path: Path) -> dict[str, Any]:
+    """读取一份自描述文件
 
     - 文件缺失或损坏一律返回空字典，由调用方决定容错方式
     """
-    path = profile_dir(code) / INSTANCE_PROFILE_NAME
     if not path.is_file():
         return {}
     try:
@@ -109,14 +108,23 @@ def read_profile_data(code: str) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def write_profile_data(code: str, payload: dict[str, Any]) -> None:
-    """写入实例自描述数据
+def write_profile_file(path: Path, payload: dict[str, Any]) -> None:
+    """写入一份自描述文件
 
     - 整份覆盖，调用方负责合并既有字段
     - 写不进抛 OSError，由调用方决定是报错还是降级
     """
-    target = profile_dir(code) / INSTANCE_PROFILE_NAME
-    write_text_atomic(target, json.dumps(payload, ensure_ascii=False, indent=2))
+    write_text_atomic(path, json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def read_profile_data(code: str) -> dict[str, Any]:
+    """读取实例自描述数据"""
+    return read_profile_file(profile_dir(code) / INSTANCE_PROFILE_NAME)
+
+
+def write_profile_data(code: str, payload: dict[str, Any]) -> None:
+    """写入实例自描述数据"""
+    write_profile_file(profile_dir(code) / INSTANCE_PROFILE_NAME, payload)
 
 
 def read_token(code: str) -> str:

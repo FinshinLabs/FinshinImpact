@@ -68,15 +68,20 @@ class ConfigIO:
             raise ConfigOutputError() from e
 
     def _parse(self) -> tuple[AppConfigData, NotesBySection]:
-        """读盘并摊平成段名键值表与说明子表两张"""
+        """读盘并摊平成段名键值表与说明子表两张
+
+        - 顶层不认识的键记一行错，不进内存
+        """
         if not self._config_path.exists():
             raise ConfigMissingError() from None
 
         try:
             raw_text = self._config_path.read_text(encoding="utf-8")
+            document = tomllib.loads(raw_text)
+            _warn_unknown_top_level(document)
             flat: AppConfigData = {}
             notes: NotesBySection = {}
-            _flatten(_sources(tomllib.loads(raw_text)), (), flat, notes)
+            _flatten(_sources(document), (), flat, notes)
             return flat, notes
         except Exception as e:
             raise ConfigInputError() from e
@@ -191,6 +196,15 @@ def _quoted_str(value: str) -> str:
         else:
             parts.append(char)
     return '"' + "".join(parts) + '"'
+
+
+def _warn_unknown_top_level(document: Mapping[str, Any]) -> None:
+    """顶层除来源块以外的键不进配置，逐个点名"""
+    for name, value in document.items():
+        if name == _SOURCE_TABLE:
+            continue
+        kind = "段" if isinstance(value, Mapping) else "键"
+        _logger.error(f"配置顶层有未识别的{kind} {name}，不进配置")
 
 
 def _sources(document: Mapping[str, Any]) -> dict[str, Any]:

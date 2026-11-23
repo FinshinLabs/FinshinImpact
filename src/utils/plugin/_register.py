@@ -38,7 +38,7 @@ from finshin_sdk.domain import (
 )
 from finshin_sdk.dto import PluginManifestDTO
 from system.plugin_roster import BUNDLED_PLUGINS, BUNDLED_PLUGINS_PKG
-from system.plugin_state import STATE_FILE_NAME
+from system.profile_env import INSTANCE_PROFILE_NAME
 
 from ..error_guard import guard
 from ..external_scope import check_external_imports
@@ -278,7 +278,7 @@ def _checked_hooks(declared: object, field: str) -> tuple[Any, ...]:
 
 def _resolve_plugins() -> list[PluginManifestDTO]:
     """计算本次注册序列"""
-    return enabled_manifests(PROFILE_DIR / STATE_FILE_NAME)
+    return enabled_manifests(PROFILE_DIR / INSTANCE_PROFILE_NAME)
 
 
 def _check_roles(manifest: PluginManifestDTO, routes: tuple[MessageRoute, ...]) -> None:

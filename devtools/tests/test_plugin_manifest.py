@@ -98,21 +98,21 @@ class TestEnabledOrder(unittest.TestCase):
 
     def test_only_bundled_enabled_without_state(self) -> None:
         """清单自称恒启用不算数，未勾选就不启用"""
-        picked = _manifest.enabled_manifests(self.root / "plugins.toml")
+        picked = _manifest.enabled_manifests(self.root / "profile.json")
 
         self.assertEqual([m.name for m in picked], ["help", "AI"])
 
     def test_unknown_keys_not_loaded(self) -> None:
         """读回来的清单对象上没有那两个键"""
-        picked = _manifest.enabled_manifests(self.root / "plugins.toml")
+        picked = _manifest.enabled_manifests(self.root / "profile.json")
 
         self.assertFalse(hasattr(picked[0], "always"))
         self.assertFalse(hasattr(picked[0], "weight"))
 
     def test_external_between_bundled(self) -> None:
         """表外插件一律常规档，排在最先档之后最后档之前"""
-        state = self.root / "plugins.toml"
-        state.write_text('enabled = ["extra"]\n', encoding="utf-8")
+        state = self.root / "profile.json"
+        state.write_text('{"plugins": {"enabled": ["extra"]}}', encoding="utf-8")
 
         picked = _manifest.enabled_manifests(state)
 

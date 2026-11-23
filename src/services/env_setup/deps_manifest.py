@@ -1,6 +1,6 @@
 """插件依赖清单
 
-- 面板与启动判定读清单、算指纹、读写实例状态
+- 面板与启动判定读清单、算指纹、看要不要开面板
 - 外部插件的库取自家声明的依赖表，随包插件的库在根声明里
 """
 
@@ -16,7 +16,6 @@ from finshin_sdk.domain import (
     PluginFileName,
     PluginManifestKeys,
 )
-from system.atomic_write import write_text_atomic
 from system.digest import lines_digest
 from system.plugin_roster import (
     BUNDLED_PLUGINS,
@@ -24,8 +23,8 @@ from system.plugin_roster import (
     INSTALLED_PLUGINS_DIR,
     INSTALLED_PLUGINS_PKG,
 )
-from system.plugin_state import STATE_FILE_NAME, StateKeys, load_instance_catalog
-from system.profile_env import DECLARATION_FILE_NAME, ROOT_DIR, profile_dir
+from system.plugin_state import StateKeys, load_instance_catalog, state_path_of
+from system.profile_env import DECLARATION_FILE_NAME, ROOT_DIR
 from system.toml_read import read_toml
 from system.tool_settings import declared_dependencies
 
@@ -202,11 +201,6 @@ def _command_pairs(data: dict[str, Any]) -> tuple[tuple[str, str], ...]:
     return tuple(commands)
 
 
-def state_path_of(code: str) -> Path:
-    """按身份码定位实例状态文件"""
-    return profile_dir(code) / STATE_FILE_NAME
-
-
 def panel_needed(code: str) -> bool:
     """判断是否需要自动弹面板
 
@@ -219,22 +213,6 @@ def panel_needed(code: str) -> bool:
     if not roots:
         return False
     return catalog_digest(load_manifests(roots)) != catalog
-
-
-def save_state(code: str, enabled: list[str], catalog: str) -> None:
-    """写实例插件状态
-
-    - 随包插件不写进启用集，读取侧恒并入
-    - 引导期写入，运行期只读不写
-    """
-    names = ", ".join(f'"{name}"' for name in enabled)
-    target = state_path_of(code)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    # 两项取值是目录名与摘要串，都不含要转义的字符
-    write_text_atomic(
-        target,
-        f'{StateKeys.ENABLED} = [{names}]\n{StateKeys.CATALOG} = "{catalog}"\n',
-    )
 
 
 def top_package_name(pin: str) -> str:

@@ -326,6 +326,24 @@ class TestSourceAssembly(unittest.TestCase):
         self.assertTrue(any("AI" in line for line in logs.output))
 
 
+class TestUnknownTopLevel(unittest.TestCase):
+    """回归点
+
+    - 顶层旧形状残留只留一行错，不进内存
+    """
+
+    def test_unknown_section_logged_and_dropped(self) -> None:
+        """顶层裸段读进来没有，日志点名那个键"""
+        path = _temp_file()
+        path.write_text('[proxy]\nproxy = "http://127.0.0.1:7890"\n', encoding="utf-8")
+
+        with self.assertLogs("Bot.Config", level="ERROR") as logs:
+            data = ConfigIO(path).load()
+
+        self.assertEqual(data, {})
+        self.assertTrue(any("proxy" in line for line in logs.output))
+
+
 class TestExistingFileUntouched(unittest.TestCase):
     """回归点
 

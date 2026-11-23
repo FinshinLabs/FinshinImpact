@@ -50,6 +50,7 @@ _PATCHED = {
         "load_manifests",
         "load_instance_enabled",
         "save_state",
+        "state_path_of",
         "catalog_digest",
     ),
 }
@@ -166,7 +167,9 @@ class TestSettleRuntime(_StartupBase):
 
         _startup.settle_runtime("AAAA")
 
-        self.m["save_state"].assert_called_once_with("AAAA", [], "cat")
+        self.m["save_state"].assert_called_once_with(
+            self.m["state_path_of"].return_value, [], "cat"
+        )
         self.m["show_popup"].assert_called_once()
 
 
@@ -216,7 +219,9 @@ class TestDisableFailed(_StartupBase):
         dropped = deps_startup.disable_failed("AAAA", ["playwright==1.62.0"])
 
         self.assertEqual(dropped, ["webshot"])
-        self.m["save_state"].assert_called_once_with("AAAA", ["other"], "cat")
+        self.m["save_state"].assert_called_once_with(
+            self.m["state_path_of"].return_value, ["other"], "cat"
+        )
 
     def test_drops_plugin_matched_by_asset(self) -> None:
         """失败项是资源声明串，同样命中所属插件"""
@@ -231,7 +236,9 @@ class TestDisableFailed(_StartupBase):
         dropped = deps_startup.disable_failed("AAAA", ["任务异常中止"])
 
         self.assertEqual(dropped, ["webshot"])
-        self.m["save_state"].assert_called_once_with("AAAA", [], "cat")
+        self.m["save_state"].assert_called_once_with(
+            self.m["state_path_of"].return_value, [], "cat"
+        )
 
     def test_no_enabled_no_write(self) -> None:
         """启用集为空无需落盘"""

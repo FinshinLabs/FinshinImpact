@@ -1,15 +1,20 @@
 """迁移执行器
 
-- 按文件名顺序跑本目录下的脚本，跑不跑由脚本自己看配置形状决定
-- 写回前留 .bak，已有则保留首次那份，渲染读回对不上或写盘失败都保持原文件
-- 单份实例失败只跳过这一份，不拦启动
+- 按文件名顺序跑本目录下的脚本，跑不跑由脚本自己看实例形状决定
+- 脚本名形如 `_0001_说明.py`，四位编号只决定先后，缺号不补
+- 脚本读写同一份实例：实例目录与 config.toml 读出的表，文件不在即空表
+- 配置文档有改动才写回，写回前留 .bak，已有则保留首次那份
+- 渲染读回对不上或写盘失败都保持原文件
+- 单份实例或单份脚本出错只跳过这一段，不拦启动
 """
 
+import copy
 import importlib
 import shutil
 import sys
 import tomllib
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Protocol, cast
@@ -23,15 +28,26 @@ _BACKUP_SUFFIX = ".bak"
 _SCRIPT_GLOB = "_[0-9]*.py"
 
 
+@dataclass(frozen=True, slots=True)
+class MigrationInstance:
+    """一份实例上可动的东西
+
+    - root 是实例目录，脚本要搬的文件都从它下面找
+    - document 是 config.toml 读出的表，文件不在即空表
+    """
+
+    root: Path
+    document: dict[str, Any]
+
+
 class _MigrationScript(Protocol):
     """一份迁移脚本对外要交的东西"""
 
-    FROM_RELEASE: str
-    TO_RELEASE: str
+    def matches(self, instance: MigrationInstance) -> bool: ...
 
-    def matches(self, document: dict[str, Any]) -> bool: ...
-
-    def apply(self, document: dict[str, Any]) -> list[str]: ...
+    def apply(self, instance: MigrationInstance) -> tuple[bool, list[str]]:
+        """应用迁移，交出「有没有动成」与逐条说明"""
+        ...
 
 
 def _report_line(line: str) -> None:
@@ -56,35 +72,36 @@ def run_instance(
     *,
     report: Callable[[str], None] = _report_line,
 ) -> bool:
-    """迁移一份实例配置，返回是否写盘"""
+    """迁移一份实例，返回是否动过盘"""
     config = instance_dir / _CONFIG_NAME
-    if not config.is_file():
-        return False
+    document: dict[str, Any] = {}
+    if config.is_file():
+        try:
+            document = tomllib.loads(config.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as e:
+            report(f"{instance_dir.name}：配置读不出，未动（{e}）")
+            return False
 
+    original = copy.deepcopy(document)
+    instance = MigrationInstance(root=instance_dir, document=document)
     name = instance_dir.name
-    try:
-        document = tomllib.loads(config.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as e:
-        report(f"{name}：配置读不出，未动（{e}）")
-        return False
-
-    changed = False
+    moved = False
     for script in _scripts():
         try:
-            if not script.matches(document):
+            if not script.matches(instance):
                 continue
-            notes = script.apply(document)
+            changed, notes = script.apply(instance)
         except Exception as e:  # noqa: BLE001  单份脚本出错不拦启动
             label = getattr(script, "__name__", "迁移脚本")
             report(f"{name}：{label} 未跑成，整份跳过（{e}）")
             return False
-        changed = True
-        report(f"{name}：{script.FROM_RELEASE} → {script.TO_RELEASE}")
+        if changed:
+            moved = True
         for line in notes:
             report(f"{name}：{line}")
 
-    if not changed:
-        return False
+    if document == original:
+        return moved
 
     try:
         text = render(document)

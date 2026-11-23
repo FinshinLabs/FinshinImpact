@@ -11,8 +11,11 @@ from typing import TypeAlias
 from finshin_sdk.domain import CommandFlag, CommandRole
 from finshin_sdk.dto import HelpCommandDTO, HelpFlagDTO
 from system.digest import lines_digest
-from system.plugin_state import STATE_FILE_NAME
-from system.profile_env import ASSET_FONT_NAME, ASSETS_DIR
+from system.profile_env import (
+    ASSET_FONT_NAME,
+    ASSETS_DIR,
+    INSTANCE_PROFILE_NAME,
+)
 from utils import get_logger
 from utils.paths import HELP_IMAGE, PROFILE_DIR
 from utils.plugin import enabled_manifests
@@ -76,7 +79,7 @@ def _build_menu_data() -> list[_MenuRow]:
     - 每个有内容的插件块之前插一行空行
     """
     rows: list[_MenuRow] = [*_MENU_HEAD]
-    for manifest in enabled_manifests(PROFILE_DIR / STATE_FILE_NAME):
+    for manifest in enabled_manifests(PROFILE_DIR / INSTANCE_PROFILE_NAME):
         block: list[_MenuRow] = []
         for section in manifest.help_section:
             if section.section:

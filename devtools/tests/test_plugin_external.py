@@ -8,6 +8,7 @@
 - 权限档对不上、缺清单、动作名不挂自己名下的插件记失败，不混进成功行
 """
 
+import json
 import sys
 import tempfile
 import unittest
@@ -219,7 +220,7 @@ class ExternalRootCase(unittest.TestCase):
         self.bundled.mkdir()
         self.installed = base / INSTALLED_PLUGINS_DIR
         self.installed.mkdir(parents=True)
-        self.state = base / "plugins.toml"
+        self.state = base / "profile.json"
         self.addCleanup(self._forget_modules)
 
         for name, directory in (
@@ -240,7 +241,7 @@ class ExternalRootCase(unittest.TestCase):
         """把外部目录里的插件全写进启用集"""
         names = [path.name for path in sorted(self.installed.iterdir())]
         self.state.write_text(
-            "enabled = [{}]\n".format(", ".join(f'"{n}"' for n in names)),
+            json.dumps({"plugins": {"enabled": names}}, ensure_ascii=False),
             encoding="utf-8",
         )
 
