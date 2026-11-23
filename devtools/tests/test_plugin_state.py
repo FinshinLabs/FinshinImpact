@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
-from finshin_sdk.domain import StateKeys  # noqa: E402
 from system.plugin_state import (  # noqa: E402
+    StateKeys,
     load_instance_catalog,
     load_instance_enabled,
 )

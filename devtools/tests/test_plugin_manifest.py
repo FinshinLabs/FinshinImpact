@@ -18,12 +18,12 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import (  # noqa: E402
+from services.env_setup import deps_manifest  # noqa: E402
+from system.plugin_roster import (  # noqa: E402
     BUNDLED_PLUGINS_PKG,
     INSTALLED_PLUGINS_DIR,
     INSTALLED_PLUGINS_PKG,
 )
-from services.env_setup import deps_manifest  # noqa: E402
 from utils.plugin import _manifest  # noqa: E402
 
 # 表外插件多写两个本体不认的键，读取侧按未知键忽略

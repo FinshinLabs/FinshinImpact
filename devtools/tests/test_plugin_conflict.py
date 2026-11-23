@@ -22,14 +22,13 @@ from system.profile_env import set_profile  # noqa: E402
 set_profile("tg.000000")
 
 from finshin_sdk.domain import (  # noqa: E402
-    BUNDLED_PLUGINS_PKG,
     CommandTaken,
     HelpKeys,
     PluginClaim,
     PluginManifestKeys,
-    resolve_claims,
 )
 from services.env_setup import deps_manifest  # noqa: E402
+from system.plugin_roster import BUNDLED_PLUGINS_PKG, resolve_claims  # noqa: E402
 from utils.plugin import _manifest  # noqa: E402
 
 _HEAD = 'name = "{name}"\ntitle = "{name}"\nsummary = "命令名抢占用例"\ndeps = []\n'

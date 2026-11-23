@@ -4,8 +4,9 @@
 - 保存插件选择后按全局清单补缺，只加不删
 """
 
-from finshin_sdk.domain import PluginManifestKeys, StateKeys, is_plugin_enabled
-from system.plugin_state import load_instance_enabled
+from finshin_sdk.domain import PluginManifestKeys
+from system.plugin_roster import is_plugin_enabled
+from system.plugin_state import StateKeys, load_instance_enabled
 
 from .deps_keep import keep_union
 from .deps_manifest import (

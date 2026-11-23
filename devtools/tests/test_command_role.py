@@ -23,7 +23,6 @@ from bundled._shared.filters import CommandMatch  # noqa: E402
 from bundled.help import _services  # noqa: E402
 from exceptions import PluginRoleError  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
-    BUNDLED_PLUGINS_PKG,
     CommandRole,
     HelpKeys,
     MessageRoute,
@@ -33,6 +32,7 @@ from finshin_sdk.dto import (  # noqa: E402
     HelpSectionDTO,
     PluginManifestDTO,
 )
+from system.plugin_roster import BUNDLED_PLUGINS_PKG  # noqa: E402
 from utils.plugin import _manifest, _manifest_help, _register  # noqa: E402
 
 

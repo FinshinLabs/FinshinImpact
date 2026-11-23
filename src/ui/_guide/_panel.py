@@ -22,13 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import (
-    BUNDLED_PLUGINS,
-    PluginManifestKeys,
-    StateKeys,
-    is_plugin_enabled,
-    resolve_claims,
-)
+from finshin_sdk.domain import PluginManifestKeys
 from services.env_setup.deps_install import install_deps
 from services.env_setup.deps_manifest import (
     catalog_digest,
@@ -44,7 +38,12 @@ from services.env_setup.toolchain import dev_mode
 from skin.messages import DialogMessage, PluginMessage
 from skin.qss import build_bootstrap_qss
 from skin.theme import GLOBAL, PANEL, ButtonStyle, ObjectName
-from system.plugin_state import load_instance_enabled
+from system.plugin_roster import (
+    BUNDLED_PLUGINS,
+    is_plugin_enabled,
+    resolve_claims,
+)
+from system.plugin_state import StateKeys, load_instance_enabled
 
 from .._lifecycle import ensure_app
 from .._primitives import BaseDialog, MarqueeLabel, TickedCheckBox, make_button

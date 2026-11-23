@@ -128,9 +128,9 @@ layers =
     exceptions
     data
     core
-    finshin_sdk
     skin
     system
+    finshin_sdk
 
 # 引导窗那一段不许直接引 utils 与其他界面层
 # 引导段取数与装卸一律经 services 那侧

@@ -29,7 +29,7 @@
 ## 新增插件（清单驱动流程）
 
 1. 建目录 `src/bundled/<Name>/`，`__init__.py` 里写一只 `BasePlugin` 子类，一只模块里只准有一只。
-   - 取件优先从 `finshin_sdk` 顶层取，顶层没导出的那几样（谓词、随包档位表、分步保留串一类）再从 `finshin_sdk.domain` 取。
+   - 取件优先从 `finshin_sdk` 顶层取，顶层没导出的再从 `finshin_sdk.domain` 取。
    - 这几只方法都可以不写，不写即没有那一类能力，交出的清单按交出的顺序生效。
    - `message_routes` 交按顺序判定的路由清单，谓词只吃归一后的处理上下文，装配时由平台侧编成引擎对象。
    - `background_loops` 交常驻循环，元素为无参协程函数，随 Bot 服务起停：轮询开始即拉起，停服即取消。跑中途抛出即静默收摊，那行日志要等停服收拢时才落，循环本身不重跑。
@@ -44,7 +44,7 @@
    - 轮到时协程都收同一份交代 `CapabilityCall`，要往外说话从它的 `say` 拿。
    - 订阅的协程抛出的异常由装载侧兜住，落一行带插件名与时机名的日志，平台接着跑。
 3. 目录内放 `plugin.toml`（模板 `assets/plugin.example.toml`）：
-   - 恒启用由 `finshin_sdk.domain` 的 `BUNDLED_PLUGINS` 定，加载档位查同一模块的 `BUNDLED_PRIORITY_TABLE`，表里没有的按常规档，外部插件一律常规档。
+   - 恒启用与加载档位由本体 `src/system/plugin_roster.py` 定，表里没有的按常规档，外部插件一律常规档。
    - 清单多写的键一律忽略，帮助段与命令条目里多写的键同样忽略，被忽略的键名记进调试日志。
    - 本插件独有的顶层库写在同目录 `pyproject.toml` 的 `[project].dependencies` 里并 pin 版本，清单里不再写 `deps`。
    - 外部插件的清单与依赖声明缺任一整份不认。随包插件的库照旧在项目根的 `pyproject.toml` 里，目录内只放清单。

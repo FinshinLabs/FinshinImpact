@@ -37,7 +37,6 @@ from exceptions import (  # noqa: E402
 )
 from finshin_sdk import CapabilityCall  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
-    BUNDLED_PLUGINS_PKG,
     BasePlugin,
     MessageRoute,
     MomentSubscription,
@@ -45,6 +44,7 @@ from finshin_sdk.domain import (  # noqa: E402
     PlatformMoment,
     QueuedAction,
 )
+from system.plugin_roster import BUNDLED_PLUGINS_PKG  # noqa: E402
 from utils.plugin import _register  # noqa: E402
 
 

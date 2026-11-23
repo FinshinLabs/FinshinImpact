@@ -1,12 +1,26 @@
 """实例插件状态读取
 
+- 状态文件名与启用集、目录指纹两键名
 - 按状态文件路径读启用集与目录指纹两键
 - 只取调用方点名的那一键
 """
 
+from enum import StrEnum
 from pathlib import Path
 
 from .toml_read import read_toml
+
+STATE_FILE_NAME = "plugins.toml"
+
+
+class StateKeys(StrEnum):
+    """实例状态文件键名
+
+    - 面板写侧与运行期读侧共用
+    """
+
+    ENABLED = "enabled"
+    CATALOG = "catalog"
 
 
 def load_instance_enabled(state_path: Path, enabled_key: str) -> frozenset[str] | None:

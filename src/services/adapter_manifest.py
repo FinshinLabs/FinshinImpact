@@ -16,7 +16,6 @@ from finshin_sdk.domain import (
     ADAPTER_ENTRY_GROUP,
     ADAPTER_MANIFEST_FILE,
     ADAPTER_MANIFEST_TABLE,
-    ADAPTERS_DIR,
     AdapterManifestKeys,
     PlatformCode,
 )
@@ -24,6 +23,9 @@ from finshin_sdk.dto import AdapterManifestDTO
 from system.distributions import SDK_DISTRIBUTION, requires_of
 from system.profile_env import ROOT_DIR
 from system.toml_read import read_toml
+
+# 适配器装载根，安装目录下的适配器目录，每个平台各占一层子目录
+_ADAPTERS_DIR = "finshin/adapter"
 
 # 声明里的标量字段与期望类型
 _SCALAR_TYPES: dict[AdapterManifestKeys, type] = {
@@ -107,7 +109,7 @@ def _adapters_dir() -> Path | None:
 
     - 根不在盘上返回 None，由调用方处理
     """
-    root = ROOT_DIR / ADAPTERS_DIR
+    root = ROOT_DIR / _ADAPTERS_DIR
     return root if root.is_dir() else None
 
 

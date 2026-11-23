@@ -13,23 +13,24 @@ from pathlib import Path
 from typing import Any
 
 from finshin_sdk.domain import (
-    BUNDLED_PLUGINS,
-    BUNDLED_PLUGINS_PKG,
-    BUNDLED_PRIORITY_TABLE,
-    INSTALLED_PLUGINS_DIR,
-    INSTALLED_PLUGINS_PKG,
     PLUGIN_MANIFEST_TABLE,
     PluginClaim,
     PluginFileName,
     PluginManifestKeys,
     PluginPriority,
-    StateKeys,
-    is_plugin_enabled,
-    resolve_claims,
 )
 from finshin_sdk.dto import PluginManifestDTO
 from system.module_mount import mount_module, mount_package
-from system.plugin_state import load_instance_enabled
+from system.plugin_roster import (
+    BUNDLED_PLUGINS,
+    BUNDLED_PLUGINS_PKG,
+    BUNDLED_PRIORITY_TABLE,
+    INSTALLED_PLUGINS_DIR,
+    INSTALLED_PLUGINS_PKG,
+    is_plugin_enabled,
+    resolve_claims,
+)
+from system.plugin_state import StateKeys, load_instance_enabled
 from system.profile_env import DECLARATION_FILE_NAME, ROOT_DIR
 from system.toml_read import read_toml
 from system.tool_settings import declared_dependencies

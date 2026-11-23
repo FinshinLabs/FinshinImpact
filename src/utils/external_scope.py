@@ -10,6 +10,8 @@ import importlib.util
 from collections.abc import Callable
 from pathlib import Path
 
+from system.plugin_roster import BUNDLED_PLUGINS_PKG
+
 # 作者放在 tests 目录里的用例不参与装载，这一道不查它
 _TEST_DIR = "tests"
 
@@ -19,7 +21,7 @@ _BODY_ROOTS = frozenset(
         "finshin",
         "bootstrap",
         "bot",
-        "bundled",
+        BUNDLED_PLUGINS_PKG,
         "core",
         "data",
         "exceptions",

@@ -30,16 +30,18 @@ from exceptions import (  # noqa: E402
     describe_error,
 )
 from finshin_sdk.domain import (  # noqa: E402
-    BUNDLED_PLUGINS_PKG,
-    INSTALLED_PLUGINS_DIR,
-    INSTALLED_PLUGINS_PKG,
     HelpKeys,
     PlatformMoment,
     PluginClaim,
     PluginManifestKeys,
-    resolve_claims,
 )
 from services.env_setup import deps_manifest  # noqa: E402
+from system.plugin_roster import (  # noqa: E402
+    BUNDLED_PLUGINS_PKG,
+    INSTALLED_PLUGINS_DIR,
+    INSTALLED_PLUGINS_PKG,
+    resolve_claims,
+)
 from utils.external_scope import check_external_imports  # noqa: E402
 from utils.plugin import _manifest, _register  # noqa: E402
 

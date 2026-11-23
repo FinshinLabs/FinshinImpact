@@ -11,19 +11,20 @@ from pathlib import Path
 from typing import Any
 
 from finshin_sdk.domain import (
-    BUNDLED_PLUGINS,
-    BUNDLED_PLUGINS_PKG,
-    INSTALLED_PLUGINS_DIR,
-    INSTALLED_PLUGINS_PKG,
     PLUGIN_MANIFEST_TABLE,
     HelpKeys,
     PluginFileName,
     PluginManifestKeys,
-    StateKeys,
 )
 from system.atomic_write import write_text_atomic
 from system.digest import lines_digest
-from system.plugin_state import load_instance_catalog
+from system.plugin_roster import (
+    BUNDLED_PLUGINS,
+    BUNDLED_PLUGINS_PKG,
+    INSTALLED_PLUGINS_DIR,
+    INSTALLED_PLUGINS_PKG,
+)
+from system.plugin_state import STATE_FILE_NAME, StateKeys, load_instance_catalog
 from system.profile_env import DECLARATION_FILE_NAME, ROOT_DIR, profile_dir
 from system.toml_read import read_toml
 from system.tool_settings import declared_dependencies
@@ -203,7 +204,7 @@ def _command_pairs(data: dict[str, Any]) -> tuple[tuple[str, str], ...]:
 
 def state_path_of(code: str) -> Path:
     """按身份码定位实例状态文件"""
-    return profile_dir(code) / PluginFileName.STATE
+    return profile_dir(code) / STATE_FILE_NAME
 
 
 def panel_needed(code: str) -> bool:

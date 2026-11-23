@@ -4,16 +4,11 @@
 - 同名被两处钉了不同版本时交出说明行
 """
 
-from finshin_sdk.domain import (
-    PlatformCode,
-    PluginFileName,
-    PluginManifestKeys,
-    StateKeys,
-    is_plugin_enabled,
-)
+from finshin_sdk.domain import PlatformCode, PluginManifestKeys
 from skin.messages import PluginMessage
 from system.distributions import SDK_DISTRIBUTION, installed_version
-from system.plugin_state import load_instance_enabled
+from system.plugin_roster import is_plugin_enabled
+from system.plugin_state import STATE_FILE_NAME, StateKeys, load_instance_enabled
 from system.profile_env import INSTANCES_DIR
 from system.tool_settings import DEVTOOLS_DECLARATION, declaration
 
@@ -114,7 +109,7 @@ def _enabled_field_union(field: str) -> list[str]:
     for path in sorted(INSTANCES_DIR.iterdir()):
         if not path.is_dir():
             continue
-        enabled = load_instance_enabled(path / PluginFileName.STATE, StateKeys.ENABLED)
+        enabled = load_instance_enabled(path / STATE_FILE_NAME, StateKeys.ENABLED)
         for manifest in manifests:
             if is_plugin_enabled(manifest[PluginManifestKeys.NAME], enabled):
                 items.extend(manifest[field])

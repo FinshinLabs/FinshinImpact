@@ -5,12 +5,8 @@
 - 插件装载不成的那一只不进配置
 """
 
-from finshin_sdk.domain import (
-    FieldSpec,
-    PluginFileName,
-    SectionSpec,
-    SourceDeclaration,
-)
+from finshin_sdk.domain import FieldSpec, SectionSpec, SourceDeclaration
+from system.plugin_state import STATE_FILE_NAME
 from utils.config import ConfigSource, CoreKeys, CoreSections, SourceKind
 from utils.logger import get_logger
 from utils.paths import PLATFORM, PROFILE_DIR
@@ -86,7 +82,7 @@ def enabled_plugin_declarations() -> tuple[tuple[str, SourceDeclaration], ...]:
     - 装载不成的那一只跳过
     """
     declarations: list[tuple[str, SourceDeclaration]] = []
-    for manifest in enabled_manifests(PROFILE_DIR / PluginFileName.STATE):
+    for manifest in enabled_manifests(PROFILE_DIR / STATE_FILE_NAME):
         try:
             declared = load_plugin(manifest).source_declaration()
         except Exception as e:
