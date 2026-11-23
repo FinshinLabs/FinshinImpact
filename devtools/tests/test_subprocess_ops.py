@@ -75,9 +75,12 @@ class TestIndexRetry(unittest.TestCase):
             patch.object(subprocess_ops, "UV_INDEX_URLS", _INDEXES),
             patch.object(subprocess_ops, "run_uv_once", side_effect=fake),
         ):
-            code = subprocess_ops.with_index_retry(["install"], lambda line: None)
+            code, unresolved = subprocess_ops.with_index_retry(
+                ["install"], lambda line: None
+            )
 
         self.assertEqual(code, 1)
+        self.assertTrue(unresolved)
         self.assertEqual(self.calls, [_INDEXES[0]])
 
     def test_plain_failure_uses_all_sources(self) -> None:
@@ -95,7 +98,10 @@ class TestIndexRetry(unittest.TestCase):
             patch.object(subprocess_ops, "UV_INDEX_URLS", _INDEXES),
             patch.object(subprocess_ops, "run_uv_once", side_effect=fake),
         ):
-            code = subprocess_ops.with_index_retry(["install"], lambda line: None)
+            code, unresolved = subprocess_ops.with_index_retry(
+                ["install"], lambda line: None
+            )
 
         self.assertEqual(code, 1)
+        self.assertFalse(unresolved)
         self.assertEqual(self.calls, list(_INDEXES))

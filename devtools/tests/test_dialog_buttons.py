@@ -11,6 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
 from skin.messages import DialogMessage  # noqa: E402
+from skin.qss import build_release_notes_dialog_qss  # noqa: E402
+from skin.theme import PALETTE, TOOLBAR, ButtonStyle  # noqa: E402
 
 SRC_DIR = Path(__file__).resolve().parent.parent.parent / "src"
 
@@ -54,6 +56,18 @@ class TestButtonSource(unittest.TestCase):
             ),
             ("是", "否", "知道了"),
         )
+
+
+class TestButtonQss(unittest.TestCase):
+    """按钮置灰只有一段规则"""
+
+    def test_versions_dialog_primary_disabled_is_grey(self) -> None:
+        """版本窗主按钮的置灰取自按钮规则"""
+        qss = build_release_notes_dialog_qss()
+
+        self.assertIn(f"QPushButton#{ButtonStyle.PRIMARY}:disabled", qss)
+        self.assertIn(f"background-color: {TOOLBAR.bg}", qss)
+        self.assertIn(f"color: {PALETTE.disabled_color}", qss)
 
 
 if __name__ == "__main__":

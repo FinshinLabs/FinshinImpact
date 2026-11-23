@@ -15,7 +15,7 @@ from ..theme import (
     ObjectName,
 )
 from ._base import WAIT_QSS, Qss, with_dialog_base
-from ._buttons import PLATFORM_PRIMARY_DISABLED_QSS, build_button_qss
+from ._buttons import build_button_qss
 
 # 退出确认窗窗口与文字
 _SHUTDOWN_WINDOW_QSS = f"""\
@@ -99,4 +99,4 @@ def build_link_dialog_qss() -> Qss:
 
 def build_platform_dialog_qss() -> Qss:
     """构建平台组件面板 QSS"""
-    return with_dialog_base(_PLATFORM_BLOCK_QSS, PLATFORM_PRIMARY_DISABLED_QSS)
+    return with_dialog_base(_PLATFORM_BLOCK_QSS)

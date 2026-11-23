@@ -10,9 +10,9 @@ from typing import cast
 from PySide6.QtCore import QThread, Signal
 
 from exceptions import NewVersionError, VersionError, describe_error
+from services.release_feed import check_latest, release_history
 from skin.theme import RELEASE_NOTES_DIALOG, WAIT_DIALOG
 from utils import get_logger
-from utils.check import check_latest, release_history
 
 from ..._dialogs import NoticeDialog, ReleaseNotesDialog, WaitDialog
 from ._base import BaseController

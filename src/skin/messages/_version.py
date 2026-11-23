@@ -13,7 +13,8 @@ class VersionMessage:
     # 用：skin/theme/_dialogs.py 等待窗的兜底字段
     CRASH = "检查异常中断：{err}，详情见日志"
 
-    # 用：utils/check/_version.py 抛版本异常时的错误正文填充值
+    # 用：services.release_feed 抛版本异常时的错误正文填充值
     LOCAL_MISS = "项目文件不存在"
     LOCAL_BROKEN = "读取失败"
     REMOTE_BROKEN = "读取未知错误"
+    REMOTE_ADDRESS = "发布地址读不出"

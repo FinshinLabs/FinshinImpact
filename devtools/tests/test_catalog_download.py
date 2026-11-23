@@ -3,7 +3,7 @@
 - 落盘件按目录里的指纹逐样核，不符即删掉半截件
 - 镜像按序轮询，坏源换下一个
 - 同名同指纹的本地件在场即不重取
-- 核过指纹的件把指纹记进同目录一份索引，索引记过的件能直接拼成可装目标
+- 核过指纹的件把指纹记进同目录一份索引
 - 每个源的坏法各记一句，合进一条点名到发行件的说明
 """
 
@@ -161,40 +161,6 @@ class TestLocalIndex(unittest.TestCase):
         """按核过的结果记一次指纹"""
         self.assertTrue(rel_mod._record_digest(self.root, _WHEEL, _SHA))
 
-    def test_recorded_wheel_becomes_target(self) -> None:
-        """记过指纹的件拼成一行目标，版本取文件名，直链指向盘上那份"""
-        self._record()
-        target = rel_mod.local_release("finshin-adapter-tg", _WHEEL, self.root)
-        if target is None:
-            self.fail("记过指纹的件没拼出目标")
-
-        self.assertEqual(target.version, "9.9.9")
-        self.assertEqual(target.sha256, _SHA)
-        self.assertEqual(Path(target.url).name, _WHEEL)
-        self.assertTrue(target.url.startswith("file:"))
-
-    def test_unrecorded_wheel_has_no_target(self) -> None:
-        """索引没记那份件即拼不出目标"""
-        self.assertIsNone(
-            rel_mod.local_release("finshin-adapter-tg", _WHEEL, self.root)
-        )
-
-    def test_changed_wheel_is_not_a_target(self) -> None:
-        """盘上内容变了即不算记过的那份件"""
-        self._record()
-        (self.root / _WHEEL).write_bytes(b"other bytes")
-        self.assertIsNone(
-            rel_mod.local_release("finshin-adapter-tg", _WHEEL, self.root)
-        )
-
-    def test_missing_wheel_is_not_a_target(self) -> None:
-        """记过但那份件已不在盘上即不交出目标"""
-        self._record()
-        (self.root / _WHEEL).unlink()
-        self.assertIsNone(
-            rel_mod.local_release("finshin-adapter-tg", _WHEEL, self.root)
-        )
-
     def test_bad_index_reads_empty(self) -> None:
         """索引不是合法 JSON 即按没记处理"""
         self._record()
@@ -215,11 +181,6 @@ class TestLocalIndex(unittest.TestCase):
 
         self.assertEqual(sorted(table), sorted([_WHEEL, other]))
         self.assertEqual(table[_WHEEL], _SHA)
-
-    def test_version_needs_five_parts(self) -> None:
-        """文件名段数不够即读不出版本号"""
-        self.assertEqual(rel_mod.version_in_name(_WHEEL), "9.9.9")
-        self.assertEqual(rel_mod.version_in_name("two-parts.whl"), "")
 
 
 if __name__ == "__main__":

@@ -37,7 +37,6 @@ class DialogMessage:
     SETUP_PERSONA_RELOAD = "从文件重新加载"
     SETUP_PERSONA_FILE_CREATE_FAIL = "人设文件无法创建，检查目录是否可写"
     SETUP_PERSONA_FILE_READ_FAIL = "人设文件无法读取，检查目录与权限"
-    SETUP_PERSONA_CLOSE = "关闭"
     SETUP_PERSONA_EDIT = "编辑人设"
     SETUP_PERSONA_EDITOR_TITLE = "人设正文编辑"
     SETUP_PERSONA_EDITOR_TIP = (
@@ -71,6 +70,7 @@ class DialogMessage:
 
     # 用：主窗弹窗与引导期选窗共用的按钮字段
     BTN_CANCEL = "取消"
+    BTN_CLOSE = "关闭"
     BTN_SAVE = "保存"
     BTN_EXIT = "退出程序"
     BTN_DONE = "完成"

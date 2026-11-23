@@ -3,7 +3,7 @@
 - 一键更新的那批只收在线比本机新、且目标版挡装判据放行的行
 - 适配器要接口包已在本机，且落在要装那一版声明的要求之内
 - 接口包要求那一行的说法按本机接口包版本定
-- 可装的旧版逐版报来路，盘上的件逐份报核没核到指纹
+- 版本窗逐版只报本机状态，挡不挡由同一条判据现算
 """
 
 from collections.abc import Sequence
@@ -17,13 +17,7 @@ from system.versions import over_ceiling, requires_met
 from ..adapter_catalog import ReleaseRow
 from .platform_rows import ComponentBucket, ComponentRow, ComponentSource
 from .toolchain import WHEELS_DIR
-from .wheel_fetch import (
-    disk_files,
-    file_name_of,
-    is_cached,
-    local_release,
-    version_in_name,
-)
+from .wheel_fetch import is_cached
 
 
 class ComponentOrigin(StrEnum):
@@ -41,46 +35,28 @@ class ComponentOrigin(StrEnum):
     NONE = "none"
 
 
-@dataclass(frozen=True, slots=True)
-class VersionLine:
-    """版本清单里一版可装件的读数
+class VersionState(StrEnum):
+    """一版在本机的状态
 
-    - installed 是本机环境里就是这一版，cached 是盘上那份件对得上目录指纹
-    - blocked 交出那句装不了的理由，能装交出空串
+    - CURRENT 环境里就是这一版
+    - LOCAL 盘上那份件指纹核过，装它从本机取
+    - NETWORK 盘上没有这一版，只能从网络装
+    """
+
+    CURRENT = "current"
+    LOCAL = "local"
+    NETWORK = "network"
+
+
+@dataclass(frozen=True, slots=True)
+class VersionEntry:
+    """版本窗里一版的读数
+
+    - state 按环境里是不是这一版、盘上那份件核没核到指纹定
     """
 
     release: ReleaseRow
-    installed: bool
-    cached: bool
-    blocked: str
-
-
-class WheelOrigin(StrEnum):
-    """盘上一份件的来路
-
-    - CATALOG 目录里有这一版，装它按目录给的指纹核
-    - RECORDED 目录里没有而本机下载时记过指纹，装它直接用盘上那份
-    - UNKNOWN 两样都没有，没有权威值可核
-    """
-
-    CATALOG = "catalog"
-    RECORDED = "recorded"
-    UNKNOWN = "unknown"
-
-
-@dataclass(frozen=True, slots=True)
-class WheelLine:
-    """盘上一份 wheel 件的读数
-
-    - version 是那份件的文件名里读出的版本号，读不出即退回文件名
-    - release 是能装时那一版的目标，装不了即空
-    - blocked 交出那句装不了的理由，能装交出空串
-    """
-
-    version: str
-    origin: WheelOrigin
-    release: ReleaseRow | None
-    blocked: str
+    state: VersionState
 
 
 def update_targets(rows: Sequence[ComponentRow]) -> list[ReleaseRow]:
@@ -165,73 +141,32 @@ def source_origin(rows: Sequence[ComponentRow], row: ComponentRow) -> ComponentO
     return ComponentOrigin.CATALOG
 
 
-def older_versions(
-    rows: Sequence[ComponentRow], row: ComponentRow
-) -> tuple[VersionLine, ...]:
-    """版本清单里最新一版以外的每一版
+def version_entries(row: ComponentRow) -> tuple[VersionEntry, ...]:
+    """版本窗里逐版的读数
 
     - 没有目录行即没有清单可列
-    - 逐版各判一次挡不挡
+    - 逐版按本机环境与盘上那份件定
     """
     if row.release is None:
         return ()
 
     return tuple(
-        VersionLine(
-            release=item,
-            installed=bool(row.installed) and item.version == row.installed,
-            cached=is_cached(item, WHEELS_DIR),
-            blocked=release_blocked(rows, row, item),
-        )
-        for item in row.release.versions[1:]
+        VersionEntry(release=item, state=_version_state(item, row))
+        for item in row.release.versions
     )
 
 
-def local_wheels(
-    rows: Sequence[ComponentRow], row: ComponentRow
-) -> tuple[WheelLine, ...]:
-    """盘上属于这只发行件的每一份件
+def _version_state(item: ReleaseRow, row: ComponentRow) -> VersionState:
+    """一版在本机的状态
 
-    - 按目录行与本机指纹记录定来路
-    - 目录取不到时，本机记过指纹的那几份仍算可装
-    - 两样都没有即没有权威值可核，那一份不给装
+    - 环境里就是这一版优先于盘上那份件
     """
-    listed = (
-        {file_name_of(item.url): item for item in row.release.versions}
-        if row.release is not None
-        else {}
-    )
-    lines: list[WheelLine] = []
-    for name in disk_files(row.distribution, WHEELS_DIR):
-        release = listed.get(name) or local_release(row.distribution, name, WHEELS_DIR)
-        lines.append(
-            WheelLine(
-                version=version_in_name(name) or name,
-                origin=_origin_of(name, listed, release),
-                release=release,
-                blocked=(
-                    release_blocked(rows, row, release) if release is not None else ""
-                ),
-            )
-        )
+    if row.installed and item.version == row.installed:
+        return VersionState.CURRENT
+    if is_cached(item, WHEELS_DIR):
+        return VersionState.LOCAL
 
-    return tuple(lines)
-
-
-def _origin_of(
-    name: str, listed: dict[str, ReleaseRow], release: ReleaseRow | None
-) -> WheelOrigin:
-    """那份件的来路
-
-    - 目录里有即按目录那一版
-    - 只有本机记过即按本机
-    """
-    if name in listed:
-        return WheelOrigin.CATALOG
-    if release is not None:
-        return WheelOrigin.RECORDED
-
-    return WheelOrigin.UNKNOWN
+    return VersionState.NETWORK
 
 
 def deps_text(row: ComponentRow) -> str:

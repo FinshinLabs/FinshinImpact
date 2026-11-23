@@ -1,11 +1,11 @@
 """按钮规则唯一出处
 
-- 通用按钮按用途词与尺寸档查表生成，窗样式只拼这一段不另写
-- 固定形状词自带尺寸与边距，不随尺寸档换名
-- 平台组件窗的禁用主按钮另出一段，仍由窗样式显式取用
+- 通用按钮的规则按用途词与尺寸档查表生成
+- 固定形状词自带尺寸与边距
+- 查表组合共用一段置灰规则
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from ..theme import (
     LIST_DIALOG,
@@ -47,9 +47,6 @@ class _Look:
     hover_fg: str = ""
     hover_border: str = ""
     pressed_bg: str = ""
-    disabled_bg: str = ""
-    disabled_fg: str = ""
-    disabled_border: str = ""
 
 
 _METRICS = {
@@ -71,8 +68,6 @@ _SOLID_DANGER = _Look(
     fg=PALETTE.sel_color,
     hover_bg=PALETTE.danger_hover_bg,
     pressed_bg=PALETTE.danger_pressed_bg,
-    disabled_bg=PALETTE.bg,
-    disabled_fg=PALETTE.disabled_color,
 )
 
 _SOLID_NEUTRAL = _Look(bg=PALETTE.neutral_bg, fg=PALETTE.sel_color)
@@ -101,8 +96,6 @@ _OUTLINE = _Look(
     hover_bg=PALETTE.hover_bg,
     hover_fg=PALETTE.hover_color,
     hover_border=f"{_BORDER_WIDTH}px solid {PALETTE.sel_bg}",
-    disabled_fg=PALETTE.disabled_color,
-    disabled_border="none",
 )
 
 _DELETE = _Look(
@@ -118,15 +111,7 @@ _DELETE = _Look(
 _COMBOS = (
     (ButtonStyle.PRIMARY, ButtonSize.SMALL, _SOLID_PRIMARY),
     (ButtonStyle.PRIMARY, ButtonSize.STANDARD, _SOLID_PRIMARY),
-    (
-        ButtonStyle.PRIMARY,
-        ButtonSize.LARGE,
-        replace(
-            _SOLID_PRIMARY,
-            disabled_bg=PALETTE.bg,
-            disabled_fg=PALETTE.disabled_color,
-        ),
-    ),
+    (ButtonStyle.PRIMARY, ButtonSize.LARGE, _SOLID_PRIMARY),
     (ButtonStyle.DANGER, ButtonSize.STANDARD, _SOLID_DANGER),
     (ButtonStyle.NEUTRAL, ButtonSize.STANDARD, _SOLID_NEUTRAL),
     (ButtonStyle.NEUTRAL, ButtonSize.COMPACT, _COMPACT_NEUTRAL),
@@ -197,13 +182,6 @@ QPushButton#{ButtonStyle.COMMAND}:hover {{
     color: {PALETTE.hover_color};
 }}"""
 
-# 平台组件窗的已装态主按钮
-PLATFORM_PRIMARY_DISABLED_QSS = f"""\
-QPushButton#{ButtonStyle.PRIMARY}:disabled {{
-    background-color: {TOOLBAR.bg};
-    color: {PALETTE.disabled_color};
-}}"""
-
 
 def _base_block(name: str, look: _Look, metrics: _Metrics) -> str:
     """单组合的常态规则"""
@@ -231,7 +209,7 @@ def _state_block(name: str, state: str, props: list[str]) -> str:
 
 
 def _combo_qss(style: ButtonStyle, size: ButtonSize, look: _Look) -> str:
-    """单组合的常态、悬停、按下与禁用规则"""
+    """单组合的常态、悬停与按下规则"""
     name = button_object_name(style, size)
     metrics = _METRICS[size]
     blocks = [_base_block(name, look, metrics)]
@@ -246,22 +224,25 @@ def _combo_qss(style: ButtonStyle, size: ButtonSize, look: _Look) -> str:
         blocks.append(
             _state_block(name, "pressed", [f"background-color: {look.pressed_bg}"])
         )
-    if look.disabled_bg or look.disabled_fg:
-        props = []
-        if look.disabled_bg:
-            props.append(f"background-color: {look.disabled_bg}")
-        if look.disabled_fg:
-            props.append(f"color: {look.disabled_fg}")
-        if look.disabled_border:
-            props.append(f"border: {look.disabled_border}")
-        if metrics.bold:
-            props.append("font-weight: normal")
-        blocks.append(_state_block(name, "disabled", props))
     return "\n\n".join(blocks)
+
+
+def _disabled_qss(names: list[str]) -> str:
+    """查表组合共用的置灰态"""
+    selectors = ",\n".join(f"QPushButton#{name}:disabled" for name in names)
+    return f"""\
+{selectors} {{
+    background-color: {TOOLBAR.bg};
+    color: {PALETTE.disabled_color};
+    border: none;
+    font-weight: normal;
+}}"""
 
 
 def build_button_qss() -> str:
     """构建全部按钮规则"""
     blocks = [_combo_qss(*combo) for combo in _COMBOS]
     blocks += [_RESET_QSS, _SHAPED_QSS]
+    names = [button_object_name(style, size) for style, size, _ in _COMBOS]
+    blocks.append(_disabled_qss(names))
     return "\n\n".join(blocks)

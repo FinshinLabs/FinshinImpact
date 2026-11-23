@@ -6,8 +6,7 @@ class PlatformMessage:
 
     - 三档段名、来源四档、来路三档、动作与卸载话术
     - 有目录行的组件多出动作一行，已装包的再多出卸载一行
-    - 历史版本与本机安装包各展开一层，逐行报来路
-    - 盘上的件分三档：目录里有这一版、本机记过指纹、目录与指纹都没有
+    - 版本窗左清单逐版标本机状态，右栏单列接口包区间
     """
 
     # 用：skin.theme 平台组件面板的窗名与弹窗标题
@@ -23,7 +22,7 @@ class PlatformMessage:
     SOURCE_TREE_ONLY = "本机源码仓（还没装进环境）"
     SOURCE_NONE = "本机没有"
 
-    # 用：ui._guide._platform_block 来源行与历史版本行都写那一句
+    # 用：ui._guide._platform_block 来源行写那一句
     LOCAL_INSTALLED = "本机已装"
 
     # 用：ui._guide._platform_block 来路行的三种取值
@@ -49,33 +48,36 @@ class PlatformMessage:
 
     # 用：services.env_setup.platform_state 接口包要求行五态，行首已有「接口包要求」标签
     REQUIRES_NONE = "未声明"
-    REQUIRES_NO_SDK = "本机没装接口包"
+    REQUIRES_NO_SDK = "{requires}，接口包没装上"
     REQUIRES_MET = "{requires}，本机接口包 {actual} 已满足"
     REQUIRES_GAP = "{requires}，本机接口包 {actual} 未满足"
     REQUIRES_UNREADABLE = "声明的版本串读不懂"
 
     # 用：services.env_setup.platform_state 适配器那颗置灰时那句下一步
-    NEED_SDK_INSTALL = "先装接口包"
-    NEED_SDK_UPDATE = "先更新程序"
+    NEED_SDK_INSTALL = "接口包没装上，重开会补装"
+    NEED_SDK_UPDATE = "接口包太旧，新版程序才带"
     SDK_TOO_NEW = "接口包太新，适配器等新版"
 
     # 用：ui._guide._platform_block 动作栏两态
     BTN_INSTALL = "安装"
     BTN_APPLY = "更新"
 
-    # 用：ui._guide._platform_block 两颗展开钮与钮旁的收起字
-    BTN_HISTORY = "查看历史版本"
-    BTN_WHEELS = "本机安装包"
-    BTN_FOLD = "收起"
+    # 用：ui._guide._platform_block 每只组件那颗版本窗按钮
+    BTN_OTHER_VERSIONS = "其他版本"
 
-    # 用：ui._guide._platform_block 历史版本每一版的读数字与装旧版那颗
-    BTN_INSTALL_VERSION = "装这版"
-    WHEEL_CACHED = "已下载"
+    # 用：ui._guide._versions_dialog 窗名与底部那颗安装钮
+    VERSIONS_TITLE = "其他版本"
+    BTN_INSTALL_THIS = "安装这一版"
+    BTN_CANNOT_INSTALL = "不可安装"
 
-    # 用：ui._guide._platform_block 盘上件的逐份读数
-    WHEEL_LISTED = "{version} 目录里有这一版"
-    WHEEL_RECORDED = "{version} 本机记过指纹"
-    WHEEL_STRAY = "{version} 没核过指纹，不给装"
+    # 用：ui._guide._versions_dialog 取数中的状态行与取不到时那一行
+    WAIT_VERSIONS = "正在取在线版本…"
+    VERSIONS_FETCH_FAILED = "在线版本读不到\n{reason}"
+
+    # 用：ui._guide._versions_dialog 左清单每版的状态
+    VERSION_CURRENT = "当前使用"
+    VERSION_LOCAL = "本地有"
+    VERSION_NETWORK = "从网络安装"
 
     # 用：ui._guide._platform 底部一键与目录拒收段的行名
     BTN_UPDATE_ALL = "一键更新"
@@ -91,12 +93,16 @@ class PlatformMessage:
     # 用：services.env_setup.wheel_install 装完复核版本对不上
     APPLY_MISMATCH = "{name} 装完读到 {found}，不是要装的 {wanted}"
 
+    # 用：services.env_setup.platform_apply 这一版要的接口包本机不满足
+    INSTALL_SDK_GAP = "{name} {version} 要接口包 {requires}，本机是 {actual}"
+    INSTALL_SDK_ABSENT = "{name} {version} 要接口包 {requires}，本机缺接口包"
+
     # 用：ui._guide._catalog_task 目录读不出时的那一行状态
     FETCH_FAILED = "在线目录读不到\n{reason}"
 
     # 用：ui._guide._platform_flow 装完后的结果文案
     INSTALL_DONE = "{items} 已装好"
-    INSTALL_PART_FAIL = "{items} 没装成\n{notes}"
+    INSTALL_PART_FAIL = "有件没装成\n{notes}"
     INSTALL_BLANK = "未报出原因"
 
     # 用：ui._guide._platform_block 已装包那一行的卸载按钮

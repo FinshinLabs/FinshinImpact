@@ -76,7 +76,7 @@ class SettingsDialogTheme:
     persona_preview_text: str = DialogMessage.SETUP_PERSONA_PREVIEW
     persona_reload_text: str = DialogMessage.SETUP_PERSONA_RELOAD
     persona_file_read_fail: str = DialogMessage.SETUP_PERSONA_FILE_READ_FAIL
-    persona_close_text: str = DialogMessage.SETUP_PERSONA_CLOSE
+    persona_close_text: str = DialogMessage.BTN_CLOSE
     persona_edit_text: str = DialogMessage.SETUP_PERSONA_EDIT
     persona_editor_title: str = DialogMessage.SETUP_PERSONA_EDITOR_TITLE
     persona_editor_tip: str = DialogMessage.SETUP_PERSONA_EDITOR_TIP

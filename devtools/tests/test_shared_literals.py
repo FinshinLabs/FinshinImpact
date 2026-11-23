@@ -28,6 +28,7 @@ import instancelock as launch_instancelock  # noqa: E402
 import pack_spec  # noqa: E402
 
 from services import adapter_catalog as catalog_mod  # noqa: E402
+from services import release_feed  # noqa: E402
 from services.env_setup import toolchain, wheel_fetch  # noqa: E402
 from system import (  # noqa: E402
     app_identity,
@@ -104,18 +105,11 @@ class TestSameValuePairs(unittest.TestCase):
         """接口包分发名本体与目录生成侧同串"""
         self.assertEqual(distributions.SDK_DISTRIBUTION, gen_release.SDK_DISTRIBUTION)
 
-    def test_wheel_version_rule_matches_generator(self) -> None:
-        """wheel 文件名里取版本号的算法本体与目录生成侧同一条"""
-        samples = (
-            "finshin_adapter_tg-0.1.1-py3-none-any.whl",
-            "finshin_sdk-1.0.0-py3-none-any.whl",
-            "two-parts.whl",
+    def test_release_max_pages_matches_feed(self) -> None:
+        """列 release 的翻页保护两处同一个数，改一处即步调不一"""
+        self.assertEqual(
+            release_feed._RELEASE_MAX_PAGES, gen_release._RELEASE_MAX_PAGES
         )
-        for name in samples:
-            self.assertEqual(
-                wheel_fetch.version_in_name(name),
-                gen_release._version_in_name(name),
-            )
 
     def test_persona_placeholder_is_in_the_template(self) -> None:
         """人设模板里写的那个占位符与注入读的那份同串"""

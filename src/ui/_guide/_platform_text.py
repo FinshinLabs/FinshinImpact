@@ -1,6 +1,6 @@
 """平台组件面板的读数文案
 
-- 来源、来路、版本与盘上件各交一句给人看的话
+- 来源、来路、版本与版本窗状态各交一句给人看的话
 - 该装哪版挡不挡的结算在服务层，这里只把结果写成句子
 """
 
@@ -10,9 +10,8 @@ from services.adapter_catalog import ReleaseRow
 from services.env_setup.platform_rows import ComponentRow, ComponentSource
 from services.env_setup.platform_state import (
     ComponentOrigin,
-    VersionLine,
-    WheelLine,
-    WheelOrigin,
+    VersionEntry,
+    VersionState,
     release_blocked,
 )
 from skin.messages import PlatformMessage
@@ -77,45 +76,16 @@ def version_text(row: ComponentRow) -> str:
     )
 
 
-def version_line_text(line: VersionLine, blocked: str, note: str) -> str:
-    """版本清单里那一版的一行
+def version_state_text(entry: VersionEntry) -> str:
+    """版本窗左清单里那一版的状态
 
-    - 版本号后面跟本机已装或已缓存的标记，再接挡它那句
+    - 按环境里已装、盘上件核过、只能走网络分三档
     """
-    state = ""
-    if line.installed:
-        state = PlatformMessage.LOCAL_INSTALLED
-    elif line.cached:
-        state = PlatformMessage.WHEEL_CACHED
-
-    return " ".join(
-        part for part in (line.release.version, state, _gap(blocked, note)) if part
-    )
-
-
-def wheel_text(line: WheelLine, blocked: str, note: str) -> str:
-    """盘上安装包的一行
-
-    - 按目录里有、本机记录过、两处都没有分三档说
-    """
-    template = {
-        WheelOrigin.CATALOG: PlatformMessage.WHEEL_LISTED,
-        WheelOrigin.RECORDED: PlatformMessage.WHEEL_RECORDED,
-        WheelOrigin.UNKNOWN: PlatformMessage.WHEEL_STRAY,
-    }[line.origin]
-    gap = _gap(blocked, note)
-
-    return " ".join(
-        part for part in (template.format(version=line.version), gap) if part
-    )
-
-
-def _gap(blocked: str, note: str) -> str:
-    """取挡装那句
-
-    - 与整行重复即交空串
-    """
-    return blocked if blocked and blocked != note else ""
+    return {
+        VersionState.CURRENT: PlatformMessage.VERSION_CURRENT,
+        VersionState.LOCAL: PlatformMessage.VERSION_LOCAL,
+        VersionState.NETWORK: PlatformMessage.VERSION_NETWORK,
+    }[entry.state]
 
 
 def row_note(

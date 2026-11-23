@@ -7,7 +7,7 @@
 - 接口包没到位或高出上限时适配器那颗不给装
 - 适配器那颗按要装那一版声明的要求挡，那一版没写要求即回落已装声明
 - 在场平台只看已装包，源码仓挂着没装的不算
-- 版本清单逐版报本机来路，盘上的件逐份报在不在清单里
+- 版本窗逐版报本机状态，挡不挡按同一条判据现算
 - 来源按源码仓在不在场与包装没装进环境分四档，来路按内容从哪儿取到分三档
 
 - 夹具一律合成值，线上发新版不许把用例改红
@@ -34,7 +34,6 @@ from services.adapter_catalog import Catalog, ReleaseRow  # noqa: E402
 from services.adapter_manifest import InstalledAdapter  # noqa: E402
 from services.env_setup import platform_rows as rows_mod  # noqa: E402
 from services.env_setup import platform_state as mod  # noqa: E402
-from services.env_setup import wheel_fetch  # noqa: E402
 
 _ADAPTER = "finshin-adapter-tg"
 _SDK = "finshin-sdk"
@@ -199,8 +198,8 @@ def _target_row(
     )
 
 
-class TestOlderVersions(unittest.TestCase):
-    """版本清单里除最新一版外的每一版"""
+class TestVersionEntries(unittest.TestCase):
+    """版本窗里逐版的读数"""
 
     def setUp(self) -> None:
         """临时 wheel 目录，0.2.0 那份件在场"""
@@ -218,64 +217,52 @@ class TestOlderVersions(unittest.TestCase):
             _release_row("0.1.0", _SHA),
         )
 
-    def test_latest_is_not_listed(self) -> None:
-        """清单只报更早的那几版，最新一版由版本行说"""
+    def _entries(self, row: rows_mod.ComponentRow) -> tuple[mod.VersionEntry, ...]:
+        """按临时目录盘一遍"""
         with patch.object(mod, "WHEELS_DIR", self._root):
-            row = self._row("0.1.0")
-            lines = mod.older_versions([row], row)
+            return mod.version_entries(row)
 
-        self.assertEqual([line.release.version for line in lines], ["0.2.0", "0.1.0"])
+    def test_all_versions_are_listed(self) -> None:
+        """清单逐版全摆，最新一版也在里面"""
+        entries = self._entries(self._row("0.1.0"))
 
-    def test_installed_version_is_marked(self) -> None:
-        """本机环境里就是那一版即标出来"""
-        with patch.object(mod, "WHEELS_DIR", self._root):
-            row = self._row("0.2.0")
-            lines = mod.older_versions([row], row)
+        self.assertEqual(
+            [entry.release.version for entry in entries], ["0.3.0", "0.2.0", "0.1.0"]
+        )
 
-        self.assertEqual([line.installed for line in lines], [True, False])
+    def test_installed_version_is_current(self) -> None:
+        """环境里就是这一版即标当前使用"""
+        entries = self._entries(self._row("0.1.0"))
 
-    def test_matching_digest_is_cached(self) -> None:
-        """盘上那份件指纹对得上目录即算已下载"""
-        with patch.object(mod, "WHEELS_DIR", self._root):
-            row = self._row("0.3.0")
-            lines = mod.older_versions([row], row)
+        self.assertEqual(entries[2].state, mod.VersionState.CURRENT)
 
-        self.assertEqual([line.cached for line in lines], [True, False])
+    def test_matching_digest_is_local(self) -> None:
+        """盘上那份件指纹对得上目录即算本地有"""
+        entries = self._entries(self._row("0.1.0"))
 
-    def test_wrong_digest_is_not_cached(self) -> None:
-        """盘上同名那份件指纹对不上即不算已下载"""
+        self.assertEqual(entries[1].state, mod.VersionState.LOCAL)
+
+    def test_wrong_digest_falls_to_network(self) -> None:
+        """盘上同名那份件指纹对不上即只能走网络"""
         row = _multi_row(
             "0.1.0",
             _release_row("0.3.0", _SHA),
             _release_row("0.2.0", "f" * 64),
         )
-        with patch.object(mod, "WHEELS_DIR", self._root):
-            lines = mod.older_versions([row], row)
 
-        self.assertEqual([line.cached for line in lines], [False])
+        self.assertEqual(self._entries(row)[1].state, mod.VersionState.NETWORK)
+
+    def test_absent_version_is_network(self) -> None:
+        """盘上没有这一版即从网络安装"""
+        entries = self._entries(self._row("0.1.0"))
+
+        self.assertEqual(entries[0].state, mod.VersionState.NETWORK)
 
     def test_no_row_lists_nothing(self) -> None:
         """没有目录行即没有清单可列"""
-        row = _multi_row("0.1.0", _release_row("0.1.0", _SHA))
-        row = replace(row, release=None)
-        with patch.object(mod, "WHEELS_DIR", self._root):
-            self.assertEqual(mod.older_versions([row], row), ())
+        row = replace(_multi_row("0.1.0", _release_row("0.1.0", _SHA)), release=None)
 
-    def test_blocked_follows_each_release(self) -> None:
-        """逐版按各自声明的接口包要求判挡装"""
-        sdk = _component("", _SDK, "0.2.0", "", "0.2.0")
-        newest = replace(_release_row("0.3.0", _SHA), sdk_requires="<0.2.0")
-        met = replace(_release_row("0.2.0", self._cached), sdk_requires=">=0.2.0")
-        over = replace(_release_row("0.1.0", _SHA), sdk_requires="<0.2.0")
-        row = replace(
-            self._row("0.1.0"), release=replace(newest, versions=(newest, met, over))
-        )
-        with patch.object(mod, "WHEELS_DIR", self._root):
-            lines = mod.older_versions([sdk, row], row)
-
-        self.assertEqual(
-            [line.blocked for line in lines], ["", "接口包太新，适配器等新版"]
-        )
+        self.assertEqual(self._entries(row), ())
 
 
 class TestUpdateTarget(unittest.TestCase):
@@ -317,94 +304,6 @@ class TestUpdateTarget(unittest.TestCase):
             self.fail("适配器那行没交出版本")
 
         self.assertEqual(target.version, "0.1.1")
-
-
-class TestLocalWheels(unittest.TestCase):
-    """盘上件的逐份读数"""
-
-    def setUp(self) -> None:
-        """临时 wheel 目录，一份在清单里，一份本机记过，一份两样都没有"""
-        holder = tempfile.TemporaryDirectory()
-        self.addCleanup(holder.cleanup)
-        self._root = Path(holder.name)
-        self._listed = _wheel_on(self._root, "0.2.0")
-        self._recorded = _wheel_on(self._root, "0.1.5")
-        _wheel_on(self._root, "0.0.9")
-        wheel_fetch._record_digest(self._root, _wheel_name("0.1.5"), self._recorded)
-
-    def _row(self, *versions: str) -> rows_mod.ComponentRow:
-        """一行读数，清单里按给定次序列那几版"""
-        return _multi_row(
-            "0.1.0",
-            *[_release_row(version, _SHA) for version in ("0.3.0", *versions)],
-        )
-
-    def _wheels(
-        self, rows: list[rows_mod.ComponentRow], row: rows_mod.ComponentRow
-    ) -> tuple[mod.WheelLine, ...]:
-        """按临时目录那份件盘一遍"""
-        with patch.object(mod, "WHEELS_DIR", self._root):
-            return mod.local_wheels(rows, row)
-
-    def test_files_are_listed_by_version(self) -> None:
-        """盘上属于这只发行件的件按版本号逐份报出"""
-        lines = self._wheels([self._row("0.2.0")], self._row("0.2.0"))
-
-        self.assertEqual([line.version for line in lines], ["0.0.9", "0.1.5", "0.2.0"])
-
-    def test_three_origins_are_told_apart(self) -> None:
-        """两样都没有、本机记过、目录里有，三档各归各"""
-        lines = self._wheels([self._row("0.2.0")], self._row("0.2.0"))
-
-        self.assertEqual(
-            [line.origin for line in lines],
-            [
-                mod.WheelOrigin.UNKNOWN,
-                mod.WheelOrigin.RECORDED,
-                mod.WheelOrigin.CATALOG,
-            ],
-        )
-
-    def test_recorded_wheel_is_installable(self) -> None:
-        """记过指纹的那份件拼成可装目标，版本与指纹按本机记的算"""
-        lines = self._wheels([self._row("0.2.0")], self._row("0.2.0"))
-        recorded = lines[1].release
-        if recorded is None:
-            self.fail("本机记过的那份件没拼出目标")
-
-        self.assertEqual(recorded.version, "0.1.5")
-        self.assertEqual(recorded.sha256, self._recorded)
-        self.assertTrue(recorded.url.startswith("file:"))
-
-    def test_unknown_wheel_has_no_target(self) -> None:
-        """两样都没有的那份件不交目标，也不给理由句"""
-        lines = self._wheels([self._row("0.2.0")], self._row("0.2.0"))
-
-        self.assertIsNone(lines[0].release)
-        self.assertEqual(lines[0].blocked, "")
-
-    def test_catalog_wheel_keeps_the_catalog_row(self) -> None:
-        """目录里有那一版即交目录那一行，装它仍按目录指纹核"""
-        row = self._row("0.2.0")
-        lines = self._wheels([row], row)
-        if row.release is None:
-            self.fail("目录行没拼出来")
-
-        self.assertIs(lines[2].release, row.release.versions[1])
-
-    def test_absent_catalog_still_offers_recorded(self) -> None:
-        """目录取不到时本机记过的那份仍算可装"""
-        row = replace(self._row("0.2.0"), release=None)
-        lines = self._wheels([row], row)
-
-        self.assertEqual(
-            [line.origin for line in lines],
-            [
-                mod.WheelOrigin.UNKNOWN,
-                mod.WheelOrigin.RECORDED,
-                mod.WheelOrigin.UNKNOWN,
-            ],
-        )
 
 
 class TestBucket(unittest.TestCase):
@@ -607,11 +506,11 @@ class TestInstallBlocked(unittest.TestCase):
     _TARGET = _release_row("0.1.1", _SHA)
 
     def test_absent_sdk_blocks_the_adapter(self) -> None:
-        """本机没装接口包即挡住，那句是先装接口包"""
+        """接口包没装上即挡住，那句让重开补装"""
         rows = _rows("", "")
         self.assertEqual(
             mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
-            "先装接口包",
+            "接口包没装上，重开会补装",
         )
 
     def test_installed_sdk_frees_the_adapter(self) -> None:
@@ -622,13 +521,13 @@ class TestInstallBlocked(unittest.TestCase):
         )
 
     def test_sdk_below_range_blocks(self) -> None:
-        """接口包在场但够不到适配器要求的下限，那句指向更新程序"""
+        """接口包在场但够不到适配器要求的下限，那句指向新版程序"""
         requires = {str(PlatformCode("tg")): ">=9.9.9"}
         with patch.object(rows_mod, "_declared_requires", lambda: requires):
             rows = _rows("0.1.0", "0.1.0")
         self.assertEqual(
             mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
-            "先更新程序",
+            "接口包太旧，新版程序才带",
         )
 
     def test_sdk_over_ceiling_blocks(self) -> None:
@@ -672,6 +571,16 @@ class TestInstallBlocked(unittest.TestCase):
         ):
             text = mod.deps_text(_adapter_row(_rows("0.2.0", "0.1.0")))
         self.assertEqual(text, ">=0.1.0,<0.2.0，本机接口包 0.2.0 未满足")
+
+    def test_requires_line_without_sdk(self) -> None:
+        """本机没装接口包时要求行照实说没装上"""
+        requires = {str(PlatformCode("tg")): ">=0.1.0,<0.2.0"}
+        with (
+            patch.object(rows_mod, "_declared_requires", lambda: requires),
+            patch.object(mod, "installed_version", lambda name: ""),
+        ):
+            text = mod.deps_text(_adapter_row(_rows("", "0.1.0")))
+        self.assertEqual(text, ">=0.1.0,<0.2.0，接口包没装上")
 
 
 class TestPresentPlatforms(unittest.TestCase):

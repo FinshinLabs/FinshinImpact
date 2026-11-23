@@ -75,10 +75,12 @@ def clean_cache(on_line: ProgressCallback | None = None) -> None:
     run_uv_once(["cache", "clean", "--cache-dir", str(UV_CACHE_DIR)], on_line=on_line)
 
 
-def with_index_retry(args: list[str], on_line: ProgressCallback | None) -> int:
+def with_index_retry(
+    args: list[str], on_line: ProgressCallback | None
+) -> tuple[int, bool]:
     """按换源序列执行 pip 命令直至成功
 
-    - 返回最后一次的退出码，全源落空即非零
+    - 交出最后一次的退出码与依赖有没有被判无解
     - 依赖无解与镜像源无关，判定后不再换源
     """
     unresolved = [False]
@@ -97,10 +99,10 @@ def with_index_retry(args: list[str], on_line: ProgressCallback | None) -> int:
         unresolved[0] = False
         code = run_uv_once(args, index, watcher)
         if code == 0:
-            return 0
+            return 0, False
         if unresolved[0]:
-            return code
-    return code
+            return code, True
+    return code, False
 
 
 def run_uv_once(

@@ -43,7 +43,6 @@ def install_flow(on_done: Callable[[], None], releases: Sequence[ReleaseRow]) ->
         _report_done(
             on_done,
             PlatformMessage.INSTALL_PART_FAIL.format(
-                items=items,
                 notes="\n".join(str(note) for note in failed)
                 or PlatformMessage.INSTALL_BLANK,
             ),

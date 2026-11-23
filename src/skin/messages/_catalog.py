@@ -50,4 +50,4 @@ class CatalogMessage:
     WRITE_FAILED = "落盘失败"
 
     # 用：services/env_setup/wheel_install.py 某只 wheel 装不进运行环境时的说明行
-    INSTALL_FAILED = "{name} 装不进运行环境"
+    INSTALL_FAILED = "{name} {version} 装不进运行环境"

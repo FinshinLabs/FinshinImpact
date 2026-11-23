@@ -48,7 +48,7 @@ class TestSyncEnv(unittest.TestCase):
             patch.object(deps_install, "_installed_dev_pins", return_value=[_DEV_PIN])
         )
         self.run = self.stack.enter_context(
-            patch.object(deps_install, "with_index_retry", return_value=0)
+            patch.object(deps_install, "with_index_retry", return_value=(0, False))
         )
 
     def test_success_returns_empty(self) -> None:
@@ -63,13 +63,13 @@ class TestSyncEnv(unittest.TestCase):
 
     def test_sync_failure_returns_keep(self) -> None:
         """sync 落空即整批判失败"""
-        self.run.return_value = 1
+        self.run.return_value = (1, False)
 
         self.assertEqual(deps_install.sync_env(list(_KEEP)), list(_KEEP))
 
     def test_compile_failure_skips_sync(self) -> None:
         """闭包编译失败即整批判失败，不再执行 sync"""
-        self.run.side_effect = [1]
+        self.run.return_value = (1, False)
 
         self.assertEqual(deps_install.sync_env(list(_KEEP)), list(_KEEP))
         self.run.assert_called_once()

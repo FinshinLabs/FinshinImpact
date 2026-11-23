@@ -62,6 +62,7 @@ def install_deps(pins: list[str], on_line: ProgressCallback | None = None) -> li
     """安装依赖并返回失败清单
 
     - 整批安装走换源序列，整批失败转逐包重试并逐只点名
+    - 依赖被判无解即整批记失败，不再逐包重试
     - 已装的包跳过，可重复调用续装
     """
     if not pins:
@@ -78,11 +79,14 @@ def install_deps(pins: list[str], on_line: ProgressCallback | None = None) -> li
         "--no-progress",
         "--compile-bytecode",
     ]
-    if with_index_retry([*base, *pins], on_line) == 0:
+    code, unresolved = with_index_retry([*base, *pins], on_line)
+    if code == 0:
         return []
+    if unresolved:
+        return list(pins)
     failed: list[str] = []
     for pin in pins:
-        if with_index_retry([*base, pin], on_line) != 0:
+        if with_index_retry([*base, pin], on_line)[0] != 0:
             failed.append(pin)
     return failed
 
@@ -167,7 +171,7 @@ def sync_env(
             str(lock_path),
         ]
         emit(on_line, PluginMessage.STAGE_COMPILE)
-        if with_index_retry(compile_argv, on_line) != 0:
+        if with_index_retry(compile_argv, on_line)[0] != 0:
             return list(keep)
         sync_argv = [
             "pip",
@@ -178,7 +182,7 @@ def sync_env(
             str(lock_path),
         ]
         emit(on_line, PluginMessage.STAGE_SYNC)
-        code = with_index_retry(sync_argv, on_line)
+        code = with_index_retry(sync_argv, on_line)[0]
     if code != 0:
         return list(keep)
     return []

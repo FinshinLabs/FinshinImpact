@@ -6,13 +6,19 @@
 from collections.abc import Sequence
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHBoxLayout, QTextBrowser, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QVBoxLayout, QWidget
 
+from services.release_feed import ReleaseNote
 from skin.qss import build_release_notes_dialog_qss
-from skin.theme import RELEASE_NOTES_DIALOG, ButtonStyle, ObjectName
-from utils.check import ReleaseNote
+from skin.theme import RELEASE_NOTES_DIALOG, ButtonStyle
 
-from .._primitives import BaseDialog, ThemedList, make_button, set_margins
+from .._primitives import (
+    BaseDialog,
+    PaneEntry,
+    ReleasePanes,
+    make_button,
+    set_margins,
+)
 
 # 无选中行时的行号
 _NO_ROW = -1
@@ -29,23 +35,14 @@ class ReleaseNotesDialog(BaseDialog):
     ) -> None:
         super().__init__(parent=parent, title=RELEASE_NOTES_DIALOG.title)
         self.setStyleSheet(build_release_notes_dialog_qss())
-        self._bodies = tuple(note.body for note in notes)
 
         layout = QVBoxLayout(self)
         set_margins(layout, RELEASE_NOTES_DIALOG.pad)
         layout.setSpacing(RELEASE_NOTES_DIALOG.spacing)
 
-        # QTextEdit 没有链接信号，只读视图要用 QTextBrowser
-        self._view = QTextBrowser(parent=self)
-        self._view.setObjectName(ObjectName.RELEASE_NOTES_VIEW)
-
-        # 默认只在 Qt 内部找锚点，点开即报找不到，交系统浏览器接手
-        self._view.setOpenExternalLinks(True)
-
-        panes = QHBoxLayout()
-        panes.addWidget(self._build_list(notes, focus_tag))
-        panes.addWidget(self._view, 1)
-        layout.addLayout(panes)
+        entries = tuple(PaneEntry(note.tag, note.body) for note in notes)
+        self._panes = ReleasePanes(entries, self)
+        layout.addWidget(self._panes, 1)
         btn = make_button(
             RELEASE_NOTES_DIALOG.ok_text, ButtonStyle.PRIMARY, default=True
         )
@@ -55,25 +52,11 @@ class ReleaseNotesDialog(BaseDialog):
         # 尺寸定死：正文再长也不把窗口顶出屏幕，读不完的部分交给滚动
         self.setFixedSize(RELEASE_NOTES_DIALOG.width, RELEASE_NOTES_DIALOG.height)
 
-    def _build_list(self, notes: Sequence[ReleaseNote], focus_tag: str) -> ThemedList:
-        """按版本建左侧清单"""
-        listing = ThemedList(parent=self)
-        listing.setObjectName(ObjectName.LIST_WIDGET)
-        listing.setFixedWidth(RELEASE_NOTES_DIALOG.list_width)
-        for note in notes:
-            listing.addItem(note.tag)
-        listing.currentRowChanged.connect(self._show_body)
-
         # 未命中焦点版本即落回最新一版，空清单留无选中
         row = _NO_ROW
         if notes:
             row = next((i for i, note in enumerate(notes) if note.tag == focus_tag), 0)
-        listing.setCurrentRow(row)
-        return listing
-
-    def _show_body(self, row: int) -> None:
-        """按选中行换正文"""
-        self._view.setMarkdown(self._bodies[row] if row >= 0 else "")
+        self._panes.set_current_row(row)
 
     @staticmethod
     def show_release_notes(

@@ -3,7 +3,6 @@
 - 镜像按序轮询，坏源换下一个
 - 目录行对应的件已在盘上且指纹对得上即不重取
 - 核过指纹的件把指纹记进同目录一份索引
-- 按发行件名盘点盘上属于它的件
 - 先落 .part 再改名，半截件不留盘
 - 每个源的坏法各记一句，合进一条点名到发行件的说明
 """
@@ -27,7 +26,6 @@ _WHEEL_SUFFIX = ".whl"
 _PART_SUFFIX = ".part"
 
 _TIMEOUT_DOWNLOAD = 120.0  # 单只发行件下载超时 2 分钟
-_WHEEL_PARTS = 5  # wheel 文件名的段数，版本是第二段，与目录生成侧同一算法
 
 # 本机指纹索引的文件名，跟着 wheel 同进同出
 _INDEX_NAME = "downloaded.json"
@@ -46,7 +44,7 @@ class DownloadOutcome:
     note: str
 
 
-def file_name_of(url: str) -> str:
+def _file_name_of(url: str) -> str:
     """取直链末段的 wheel 文件名
 
     - 形态不对交出空串
@@ -55,15 +53,6 @@ def file_name_of(url: str) -> str:
     if not name.endswith(_WHEEL_SUFFIX) or "\\" in name:
         return ""
     return name
-
-
-def version_in_name(name: str) -> str:
-    """取 wheel 文件名第二段版本号
-
-    - 段数不对交出空串
-    """
-    parts = name.split("-")
-    return parts[1] if len(parts) >= _WHEEL_PARTS else ""
 
 
 def _recorded_digests(target_dir: Path) -> dict[str, str]:
@@ -107,58 +96,14 @@ def _record_digest(target_dir: Path, name: str, sha256: str) -> bool:
     return True
 
 
-def local_release(distribution: str, name: str, target_dir: Path) -> ReleaseRow | None:
-    """本机记过指纹的那份件拼成一行可装目标
-
-    - 没记或读不出版本即不交出
-    - 盘上那份件与记下的指纹不符即不算
-    """
-    sha256 = _recorded_digests(target_dir).get(name, "")
-    version = version_in_name(name)
-    target = target_dir / name
-    if not sha256 or not version or not target.is_file():
-        return None
-    if file_digest(target) != sha256:
-        return None
-
-    return ReleaseRow(
-        distribution=distribution,
-        version=version,
-        url=target.as_uri(),
-        sha256=sha256,
-    )
-
-
 def is_cached(row: ReleaseRow, target_dir: Path) -> bool:
     """目录行对应的那份件已在盘上且指纹对得上"""
-    name = file_name_of(row.url)
+    name = _file_name_of(row.url)
     if not name:
         return False
     target = target_dir / name
 
     return target.is_file() and file_digest(target) == row.sha256
-
-
-def disk_files(distribution: str, target_dir: Path) -> tuple[str, ...]:
-    """盘上属于这只发行件的 wheel 文件名
-
-    - 按名升序
-    - 目录不在场即空
-    - 下载没跑完的 .part 不算一份件
-    """
-    if not target_dir.is_dir():
-        return ()
-    stem = f"{distribution.replace('-', '_')}-"
-
-    return tuple(
-        sorted(
-            item.name
-            for item in target_dir.iterdir()
-            if item.is_file()
-            and item.name.startswith(stem)
-            and item.name.endswith(_WHEEL_SUFFIX)
-        )
-    )
 
 
 def _reject(distribution: str, reason: str) -> DownloadOutcome:
@@ -179,7 +124,7 @@ async def download_release(
 
     - 落盘件与目录指纹不符即删掉那份件并换下一源
     """
-    name = file_name_of(row.url)
+    name = _file_name_of(row.url)
     if not name:
         return _reject(row.distribution, CatalogMessage.BAD_FILE_NAME)
 
