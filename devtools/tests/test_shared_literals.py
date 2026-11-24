@@ -79,7 +79,7 @@ class TestCatalogShape(unittest.TestCase):
             if "site/adapters" in line
         ]
         self.assertEqual(len(deployed), 1, deployed)
-        tail = links.CATALOG_PATH.rpartition("/")[2]
+        tail = links.GITHUB.catalog_path.rpartition("/")[2]
         self.assertIn(f"site/{tail}", deployed[0])
 
 
@@ -122,11 +122,13 @@ class TestEndpoints(unittest.TestCase):
 
     def test_pages_host_matches_launcher(self) -> None:
         """版本页与在线目录同主机，本体与启动器各写一遍"""
-        self.assertTrue(pack_spec._PAGES_PYPROJECT_URL.startswith(links.PAGES_BASE_URL))
+        self.assertTrue(
+            pack_spec._PAGES_PYPROJECT_URL.startswith(links.GITHUB.pages_base_url)
+        )
 
     def test_api_host_matches_generator(self) -> None:
         """发布接口主机名本体与生成侧同值"""
-        self.assertEqual(pack_spec.API_HOST, links.API_BASE_URL)
+        self.assertEqual(pack_spec.API_HOST, links.GITHUB.api_base_url)
 
     def test_mirrors_come_from_the_setting_table(self) -> None:
         """镜像名单只有配置表一个出处"""

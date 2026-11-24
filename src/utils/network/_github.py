@@ -8,11 +8,11 @@ import asyncio
 from typing import Any, Literal, cast
 
 from exceptions import ConnectionFailedError, RequestTimeoutError
-from system.links import API_BASE_URL, API_USER_AGENT, PAGES_BASE_URL
+from system.links import GITHUB
 
 from ._client import BaseClient
 
-_HEADER = {"User-Agent": API_USER_AGENT}
+_HEADER = {"User-Agent": GITHUB.api_user_agent}
 
 # 度量档
 _CONNECT_TIMEOUT = 2.0  # 对 GitHub 建连超时 2 秒
@@ -28,7 +28,7 @@ class GitClient(BaseClient):
     @classmethod
     async def get_pages(cls, path: str, timeout: float) -> str:
         """取 Pages 上的一份文本"""
-        content = await cls._request("text", PAGES_BASE_URL, path, timeout)
+        content = await cls._request("text", GITHUB.pages_base_url, path, timeout)
 
         return cast(str, content or "")
 
@@ -37,7 +37,7 @@ class GitClient(BaseClient):
         """取 release 接口的一段 JSON"""
         return cast(
             dict[str, Any],
-            await cls._request("json", API_BASE_URL, path, timeout),
+            await cls._request("json", GITHUB.api_base_url, path, timeout),
         )
 
     @classmethod

@@ -12,7 +12,7 @@ from typing import Any
 
 from finshin_sdk.domain import PlatformCode
 from skin.messages import CatalogMessage
-from system.links import CATALOG_PATH, HTTPS_SCHEME
+from system.links import GITHUB, HTTPS_SCHEME
 from utils.network import GitClient
 
 _TIMEOUT = 5.0  # 目录读取超时 5 秒
@@ -244,6 +244,6 @@ async def load_catalog() -> Catalog:
 
     - 一次请求取文本，字段逐行验
     """
-    text = await GitClient.get_pages(CATALOG_PATH, _TIMEOUT)
+    text = await GitClient.get_pages(GITHUB.catalog_path, _TIMEOUT)
 
     return _parse(text)

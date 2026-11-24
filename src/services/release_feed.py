@@ -22,7 +22,7 @@ from exceptions import (
     describe_error,
 )
 from skin.messages import VersionMessage
-from system.links import ACCOUNT, MAIN_REPO, releases_api_path
+from system.links import GITHUB
 from system.tool_settings import declaration
 from system.versions import is_upgrade
 from utils.network import GitClient
@@ -80,7 +80,7 @@ class ReleaseNote:
     body: str
 
 
-_MAIN = _Repo(ACCOUNT, MAIN_REPO)
+_MAIN = _Repo(GITHUB.account, GITHUB.main_repo)
 
 
 def _repo_of(url: str) -> _Repo | NoReturn:
@@ -159,7 +159,9 @@ async def _repo_notes(repo: _Repo, formal_only: bool) -> tuple[ReleaseNote, ...]
         rows = cast(
             Any,
             await _fetch(
-                releases_api_path(repo.owner, repo.name, _RELEASE_PAGE_SIZE, page),
+                GITHUB.releases_api_path(
+                    repo.owner, repo.name, _RELEASE_PAGE_SIZE, page
+                ),
                 _TIMEOUT_RELEASE,
             ),
         )
