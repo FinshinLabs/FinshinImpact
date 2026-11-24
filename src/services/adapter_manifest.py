@@ -11,10 +11,10 @@ from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 from typing import Any
 
+from finshin_sdk import PROJECT_MANIFEST_FILE
 from finshin_sdk.domain import (
     ADAPTER_ENTRY_ATTR,
     ADAPTER_ENTRY_GROUP,
-    ADAPTER_MANIFEST_FILE,
     ADAPTER_MANIFEST_TABLE,
     AdapterManifestKeys,
     PlatformCode,
@@ -137,7 +137,7 @@ def _read_dir(adapter_dir: Path) -> tuple[AdapterManifestDTO, str] | None:
     - 入口点没点名本平台、或属性名不合本体规定，整份拒收
     - 认下来交出声明与项目名
     """
-    data = read_toml(adapter_dir / ADAPTER_MANIFEST_FILE)
+    data = read_toml(adapter_dir / PROJECT_MANIFEST_FILE)
     if data is None:
         return None
 

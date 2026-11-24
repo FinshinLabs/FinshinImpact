@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from bot.error_guard import error_guard
-from finshin_sdk import ConnectionPlan
 from finshin_sdk.domain import (
     ConfigPath,
     ConfigValues,
+    ConnectionPlan,
     FieldCondition,
     FieldSpec,
     SectionSpec,

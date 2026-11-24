@@ -8,7 +8,7 @@
 import asyncio
 from collections.abc import Callable, Sequence
 
-from finshin_sdk import ProbeChannel, ProbeOutcome, ProbeResult
+from finshin_sdk.domain import ProbeChannel, ProbeOutcome, ProbeResult
 from skin.messages import CheckMessage
 
 from ..config import AppConfigData, AppSchema, FieldErrors, validate_types

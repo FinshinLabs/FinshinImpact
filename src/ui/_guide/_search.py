@@ -2,10 +2,8 @@
 
 - 一只输入框配一档筛选，每敲一个字符当场筛一次
 - 只切每行显隐，不动勾选也不动行序，清空即全显
-- 一只都没命中时在清单下方顶一句提示
+- 一只都没命中时在列表下方顶一句提示
 """
-
-from typing import Any
 
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -15,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import HelpKeys, PluginManifestKeys
+from finshin_sdk.dto import PluginManifestDTO
 from skin.messages import PluginMessage
 
 from .._primitives import ThemedList, make_combo
@@ -25,32 +23,31 @@ _SCOPE_ALL = "all"
 _SCOPE_NAME = "name"
 _SCOPE_CMD = "cmd"
 
-# 行上挂最小清单的数据角色
+# 行上挂加载记录的数据角色
 ROLE_MANIFEST = 0x0100
 
 # 命令名的两种写法，面板上带斜杠显示，输入时带不带都要命中
 _CMD_MARKS = ("", "/")
 
 
-def _matches(manifest: dict[str, Any], query: str, scope: str) -> bool:
+def _matches(manifest: PluginManifestDTO, query: str, scope: str) -> bool:
     """判这一行留不留
 
     - 不分大小写，子串命中即留
     - 名字一列比的是面板上看得见的显示名，没填标题即目录名
     """
-    display = (
-        manifest[PluginManifestKeys.TITLE] or manifest[PluginManifestKeys.NAME]
-    ).lower()
+    display = (manifest.declaration.title or manifest.name).lower()
     name_ok = scope != _SCOPE_CMD and query in display
     cmd_ok = scope != _SCOPE_NAME and any(query in one for one in _cmd_forms(manifest))
     return name_ok or cmd_ok
 
 
-def _cmd_forms(manifest: dict[str, Any]) -> list[str]:
+def _cmd_forms(manifest: PluginManifestDTO) -> list[str]:
     """交出每条命令名的带斜杠与不带斜杠两种写法"""
     return [
-        f"{mark}{cmd}".lower()
-        for cmd, _ in manifest[HelpKeys.COMMANDS]
+        f"{mark}{command.cmd}".lower()
+        for section in manifest.declaration.help
+        for command in section.commands
         for mark in _CMD_MARKS
     ]
 
@@ -62,10 +59,10 @@ class _PluginSearch(QWidget):
     """
 
     def __init__(self, rows: ThemedList) -> None:
-        """接上要筛的清单
+        """接上要筛的加载记录
 
-        - 行上的最小清单按列表项数据角色取
-        - 清单由装配入口创建，本件只切每行的显隐
+        - 行上的加载记录按列表项数据角色取
+        - 记录由装配入口创建，本件只切每行的显隐
         """
         super().__init__()
         self._rows = rows
@@ -120,10 +117,10 @@ class _PluginSearch(QWidget):
 
 
 def build_searchable_list(layout: QVBoxLayout) -> tuple[ThemedList, _PluginSearch]:
-    """装配可搜索插件清单
+    """装配插件列表与搜索件
 
-    - 交出清单与搜索件
-    - 清单、搜索行与空命中提示按这个顺序进布局
+    - 交出记录列表与搜索件
+    - 列表、搜索行与空命中提示按这个顺序进布局
     - 行内容仍由调用方填，重拼行之后要叫搜索件补筛一次
     """
     rows = ThemedList()

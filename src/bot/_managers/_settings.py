@@ -7,8 +7,7 @@
 import time
 from collections.abc import Callable
 
-from finshin_sdk import ConnectionPlan, PlanVerdict
-from finshin_sdk.domain import ConfigPath
+from finshin_sdk.domain import ConfigPath, ConnectionPlan, PlanVerdict
 from skin.messages import CheckMessage
 from ui import gui_bridge
 from utils import config_manager

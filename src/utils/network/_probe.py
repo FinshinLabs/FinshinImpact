@@ -6,8 +6,7 @@
 
 from typing import Any
 
-from finshin_sdk import ConnectionPlan
-from finshin_sdk.domain import RowStatus
+from finshin_sdk.domain import ConnectionPlan, RowStatus
 from skin.messages import CheckMessage
 
 # 进度帧专有态，接口包的终态里没有这一档

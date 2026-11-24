@@ -7,11 +7,11 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
-from finshin_sdk import ConnectionPlan
 from finshin_sdk.domain import (
     ConfigPath,
     ConfigValue,
     ConfigValues,
+    ConnectionPlan,
     FieldCondition,
     SourceCode,
 )

@@ -88,3 +88,21 @@ section = "命名与门面导出"
 path = "src/system/migrations/_0001_old_layout.py"
 match = "apply"
 reason = "同上一份脚本，runner 反射调用迁移动作"
+
+[[waiver]]
+section = "命名与门面导出"
+path = "src/bundled/AI/_declaration.py"
+match = "DECLARATION"
+reason = "插件读取器按文件名加载后取 DECLARATION，导入图查不到这个消费方"
+
+[[waiver]]
+section = "命名与门面导出"
+path = "src/bundled/grant/_declaration.py"
+match = "DECLARATION"
+reason = "插件读取器按文件名加载后取 DECLARATION，导入图查不到这个消费方"
+
+[[waiver]]
+section = "命名与门面导出"
+path = "src/bundled/help/_declaration.py"
+match = "DECLARATION"
+reason = "插件读取器按文件名加载后取 DECLARATION，导入图查不到这个消费方"

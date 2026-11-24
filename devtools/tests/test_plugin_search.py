@@ -23,7 +23,12 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import HelpKeys, PluginManifestKeys  # noqa: E402
+from finshin_sdk.domain import (  # noqa: E402
+    CommandHelp,
+    PluginDeclaration,
+    SectionHelp,
+)
+from finshin_sdk.dto import PluginManifestDTO  # noqa: E402
 from skin.messages import PluginMessage  # noqa: E402
 from ui._guide._conflict import _command_lines  # noqa: E402
 from ui._guide._search import (  # noqa: E402
@@ -36,13 +41,21 @@ from ui._guide._search import (  # noqa: E402
 )
 
 
-def _manifest(title: str, cmds: tuple[tuple[str, str], ...]) -> dict[str, object]:
-    """造一份搜索与明细要读的三列最小清单"""
-    return {
-        PluginManifestKeys.NAME: "ping_a",
-        PluginManifestKeys.TITLE: title,
-        HelpKeys.COMMANDS: cmds,
-    }
+def _manifest(title: str, cmds: tuple[tuple[str, str], ...]) -> PluginManifestDTO:
+    """造一份搜索与明细要读的加载记录"""
+    declaration = PluginDeclaration(
+        title=title,
+        summary="搜索用例",
+        help=(
+            SectionHelp(
+                section="样例",
+                commands=tuple(CommandHelp(cmd=cmd, desc=desc) for cmd, desc in cmds),
+            ),
+        ),
+    )
+    return PluginManifestDTO(
+        name="ping_a", module="plugin.ping_a", deps=(), declaration=declaration
+    )
 
 
 class TestMatchScope(unittest.TestCase):
@@ -124,7 +137,7 @@ class TestRowVisibility(unittest.TestCase):
         self.tip = MagicMock()
 
     def _refresh(self, query: str, scope: str = _SCOPE_ALL) -> None:
-        """用假件跑一次刷新，清单与输入都换成替身"""
+        """用假件跑一次刷新，加载记录与输入都换成替身"""
         rows = SimpleNamespace(
             count=lambda: len(self.items),
             item=lambda index: self.items[index],
@@ -163,13 +176,13 @@ class TestRowVisibility(unittest.TestCase):
         self.items[1].setHidden.assert_called_once_with(False)
 
     def test_zero_hit_raises_tip(self) -> None:
-        """一只都没命中时在清单下方顶一句提示"""
+        """一只都没命中时在列表下方顶一句提示"""
         self._refresh("nobody")
 
         self.tip.setVisible.assert_called_once_with(True)
 
     def test_rows_are_read_through_manifest_role(self) -> None:
-        """筛选读的是行上那份最小清单，角色取错就整表隐掉"""
+        """筛选读的是行上那份加载记录，角色取错就整表隐掉"""
         self._refresh("ping")
 
         for item in self.items:

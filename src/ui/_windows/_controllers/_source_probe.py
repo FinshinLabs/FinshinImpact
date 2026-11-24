@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import QDialog, QWidget
 
-from finshin_sdk import ConnectionPlan, PlanVerdict, ProbeOutcome
+from finshin_sdk.domain import ConnectionPlan, PlanVerdict, ProbeOutcome
 from skin.messages import CheckMessage
 from utils import get_logger
 from utils.check import failure_note, run_probe_round

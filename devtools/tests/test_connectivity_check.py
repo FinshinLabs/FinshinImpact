@@ -23,8 +23,7 @@ set_profile("tg.000000")
 from adapter_presence import adapter_present  # noqa: E402
 from config_plan import assemble_for_case, fake_adapter_parts  # noqa: E402
 
-from finshin_sdk import ProbeResult  # noqa: E402
-from finshin_sdk.domain import ConfigPath  # noqa: E402
+from finshin_sdk.domain import ConfigPath, ProbeResult  # noqa: E402
 from finshin_sdk.exceptions import ProbeTimeoutError  # noqa: E402
 from skin.messages import CheckMessage  # noqa: E402
 from utils.check import _verify as verify_mod  # noqa: E402

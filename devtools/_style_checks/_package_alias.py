@@ -12,11 +12,12 @@ import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from finshin_sdk import PROJECT_MANIFEST_FILE
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-# 声明载体文件名，与改名表在声明里的位置
-_DECLARATION_NAME = "pyproject.toml"
+# 改名表在声明里的位置
 _PACKAGE_DIR_PATH: tuple[str, ...] = ("tool", "setuptools", "package-dir")
 
 # 缓存键是声明所在目录，值是展开成绝对路径的「源码目录 → 包名」
@@ -80,7 +81,7 @@ def _table(base: Path, cache: AliasCache) -> dict[Path, str]:
 
 def _read_table(base: Path) -> dict[Path, str]:
     """解析 base 那份声明的改名表，没有该段即交空表"""
-    declared = _dig(_load(base / _DECLARATION_NAME))
+    declared = _dig(_load(base / PROJECT_MANIFEST_FILE))
     if not isinstance(declared, dict):
         return {}
     return {

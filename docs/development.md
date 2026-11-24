@@ -26,17 +26,17 @@
    - 发布包解压后手动单跑 `runtime\python.exe main.py` 也会先弹选择窗，无需自行设置该变量。
 10. `config.toml` 住在实例目录里，根目录那一份不读取，手头的老配置要自己备份，再重填 API Key 与人设。
 
-## 新增插件（清单驱动流程）
+## 新增插件（代码声明流程）
 
 ### 插件目录与基类
 
 - 建目录 `src/bundled/<Name>/`，`__init__.py` 里写一只 `BasePlugin` 子类，一只模块里只准有一只。
-- 取件优先从 `finshin_sdk` 顶层取，顶层没导出的再从 `finshin_sdk.domain` 取。
+- 插件与适配器形状从 `finshin_sdk.domain` 取，处理上下文与平台能力从 `finshin_sdk` 顶层取。
 - 这几只方法都可以不写，不写即没有那一类能力，交出的清单按交出的顺序生效。
 - `message_routes` 交按顺序判定的路由清单，谓词只吃归一后的处理上下文，装配时由平台侧编成引擎对象。
 - `background_loops` 交常驻循环，元素为无参协程函数，随 Bot 服务起停：轮询开始即拉起，停服即取消。跑中途抛出即静默收摊，那行日志要等停服收拢时才落，循环本身不重跑。
 - `queued_actions` 交可排队的动作，动作名写成 `插件名.动作`，前段不等于自己的插件名整只拒装。
-- 要交的那几样与处理上下文都取自接口包：`BasePlugin`、`MessageRoute`、`QueuedAction`、`MomentSubscription`、`HandlerContext`。
+- `BasePlugin`、`MessageRoute`、`QueuedAction`、`MomentSubscription` 从 `finshin_sdk.domain` 取，`HandlerContext` 从 `finshin_sdk` 顶层取。
 - 要跨插件共用的守卫、谓词、话术放 `src/bundled/_shared/`。
 
 ### 平台机会
@@ -49,22 +49,43 @@
 - 轮到时协程都收同一份交代 `CapabilityCall`，要往外说话从它的 `say` 拿。
 - 订阅的协程抛出的异常由装载侧兜住，落一行带插件名与时机名的日志，平台接着跑。
 
-### 插件清单
+### 插件声明
 
-- 目录内放 `plugin.toml`（模板 `assets/plugin.example.toml`）：
-  - 恒启用与加载档位由本体 `src/system/plugin_roster.py` 定，表里没有的按常规档，外部插件一律常规档。
-  - 清单多写的键一律忽略，帮助段与命令条目里多写的键同样忽略。
-  - 本插件独有的顶层库写在同目录 `pyproject.toml` 的 `[project].dependencies` 里并 pin 版本，清单里不再写 `deps`。
-  - 外部插件的清单与依赖声明缺任一整份不认。随包插件的库照旧在项目根的 `pyproject.toml` 里，目录内只放清单。
-- 注册序列与帮助图自动消费清单，随包表决定谁恒启用、谁排前面。`name` 必须与目录名一致，对不上时整份清单被拒收。
-- 命令可见性由清单 `[[help]]` 贡献决定，未写贡献的命令按未知命令拦截。
+- 目录内放 `_declaration.py`，交一个 `PluginDeclaration`：
+
+```python
+from finshin_sdk.domain import CommandHelp, PluginDeclaration, SectionHelp
+
+DECLARATION = PluginDeclaration(
+    title="示例",
+    summary="一句话说明",
+    assets=(),
+    help=(
+        SectionHelp(
+            section="示例",
+            commands=(CommandHelp(cmd="demo", desc="示例命令"),),
+        ),
+    ),
+)
+```
+
+- 文件顶层只许 `finshin_sdk` 导入、赋值与 `def`，函数默认值与装饰器也按同一组限制检查，违规报「文件:行号」。
+- 读取声明不执行插件包的 `__init__.py`，每次重新读取，不做缓存。
+- 缺文件、`DECLARATION` 形状不合法或接口包区间不满足，整只插件不收。
+- 恒启用与加载档位由本体 `src/system/plugin_roster.py` 定，表里没有的按常规档，外部插件一律常规档。
+- 本插件独有的顶层库写在同目录 `pyproject.toml` 的 `[project].dependencies` 里并 pin 版本。
+- 外部插件的 `[project].name` 必须写成 `finshin-plugin-<目录名>`，后缀与目录名完全一致，`dependencies` 必须写明 `finshin-sdk` 区间。
+- 外部插件缺项目声明、没写接口包区间或本机版本不在区间内即不加载，日志写明插件名、要求区间与本机版本。
+- 随包插件取目录名，不查接口包区间，库照旧写在项目根的 `pyproject.toml` 里。
+- 注册序列与帮助图自动消费代码声明，随包表决定谁恒启用、谁排前面。
+- 命令可见性由 `SectionHelp.commands` 决定，未写贡献的命令按未知命令拦截。
 
 ### 命令输入
 
-- 命令的可选输入只在 `[[help.commands]]` 登记，help 侧取的就是这一份。
-  - `flags` 每项写成 `["-i", "说明"]`，这是不收值的纯开关。`-h` 全命令默认可用、不必登记。
-  - 要带值的开关补第三段默认值，写成 `["-t", "说明", 0.0]`，命令没写这只开关即落默认值。
-  - 默认值只认整数、小数、文本三种，写成真假值、空文本或数组当场报错，报的是类型本名，不在解析里静默吞。
+- 命令的可选输入写在 `CommandHelp.flags`，help 侧取的就是这一份。
+  - 纯开关写成 `FlagHelp(name="-i", desc="说明")`。`-h` 全命令默认可用、不必登记。
+  - 带值开关写 `default`，例如 `FlagHelp(name="-t", desc="说明", default=0.0)`，命令没写这只开关即落默认值。
+  - 默认值只认整数、小数、非空文本，写成真假值、空文本或数组整只拒收。
   - 默认值的类型即这只开关的取值类型：整数档拒收小数写法，小数档把 `5` 这类写法转成 `5.0`，文本档原样交出。
   - 收不进该档的写法判多余输入。范围仍由命令自己判，判不过回一句要什么。
   - 开关数量不设上限，值就是紧跟在开关后面的那一段，后面紧跟别的开关即判缺值。
@@ -77,16 +98,16 @@
 
 ### 权限与提示
 
-- 命令权限档写清单 `role`，取 `owner` / `admin` / `member`，不写即 `member`。
+- 命令权限档写 `CommandHelp.role`，取 `CommandRole.OWNER` / `CommandRole.ADMIN` / `CommandRole.MEMBER`，不写即 `CommandRole.MEMBER`。
 - 装配时与代码里 `require_role(CommandRole.X)` 的档位比对，对不上整份插件拒装。
-- 对话场景的门槛仍写进判定函数读 `role_of`，清单不认。
+- 对话场景的门槛仍写进判定函数读 `role_of`，命令声明不认。
 - 帮助图的命令描述尾部按档位自动追加（仅主人）/（需授权），文案不要再手抄一份。
-- 段级 `note` 只写清单字段表达不了的规矩，比如私聊能不能用。
+- `SectionHelp.note` 只写命令字段表达不了的规矩，比如私聊能不能用。
 
 ### 装库链路
 
-- 插件的库按自家 `pyproject.toml` 的 `[project].dependencies` 收集，`plugin.toml` 的 `assets` 照旧，两者由插件面板汇总，选定实例后在启动前统一结算。
-- 判定以启用插件的 pip 包实测优先，资源靠指纹兜底。
+- 插件的库按自家 `pyproject.toml` 的 `[project].dependencies` 收集，资源取 `PluginDeclaration.assets`，选定实例后在启动前统一结算。
+- pip 包与资源都在启动前逐个实测，缺哪样补哪样。
 - 装 wheel 时逐只点名重装，装完再按本机读到的版本复核一次。
 - 装完才放行启动，装失败的插件自动禁用并弹窗告知。
 - 实例未保存过插件选择时仅随包插件运行。
@@ -98,28 +119,29 @@
 
 ## 外部插件
 
-1. 建目录 `finshin/plugin/<Name>/`，清单与字段同上，`name` 与目录名一致，代码放 `src` 那一层。
+1. 建目录 `finshin/plugin/<Name>/`，代码声明与字段同上，同目录 `pyproject.toml` 的 `[project].name` 写成 `finshin-plugin-<Name>`。代码放插件目录，也可放它的 `src` 子目录。
    - 导入范围见 [分层职责](coding-style.md#分层职责)。
    - 装载前扫描源码，引了本体的整只拒装，面板写明引用位置，一份多处只报第一处。
    - 两根目录一起扫，先读随包再读外部。外部插件的导入名是 `plugin.<Name>`，代码所在那一层按名字接到它，插件内部的相对引用走得通。
-2. 与随包插件同名的那份不放行，改 `name` 或写进启用集都不认。
-3. 被顶掉的那一份在面板单开一行，排在整张清单末尾，勾选位是"重名"按钮，点开写明插件名被谁占用。
-4. 清单声明的命令名已被拿走的整只不装载，面板把勾选位换成"冲突"按钮，点开逐条写明哪条命令被哪只插件占用。
+2. 与随包插件同名的那份不放行，改项目名或写进启用集都不认。
+3. 被顶掉的那一份在面板单开一行，排在整张加载记录末尾，勾选位是"重名"按钮，点开写明插件名被谁占用。
+4. 代码声明里的命令名已被拿走的整只不装载，面板把勾选位换成"冲突"按钮，点开逐条写明哪条命令被哪只插件占用。
    - 随包插件优先拿走命令名，同一命令名被两只外部插件一起勾上时整组不装载，状态文件怎么写都不算数。
    - 一只插件交出的是整套路由，摘不掉单独一条命令，命令名被抢走即整只不装载。
 5. 勾选与取消当场重算，撞车的另一只立刻换成按钮，不用重启也不用再保存。
 
 ## 从 dev4 及更早的写法改过来
 
-1. 入口写法：模块属性 `spec` 那套不再读取，改在 `__init__.py` 里写一只 `BasePlugin` 子类，一只模块只准有一只。`plugin.toml` 不用改。
-2. 导入行：领域词表、归一数据快照与处理上下文从 `core` 整只搬进 `finshin_sdk`。原来写 `from core.domain import ...`、`from core.dto import ...` 的行改从 `finshin_sdk` 取，`CapabilityCall` 同住接口包。
+1. 入口写法：模块属性 `spec` 那套不再读取，改在 `__init__.py` 里写一只 `BasePlugin` 子类，一只模块只准有一只。
+2. 导入行：领域词表从 `core.domain` 搬进 `finshin_sdk.domain`，归一数据快照从 `core.dto` 搬进 `finshin_sdk.dto`，`HandlerContext` 与 `CapabilityCall` 从 `finshin_sdk` 顶层取。
 3. 交出的东西改名：`PluginRoute` → `MessageRoute`、`PluginPredicate` → `RouteMatcher`、`PluginBackground` → `BackgroundLoop`、`TaskHandler` → `QueuedAction`、`timings` → `platform_moments`。
    - 时机那几样一并归到 moment 词根：`PlatformTiming` → `PlatformMoment`、`PluginTiming` → `MomentSubscription`、`PluginTimingRun` → `MomentRun`。
    - `PluginSpec` 那只袋子删了。
 4. 内置对话的动作名由 `chat` 改成 `AI.chat`，动作名归属见 [插件目录与基类](#插件目录与基类)。
 5. 接口包撤掉没人用的形状：`ContentDTO` 的 `file_token` 与 `origin_ref`、`AdapterFieldSpec.default`、`BoundCommand.value_of`、`PrincipalRepository.find_by_key`。用到哪一处改哪一处，没用到不必动。
 6. 把适配器声明从 `adapter.toml` 搬进 `pyproject.toml`，字段写法见 [仓与声明](#仓与声明)。
-7. 插件独有的库从 `plugin.toml` 的 `deps` 搬到同目录 `pyproject.toml` 的 `[project].dependencies`，清单里再写 `deps` 属未知键、一律忽略。
+7. 旧 TOML 插件声明里的标题、说明、资源与帮助搬进同目录 `_declaration.py`，依赖搬进同目录 `pyproject.toml` 的 `[project].dependencies`。
+8. 外部插件的名字从同目录 `pyproject.toml` 的 `[project].name` 读取，必须写成 `finshin-plugin-<目录名>`。`dependencies` 还须写明 `finshin-sdk` 区间，缺行或本机版本不在区间内即不加载。
 
 ## 新增平台适配器
 

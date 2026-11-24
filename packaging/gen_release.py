@@ -14,14 +14,14 @@ from typing import Any
 import net_channel
 import pack_spec
 
+from finshin_sdk import PROJECT_MANIFEST_FILE, SDK_DISTRIBUTION
+
 _TIMEOUT = 20.0  # 单次请求超时 20 秒
 _PER_PAGE = 100  # 列仓与列 release 的单页条数
 _RELEASE_MAX_PAGES = 10  # 翻页保护，与本体版本比对那侧同值，两处改名必须同步
 _ACCEPT = "application/vnd.github+json"  # 取件要的响应格式
 _WHEEL_PARTS = 5  # wheel 文件名的段数，版本是第二段
 
-# 分发名口径与开发工具清单里那两条一致，改名要一起改
-SDK_DISTRIBUTION = "finshin-sdk"
 _ADAPTER_PREFIX = "finshin-adapter-"
 
 # 目录行与版本条目的键位，与本体读目录那侧同值，两处改名必须同步
@@ -41,7 +41,6 @@ _DECL_PROJECT = "project"
 _DECL_TOOL = "tool"
 _DECL_NAME = "name"
 _DECL_DEPENDENCIES = "dependencies"
-_DECL_FILE = pack_spec.PackLayout.DECLARATION
 _DECL_ADAPTER_TABLE = "finshin-adapter"
 
 _WHEEL_SUFFIX = ".whl"
@@ -119,7 +118,9 @@ def _declaration(name: str, ref: str) -> dict[str, Any] | None:
 
     - 走 contents 口，与 release 同一个 host
     """
-    data = _get(f"{pack_spec.API_HOST}/repos/{name}/contents/{_DECL_FILE}?ref={ref}")
+    data = _get(
+        f"{pack_spec.API_HOST}/repos/{name}/contents/{PROJECT_MANIFEST_FILE}?ref={ref}"
+    )
     body = data.get("content") if isinstance(data, dict) else None
     if not isinstance(body, str):
         return None

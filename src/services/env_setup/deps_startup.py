@@ -4,7 +4,7 @@
 - 保存插件选择后按全局清单补缺，只加不删
 """
 
-from finshin_sdk.domain import PluginManifestKeys
+from finshin_sdk.dto import PluginManifestDTO
 from system.plugin_roster import is_plugin_enabled
 from system.plugin_state import (
     StateKeys,
@@ -31,8 +31,8 @@ def missing_global() -> list[str]:
     return [pin for pin in keep_union() if not is_pin_installed(pin)]
 
 
-def target_manifests(code: str) -> list[dict]:
-    """取本实例应结算的插件清单
+def target_manifests(code: str) -> list[PluginManifestDTO]:
+    """取本实例应结算的插件加载记录
 
     - 范围是随包插件与本实例启用集
     - 随包插件不看勾选，读取侧恒并入
@@ -44,7 +44,7 @@ def target_manifests(code: str) -> list[dict]:
     return [
         manifest
         for manifest in load_manifests(roots)
-        if is_plugin_enabled(manifest[PluginManifestKeys.NAME], enabled)
+        if is_plugin_enabled(manifest.name, enabled)
     ]
 
 
@@ -67,12 +67,12 @@ def disable_failed(code: str, failed: list[str]) -> list[str]:
     ordered: list[str] = []
     dropped: list[str] = []
     for manifest in manifests:
-        name = manifest[PluginManifestKeys.NAME]
+        name = manifest.name
         if name not in enabled:
             continue
         ordered.append(name)
-        deps = {top_package_name(pin) for pin in manifest[PluginManifestKeys.DEPS]}
-        assets = set(manifest[PluginManifestKeys.ASSETS])
+        deps = {top_package_name(pin) for pin in manifest.deps}
+        assets = set(manifest.declaration.assets)
         if deps & tops or assets & set(failed):
             dropped.append(name)
     if not dropped:

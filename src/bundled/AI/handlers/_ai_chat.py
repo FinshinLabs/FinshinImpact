@@ -4,8 +4,8 @@
 - 对话任务入队分发
 """
 
-from finshin_sdk import HandlerContext, MessageRoute
-from finshin_sdk.domain import ChatScope, CommandRole
+from finshin_sdk import HandlerContext
+from finshin_sdk.domain import ChatScope, CommandRole, MessageRoute
 from utils import get_logger
 
 from ..._shared.access import role_of

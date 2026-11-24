@@ -1,15 +1,14 @@
 """命令权限声明的单元测试
 
-- 覆盖 plugin.toml 里 role 的解析口径
 - 覆盖帮助图描述尾部的权限说明
-- 覆盖装配期的清单声明与守卫比对
+- 覆盖装配期的代码声明与守卫比对
+- 随仓三只插件的声明与守卫对得上
 """
 
 import importlib
 import sys
 import unittest
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
@@ -23,40 +22,35 @@ from bundled._shared.filters import CommandMatch  # noqa: E402
 from bundled.help import _services  # noqa: E402
 from exceptions import PluginRoleError  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
+    CommandHelp,
     CommandRole,
-    HelpKeys,
     MessageRoute,
+    PluginDeclaration,
+    SectionHelp,
 )
-from finshin_sdk.dto import (  # noqa: E402
-    HelpCommandDTO,
-    HelpSectionDTO,
-    PluginManifestDTO,
-)
+from finshin_sdk.dto import PluginManifestDTO  # noqa: E402
 from system.plugin_roster import BUNDLED_PLUGINS_PKG  # noqa: E402
-from utils.plugin import _manifest, _manifest_help, _register  # noqa: E402
-
-
-def _section(raw_command: dict[str, Any]) -> list[dict[str, Any]]:
-    """把单条命令包成一段帮助贡献"""
-    return [
-        {HelpKeys.SECTION: "工具", HelpKeys.NOTE: "", HelpKeys.COMMANDS: [raw_command]}
-    ]
-
-
-def _read(sections: list[dict[str, Any]]) -> tuple[HelpSectionDTO, ...]:
-    """按固定插件名读帮助段"""
-    return _manifest_help.read_help_sections(sections, "demo")
+from utils.plugin import _manifest, _register  # noqa: E402
 
 
 def _manifest_of(cmd: str, role: CommandRole) -> PluginManifestDTO:
-    """造一份只含单条命令声明的插件清单"""
-    command = HelpCommandDTO(cmd=cmd, desc="演示命令", role=role)
+    """造一份只含单条命令声明的加载记录"""
+    declaration = PluginDeclaration(
+        title="演示",
+        summary="演示",
+        assets=(),
+        help=(
+            SectionHelp(
+                section="工具",
+                commands=(CommandHelp(cmd=cmd, desc="演示命令", role=role),),
+            ),
+        ),
+    )
     return PluginManifestDTO(
         name="demo",
         module=f"{BUNDLED_PLUGINS_PKG}.demo",
-        title="演示",
-        summary="演示",
-        help_section=(HelpSectionDTO(commands=(command,)),),
+        deps=(),
+        declaration=declaration,
     )
 
 
@@ -70,57 +64,28 @@ def _routes(name: str, limit: CommandRole | None) -> tuple[MessageRoute, ...]:
     return (MessageRoute(CommandMatch(name), guarded),)
 
 
-class TestRoleParse(unittest.TestCase):
-    """清单里权限档的解析口径"""
-
-    def test_owner_word_parsed(self) -> None:
-        command = _read(
-            _section({HelpKeys.CMD: "wipe", HelpKeys.DESC: "清空", "role": "owner"})
-        )[0].commands[0]
-        self.assertEqual(command.role, CommandRole.OWNER)
-
-    def test_missing_role_defaults_to_member(self) -> None:
-        command = _read(_section({HelpKeys.CMD: "say", HelpKeys.DESC: "说话"}))[
-            0
-        ].commands[0]
-        self.assertEqual(command.role, CommandRole.MEMBER)
-
-    def test_word_out_of_table_drops_the_command(self) -> None:
-        sections = _read(
-            _section({HelpKeys.CMD: "say", HelpKeys.DESC: "说话", "role": "boss"})
-        )
-        self.assertEqual(sections[0].commands, ())
-
-
 class TestMenuRoleNote(unittest.TestCase):
     """帮助图描述尾部的权限说明"""
 
     def _desc(self, role: CommandRole) -> str:
-        command = HelpCommandDTO(cmd="md", desc="图片输出", role=role)
-        manifest = PluginManifestDTO(
-            name="demo",
-            module=f"{BUNDLED_PLUGINS_PKG}.demo",
-            title="演示",
-            summary="演示",
-            help_section=(HelpSectionDTO(commands=(command,)),),
-        )
+        manifest = _manifest_of("md", role)
         with patch.object(_services, "enabled_manifests", lambda path: [manifest]):
             help_list, specs, _ = _services._build_help_menu()
         self.assertEqual(specs["md"].role, role)
         return help_list["md"]
 
     def test_owner_note_appended(self) -> None:
-        self.assertEqual(self._desc(CommandRole.OWNER), "图片输出（仅主人）")
+        self.assertEqual(self._desc(CommandRole.OWNER), "演示命令（仅主人）")
 
     def test_admin_note_appended(self) -> None:
-        self.assertEqual(self._desc(CommandRole.ADMIN), "图片输出（需授权）")
+        self.assertEqual(self._desc(CommandRole.ADMIN), "演示命令（需授权）")
 
     def test_member_note_left_out(self) -> None:
-        self.assertEqual(self._desc(CommandRole.MEMBER), "图片输出")
+        self.assertEqual(self._desc(CommandRole.MEMBER), "演示命令")
 
 
 class TestRoleCheck(unittest.TestCase):
-    """装配期的清单声明与守卫比对"""
+    """装配期的代码声明与守卫比对"""
 
     def test_declared_owner_with_owner_guard_passes(self) -> None:
         _register._check_roles(

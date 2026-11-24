@@ -12,6 +12,8 @@ import sys
 import unittest
 from pathlib import Path
 
+from finshin_sdk import PROJECT_MANIFEST_FILE, SDK_DISTRIBUTION
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "packaging"))
@@ -103,7 +105,8 @@ class TestSameValuePairs(unittest.TestCase):
 
     def test_sdk_distribution_matches_generator(self) -> None:
         """接口包分发名本体与目录生成侧同串"""
-        self.assertEqual(distributions.SDK_DISTRIBUTION, gen_release.SDK_DISTRIBUTION)
+        self.assertIs(SDK_DISTRIBUTION, distributions.SDK_DISTRIBUTION)
+        self.assertIs(SDK_DISTRIBUTION, gen_release.SDK_DISTRIBUTION)
 
     def test_release_max_pages_matches_feed(self) -> None:
         """列 release 的翻页保护两处同一个数，改一处即步调不一"""
@@ -172,17 +175,15 @@ class TestNaming(unittest.TestCase):
         """包内解释器名启动器与本体同值"""
         self.assertEqual(toolchain._PY_EXE.name, pack_spec.PackLayout.PYTHON_EXE)
 
-    def test_declaration_name_matches_packaging(self) -> None:
-        """项目声明文件名本体两份与启动器同值"""
-        self.assertEqual(
-            profile_env.DECLARATION_FILE_NAME, pack_spec.PackLayout.DECLARATION
-        )
-        self.assertEqual(
-            tool_settings._ROOT_DECLARATION.name, profile_env.DECLARATION_FILE_NAME
-        )
-        self.assertEqual(
-            tool_settings.DEVTOOLS_DECLARATION.name, profile_env.DECLARATION_FILE_NAME
-        )
+    def test_declaration_name_comes_from_sdk(self) -> None:
+        """项目声明文件名各处直接引用接口包同一个名"""
+        self.assertIs(PROJECT_MANIFEST_FILE, profile_env.PROJECT_MANIFEST_FILE)
+        self.assertIs(PROJECT_MANIFEST_FILE, tool_settings.PROJECT_MANIFEST_FILE)
+        self.assertIs(PROJECT_MANIFEST_FILE, pack_spec.PROJECT_MANIFEST_FILE)
+        self.assertIs(PROJECT_MANIFEST_FILE, build.PROJECT_MANIFEST_FILE)
+        self.assertIs(PROJECT_MANIFEST_FILE, gen_release.PROJECT_MANIFEST_FILE)
+        self.assertEqual(tool_settings._ROOT_DECLARATION.name, PROJECT_MANIFEST_FILE)
+        self.assertEqual(tool_settings.DEVTOOLS_DECLARATION.name, PROJECT_MANIFEST_FILE)
 
     def test_icon_name_matches_build(self) -> None:
         """图标文件名本体与构建侧同值"""
@@ -221,7 +222,7 @@ def _read_uv_sources() -> set[str]:
     import tomllib
 
     data = tomllib.loads(
-        (ROOT / "devtools" / "pyproject.toml").read_text(encoding="utf-8")
+        (ROOT / "devtools" / PROJECT_MANIFEST_FILE).read_text(encoding="utf-8")
     )
     return set(data.get("tool", {}).get("uv", {}).get("sources", {}))
 

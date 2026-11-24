@@ -7,7 +7,7 @@
 from typing import TYPE_CHECKING
 
 from exceptions import ConfigOutputError
-from finshin_sdk import PlatformMoment
+from finshin_sdk.domain import PlatformMoment
 from skin.messages import CheckMessage, DialogMessage
 from system.profile_env import get_profile, read_token
 from ui import gui_bridge

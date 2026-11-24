@@ -6,7 +6,7 @@
 - 交出本插件的来源声明与配置字段表
 """
 
-from finshin_sdk import (
+from finshin_sdk.domain import (
     BackgroundLoop,
     BasePlugin,
     MessageRoute,

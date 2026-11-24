@@ -48,7 +48,7 @@
 - **平台组件**：在"环境维护"里点"管理平台组件"，在线装、更新平台适配器，可换其他版本，与本机接口包不兼容的那一版不给装。还有实例在用的平台不给卸。
 - **多实例隔离**：每个机器人独占一个实例目录，配置、人设、库、记录、日志互不干扰。拦截同一身份码的实例重复启动。
 - **权限管理**：分为主人、管理员、成员三档，授予和撤销全局生效，可用功能按权限分。
-- **插件化**：随包插件必选，三方插件放进安装目录 `finshin\plugin\`，面板勾选启用，未启用即不响应，依赖自动安装，配置随面板管理。
+- **插件化**：随包插件必选，三方插件放进安装目录 `finshin\plugin\`，面板勾选启用，未启用即不响应，依赖自动安装，配置随面板管理。插件标题、说明、资源与帮助写在同目录 `_declaration.py`，外部插件名、依赖与接口包区间写在 `pyproject.toml`。
 
 [⤴️ 返回目录](#目录)
 
@@ -73,13 +73,18 @@ Telegram：[`FinshinAdapterTG`](https://github.com/FinshinLabs/FinshinAdapterTG)
 
 - 🤖 **开发前先看**：[代码规范](docs/coding-style.md) 与 [开发手册](docs/development.md)，交给 AI 编码工具时把这两份喂给它，改完按规范自查。
 - 🧭 **仓库导航**：[写作规范](docs/writing-style.md)、[规范扫描器](docs/style-checker.md)、[测试](docs/testing.md)、[发布工作流](docs/release-workflow.md)、[打包教程](docs/packaging.md)、[`.gitmessage`](.gitmessage)、[工程经验](docs/lessons/README.md)。
-- 🧩 **插件清单模板**：[`assets/plugin.example.toml`](assets/plugin.example.toml)，配置字段表单源在接口包 [`FinshinSDK`](https://github.com/FinshinLabs/FinshinSDK)。
+- 🧩 **插件写法**：见 [开发手册的插件声明](docs/development.md#插件声明)，配置字段表单源在接口包 [`FinshinSDK`](https://github.com/FinshinLabs/FinshinSDK)。
 
 [⤴️ 返回目录](#目录)
 
 ---
 
 ## ⬆️ 旧版迁移<a id="旧版迁移"></a>
+
+### v1.0.0-alpha.7.dev9
+
+- 接口包首启自动换到 0.3.0。到"环境维护"里的"管理平台组件"把 Telegram 适配器更新到 0.3.0，0.2.x 与这一版的接口件不兼容。
+- 自己写过外部插件的人才要动：同目录 `plugin.toml` 不再读取，标题、说明、资源与帮助搬进 `_declaration.py`，名字、依赖与 `finshin-sdk` 区间写进 `pyproject.toml`。
 
 ### v1.0.0-alpha.7.dev8
 

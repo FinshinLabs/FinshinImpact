@@ -8,7 +8,6 @@
 - 包缓存清理走环境维护手动入口
 """
 
-from finshin_sdk.domain import PluginManifestKeys
 from services.env_setup.assets import install_assets, is_asset_installed
 from services.env_setup.deps_install import install_deps
 from services.env_setup.deps_startup import disable_failed, target_manifests
@@ -30,18 +29,14 @@ def _collect_missing(code: str) -> list[_Pending]:
     """
     plan: list[_Pending] = []
     for manifest in target_manifests(code):
-        missing = [
-            pin
-            for pin in manifest[PluginManifestKeys.DEPS]
-            if not is_pin_installed(pin)
-        ]
+        missing = [pin for pin in manifest.deps if not is_pin_installed(pin)]
         assets = [
             asset
-            for asset in manifest[PluginManifestKeys.ASSETS]
+            for asset in manifest.declaration.assets
             if not is_asset_installed(asset)
         ]
         if missing or assets:
-            plan.append((manifest[PluginManifestKeys.NAME], missing, assets))
+            plan.append((manifest.name, missing, assets))
     return plan
 
 

@@ -5,12 +5,10 @@
 - 名字撞上先读到的那份插件即整只不装载，面板上单开一行写明被谁顶掉
 - 冲突明细与命令明细共一只定宽小窗，一行一句，放不下即在行内循环滚
 - 冲突明细里的插件名与命令名都按用户看得见的那份写
-- 行尾一颗看命令的按钮，点开逐条列出这份清单声明的命令名与说明
+- 行尾一颗看命令的按钮，点开逐条列出这份加载记录声明的命令名与说明
 - 依赖与资源的安装由启动结算负责，禁用不删已装库
 - 清库只走选窗「环境维护」同步，面板保存无删除动作
 """
-
-from typing import Any
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
@@ -22,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import PluginManifestKeys
+from finshin_sdk.dto import PluginManifestDTO
 from services.env_setup.deps_install import install_deps
 from services.env_setup.deps_manifest import (
     catalog_digest,
@@ -68,15 +66,13 @@ _ROLE_LINES = 0x0101
 _ROLE_NAME_TAKEN = 0x0102
 
 
-def _status_label(manifest: dict[str, Any]) -> str:
+def _status_label(manifest: PluginManifestDTO) -> str:
     """算一行行尾的状态标签
 
-    - 缺库数按这份清单声明的依赖逐条查已装
+    - 缺库数按加载记录里的依赖逐条查已装
     - 开发模式只报话不动环境
     """
-    missing = sum(
-        1 for pin in manifest[PluginManifestKeys.DEPS] if not is_pin_installed(pin)
-    )
+    missing = sum(1 for pin in manifest.deps if not is_pin_installed(pin))
     if not missing:
         return PluginMessage.STATUS_INSTALLED
     if dev_mode():
@@ -95,7 +91,7 @@ class _PluginPanelDialog(BaseDialog):
         super().__init__(parent=parent, title=PluginMessage.TITLE.format(code=code))
         self._code = code
         self._mode = mode
-        self._manifests: list[dict[str, Any]] = []
+        self._manifests: list[PluginManifestDTO] = []
         self._titles: dict[str, str] = {}
         self._build()
 
@@ -103,7 +99,7 @@ class _PluginPanelDialog(BaseDialog):
         """装配面板版面
 
         - 标题、样式与尺寸一并定下
-        - 列表自带搜索行，行内容按清单与实例状态填充
+        - 列表自带搜索行，行内容按加载记录与实例状态填充
         - 底栏只摆一颗保存钮，文案随模式换
         """
         self.setStyleSheet(build_bootstrap_qss())
@@ -130,10 +126,10 @@ class _PluginPanelDialog(BaseDialog):
         layout.addLayout(buttons)
 
     def _build_rows(self) -> None:
-        """按清单与实例状态填充插件行
+        """按加载记录与实例状态填充插件行
 
         - 首屏就按抢占结果定勾选位形态
-        - 被同名顶掉的那一份排在整张清单末尾
+        - 被同名顶掉的那一份排在整张插件列表末尾
         """
         self._list.clear()
         self._manifests = []
@@ -145,14 +141,13 @@ class _PluginPanelDialog(BaseDialog):
         enabled = load_instance_enabled(state_path_of(self._code), StateKeys.ENABLED)
         self._manifests = load_manifests(roots)
         self._titles = {
-            manifest[PluginManifestKeys.NAME]: manifest[PluginManifestKeys.TITLE]
-            or manifest[PluginManifestKeys.NAME]
+            manifest.name: manifest.declaration.title or manifest.name
             for manifest in self._manifests
         }
 
         _, conflicts = resolve_claims(claims_of(self._manifests), enabled)
         for manifest in self._manifests:
-            name = manifest[PluginManifestKeys.NAME]
+            name = manifest.name
             lines = clash_lines(conflicts.get(name, ()), self._titles)
             self._add_row(manifest, is_plugin_enabled(name, enabled), lines)
         for loser, winner in shadowed_manifests(roots):
@@ -161,13 +156,13 @@ class _PluginPanelDialog(BaseDialog):
 
     def _add_row(
         self,
-        manifest: dict[str, Any],
+        manifest: PluginManifestDTO,
         checked: bool,
         lines: list[str],
         taken_by: str = "",
         label: str = PluginMessage.BTN_CONFLICT,
     ) -> None:
-        """拼一行挂进清单
+        """拼一行挂进插件列表
 
         - 冲突明细、按钮名与顶掉它的那份插件名挂在行上
         """
@@ -183,7 +178,7 @@ class _PluginPanelDialog(BaseDialog):
 
     def _make_row(
         self,
-        manifest: dict[str, Any],
+        manifest: PluginManifestDTO,
         checked: bool,
         lines: list[str],
         label: str = PluginMessage.BTN_CONFLICT,
@@ -192,8 +187,8 @@ class _PluginPanelDialog(BaseDialog):
 
         - 名称与说明由插件作者自写，宽度放不下即循环滚，全文挂悬浮提示
         """
-        bundled = manifest[PluginManifestKeys.NAME] in BUNDLED_PLUGINS
-        title = manifest[PluginManifestKeys.TITLE] or manifest[PluginManifestKeys.NAME]
+        bundled = manifest.name in BUNDLED_PLUGINS
+        title = manifest.declaration.title or manifest.name
 
         row = QWidget()
         row.setFixedHeight(PANEL.row_height)
@@ -206,7 +201,7 @@ class _PluginPanelDialog(BaseDialog):
 
         name_label = MarqueeLabel(title)
         name_label.setFixedWidth(PANEL.name_width)
-        desc_label = MarqueeLabel(manifest[PluginManifestKeys.SUMMARY])
+        desc_label = MarqueeLabel(manifest.declaration.summary)
         status = QLabel(_status_label(manifest))
         status.setFixedWidth(PANEL.status_width)
         status.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -247,7 +242,7 @@ class _PluginPanelDialog(BaseDialog):
         for row in range(self._list.count()):
             item = self._list.item(row)
             manifest = item.data(ROLE_MANIFEST)
-            name = manifest[PluginManifestKeys.NAME]
+            name = manifest.name
             if item.data(_ROLE_NAME_TAKEN) or name in BUNDLED_PLUGINS:
                 continue
             lines = clash_lines(conflicts.get(name, ()), self._titles)
@@ -272,12 +267,12 @@ class _PluginPanelDialog(BaseDialog):
             item = self._list.item(row)
             manifest = item.data(ROLE_MANIFEST)
             if (
-                not isinstance(manifest, dict)
-                or manifest[PluginManifestKeys.NAME] in BUNDLED_PLUGINS
+                not isinstance(manifest, PluginManifestDTO)
+                or manifest.name in BUNDLED_PLUGINS
             ):
                 continue
             if self._row_checked(item):
-                names.append(manifest[PluginManifestKeys.NAME])
+                names.append(manifest.name)
         return names
 
     def _on_save(self) -> None:

@@ -19,21 +19,32 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import PluginManifestKeys  # noqa: E402
+from finshin_sdk.domain import PluginDeclaration  # noqa: E402
+from finshin_sdk.dto import PluginManifestDTO  # noqa: E402
 from services.env_setup import deps_startup  # noqa: E402
 from ui._guide import _startup  # noqa: E402
 
 _SENTINEL = Path("plugins-sentinel")
-_WEB = {
-    PluginManifestKeys.NAME: "webshot",
-    PluginManifestKeys.DEPS: ["markdown==3.10.2", "playwright==1.62.0"],
-    PluginManifestKeys.ASSETS: ["playwright chromium-headless-shell"],
-}
-_AI = {
-    PluginManifestKeys.NAME: "AI",
-    PluginManifestKeys.DEPS: [],
-    PluginManifestKeys.ASSETS: [],
-}
+
+
+def _manifest(
+    name: str, deps: tuple[str, ...] = (), assets: tuple[str, ...] = ()
+) -> PluginManifestDTO:
+    """造一份启动结算要读的加载记录"""
+    return PluginManifestDTO(
+        name=name,
+        module=f"plugin.{name}",
+        deps=deps,
+        declaration=PluginDeclaration(title=name, summary=name, assets=assets),
+    )
+
+
+_WEB = _manifest(
+    "webshot",
+    ("markdown==3.10.2", "playwright==1.62.0"),
+    ("playwright chromium-headless-shell",),
+)
+_AI = _manifest("AI")
 
 _PATCHED = {
     _startup: (
@@ -102,11 +113,7 @@ class TestCollectMissing(_StartupBase):
     def test_bundled_plugin_always_checked(self) -> None:
         """启用集为空也覆盖随包插件的缺失"""
         self.m["load_instance_enabled"].return_value = frozenset()
-        bundled = {
-            PluginManifestKeys.NAME: "help",
-            PluginManifestKeys.DEPS: ["foo==1.0"],
-            PluginManifestKeys.ASSETS: [],
-        }
+        bundled = _manifest("help", ("foo==1.0",))
         self.m["load_manifests"].return_value = [bundled]
         self.m["is_pin_installed"].return_value = False
 
@@ -117,11 +124,7 @@ class TestCollectMissing(_StartupBase):
     def test_never_saved_state_keeps_bundled(self) -> None:
         """实例从没保存过勾选，随包插件的缺失照样列入计划"""
         self.m["load_instance_enabled"].return_value = None
-        bundled = {
-            PluginManifestKeys.NAME: "help",
-            PluginManifestKeys.DEPS: ["foo==1.0"],
-            PluginManifestKeys.ASSETS: [],
-        }
+        bundled = _manifest("help", ("foo==1.0",))
         self.m["load_manifests"].return_value = [bundled, _WEB]
         self.m["is_pin_installed"].return_value = False
 
@@ -209,11 +212,7 @@ class TestDisableFailed(_StartupBase):
     def test_drops_plugin_matched_by_dep(self) -> None:
         """失败项命中某插件的依赖，只禁该插件并落盘剩余启用集"""
         self.m["load_instance_enabled"].return_value = frozenset({"webshot", "other"})
-        other = {
-            PluginManifestKeys.NAME: "other",
-            PluginManifestKeys.DEPS: ["foo==1.0"],
-            PluginManifestKeys.ASSETS: [],
-        }
+        other = _manifest("other", ("foo==1.0",))
         self.m["load_manifests"].return_value = [_AI, _WEB, other]
 
         dropped = deps_startup.disable_failed("AAAA", ["playwright==1.62.0"])

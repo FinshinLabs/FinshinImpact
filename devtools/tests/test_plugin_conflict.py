@@ -4,7 +4,7 @@
 - 插件任一命令名被拿走即整只不放行
 - 同一命令名多只表外插件同时在场整组作废且不记冲突
 - 装载序列与面板勾选集共用 resolve_claims 这一份判定
-- 精简清单取到的命令名与注册表认到的同集合
+- 两份读取取到的命令名与注册表认到的同集合
 """
 
 import sys
@@ -21,29 +21,29 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import (  # noqa: E402
-    CommandTaken,
-    HelpKeys,
-    PluginClaim,
-    PluginManifestKeys,
-)
+from finshin_sdk.domain import CommandTaken, PluginClaim  # noqa: E402
 from services.env_setup import deps_manifest  # noqa: E402
 from system.plugin_roster import BUNDLED_PLUGINS_PKG, resolve_claims  # noqa: E402
 from utils.plugin import _manifest  # noqa: E402
 
-_HEAD = 'name = "{name}"\ntitle = "{name}"\nsummary = "命令名抢占用例"\ndeps = []\n'
-_COMMAND = '\n[[help.commands]]\ncmd = "{cmd}"\ndesc = "回一声"\n'
+_HEAD = """from finshin_sdk.domain import CommandHelp, PluginDeclaration, SectionHelp
+
+DECLARATION = PluginDeclaration(
+    title="{name}",
+    summary="命令名抢占用例",
+    assets=(),
+    help=(SectionHelp(section="样例", commands=({commands})),),
+)
+"""
+_COMMAND = 'CommandHelp(cmd="{cmd}", desc="回一声"),'
 
 
 def _write(root: Path, name: str, cmds: tuple[str, ...]) -> None:
-    """在目录下造一份声明命令名的清单"""
-    target = root / name / "plugin.toml"
+    """在目录下造一份声明命令名的代码声明"""
+    target = root / name / "_declaration.py"
     target.parent.mkdir(parents=True)
-    text = _HEAD.format(name=name)
-    text += '\n[[help]]\nsection = "样例"\n'
-    for cmd in cmds:
-        text += _COMMAND.format(cmd=cmd)
-    target.write_text(text, encoding="utf-8")
+    commands = "".join(_COMMAND.format(cmd=cmd) for cmd in cmds)
+    target.write_text(_HEAD.format(name=name, commands=commands), encoding="utf-8")
 
 
 def _claim(name: str, *cmds: str) -> PluginClaim:
@@ -159,22 +159,24 @@ class TestLoaderRefusal(unittest.TestCase):
 
 
 class TestTwoReadersAgree(unittest.TestCase):
-    """命令名集合：面板读的精简清单与注册表读的清单同集合"""
+    """命令名集合：面板与注册表两份读取同集合"""
 
     def _rows_and_manifests(
         self, root: Path
     ) -> tuple[dict[str, tuple[str, ...]], dict[str, tuple[str, ...]]]:
         """分别取两份读侧认到的命令名"""
         rows = {
-            row[PluginManifestKeys.NAME]: tuple(
-                cmd for cmd, _ in row[HelpKeys.COMMANDS]
+            row.name: tuple(
+                command.cmd
+                for section in row.declaration.help
+                for command in section.commands
             )
             for row in deps_manifest.load_manifests([(root, BUNDLED_PLUGINS_PKG)])
         }
         manifests = {
             name: tuple(
                 command.cmd
-                for section in manifest.help_section
+                for section in manifest.declaration.help
                 for command in section.commands
             )
             for name, manifest in _manifest._load_manifests(
@@ -194,22 +196,24 @@ class TestTwoReadersAgree(unittest.TestCase):
             self.assertEqual(rows, manifests)
             self.assertEqual(rows["help"], ("history", "clear"))
 
-    def test_both_skip_command_missing_desc(self) -> None:
-        """缺说明的那条命令名两边都不认，判定不会只在一侧成立"""
+    def test_both_skip_declaration_with_bad_shape(self) -> None:
+        """命令缺说明时整只拒收，判定不会只在一侧成立"""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write(root, "help", ("history",))
-            target = root / "help" / "plugin.toml"
+            target = root / "help" / "_declaration.py"
             target.write_text(
-                target.read_text(encoding="utf-8")
-                + '\n[[help.commands]]\ncmd = "half"\nflags = []\n',
+                target.read_text(encoding="utf-8").replace(
+                    'CommandHelp(cmd="history", desc="回一声")',
+                    'CommandHelp(cmd="history", desc="")',
+                ),
                 encoding="utf-8",
             )
 
             rows, manifests = self._rows_and_manifests(root)
 
-            self.assertEqual(rows, manifests)
-            self.assertEqual(rows["help"], ("history",))
+            self.assertEqual(rows, {})
+            self.assertEqual(manifests, {})
 
 
 if __name__ == "__main__":

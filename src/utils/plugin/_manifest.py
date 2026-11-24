@@ -1,26 +1,22 @@
-"""插件清单读取器
+"""插件加载记录读取器
 
-- 扫描插件目录聚合各插件自描述清单
+- 扫描插件目录聚合各插件自描述加载记录
 - 按实例自描述文件里的启用集算启用序列
 - 外部根里名字撞上随包表的插件整份不放行
 - 命令名被在场插件拿走的整只不放行
-- 引导期另有一份只取最小字段集的精简实现
 """
 
-import importlib.machinery
 import importlib.util
 from pathlib import Path
-from typing import Any
 
-from finshin_sdk.domain import (
-    PLUGIN_MANIFEST_TABLE,
-    PluginClaim,
-    PluginFileName,
-    PluginManifestKeys,
-    PluginPriority,
-)
+from finshin_sdk.domain import PluginClaim, PluginFileName, PluginPriority
 from finshin_sdk.dto import PluginManifestDTO
 from system.module_mount import mount_module, mount_package
+from system.plugin_declaration import (
+    PluginDeclarationError,
+    PluginSdkError,
+    read_plugin_manifest,
+)
 from system.plugin_roster import (
     BUNDLED_PLUGINS,
     BUNDLED_PLUGINS_PKG,
@@ -31,19 +27,11 @@ from system.plugin_roster import (
     resolve_claims,
 )
 from system.plugin_state import StateKeys, load_instance_enabled
-from system.profile_env import DECLARATION_FILE_NAME, ROOT_DIR
-from system.toml_read import read_toml
-from system.tool_settings import declared_dependencies
+from system.profile_env import ROOT_DIR
 
-from ._manifest_help import read_help_sections
+from ..logger import get_logger
 
-# 清单标量字段与期望类型，deps/assets 列表成员一律 str
-_SCALAR_TYPES: dict[str, type] = {
-    spec.key: spec.value_type for spec in PLUGIN_MANIFEST_TABLE
-}
-
-# 清单必填项，缺任一拒收
-_REQUIRED_KEYS = tuple(spec.key for spec in PLUGIN_MANIFEST_TABLE if spec.required)
+_logger = get_logger("Plugin")
 
 # 插件根：目录与这棵树的顶层包名
 _PluginRoot = tuple[Path, str]
@@ -102,9 +90,9 @@ def _code_dir(plugin_dir: Path) -> Path:
 def _load_manifests(
     plugins_path: Path, pkg: str, mount_code: bool
 ) -> dict[str, PluginManifestDTO]:
-    """扫描插件目录聚合清单
+    """扫描插件目录聚合加载记录
 
-    - 只认含清单文件的直接子目录
+    - 只认含声明文件的直接子目录
     - 按目录名升序插入，dict 保序
     - 读取失败或字段非法的插件跳过
     """
@@ -126,57 +114,22 @@ def _load_manifests(
 
 
 def _read_manifest(dir_path: Path, dir_name: str, pkg: str) -> PluginManifestDTO | None:
-    """读取单份插件清单并接上自家依赖表
+    """读取单份插件加载记录
 
-    - 清单缺失或解析失败返回 None
-    - 必填三项缺失、name 与目录名不符或类型错误则整份拒收
-    - 外部那份的依赖表读不出即整份拒收，随包那份的库在根声明里
-    - 未知键忽略，可选字段缺省用 DTO 默认值
-    - 导入路径按所在根的顶层包名拼，清单不写这一行
+    - 缺声明文件即跳过，不导入插件包
+    - 代码声明、项目声明或接口包区间不合法即整只拒收
     """
-    data = read_toml(dir_path / PluginFileName.MANIFEST)
-    if data is None:
+    if not (dir_path / PluginFileName.DECLARATION).is_file():
         return None
-
-    kwargs: dict[str, Any] = {}
-    for key, expected in _SCALAR_TYPES.items():
-        if key not in data:
-            continue
-        value = data[key]
-        if not isinstance(value, expected):
-            return None
-        if isinstance(value, list):
-            if not all(isinstance(item, str) for item in value):
-                return None
-            kwargs[key] = tuple(value)
-        else:
-            kwargs[key] = value
-
-    if not all(k in kwargs for k in _REQUIRED_KEYS):
-        return None
-    if kwargs[PluginManifestKeys.NAME] != dir_name:
-        return None
-
-    deps = _deps_of(dir_path, pkg)
-    if deps is None:
-        return None
-
-    if raw_sections := data.get(PluginManifestKeys.HELP):
-        kwargs["help_section"] = read_help_sections(raw_sections, dir_name)
-
-    return PluginManifestDTO(deps=deps, module=f"{pkg}.{dir_name}", **kwargs)
-
-
-def _deps_of(plugin_dir: Path, pkg: str) -> tuple[str, ...] | None:
-    """插件的依赖表
-
-    - 随包那份的库在根声明里，此处即空表
-    - 外部那份交出 None 即自家声明的依赖表读不出，整份不认
-    """
-    if pkg == BUNDLED_PLUGINS_PKG:
-        return ()
-
-    return declared_dependencies(plugin_dir / DECLARATION_FILE_NAME)
+    try:
+        return read_plugin_manifest(
+            dir_path, dir_name, pkg, bundled=pkg == BUNDLED_PLUGINS_PKG
+        )
+    except PluginSdkError as error:
+        _logger.info(str(error))
+    except PluginDeclarationError as error:
+        _logger.debug(str(error))
+    return None
 
 
 def _resolve_enabled(
@@ -203,17 +156,19 @@ def _resolve_enabled(
 
 
 def _declared_commands(manifest: PluginManifestDTO) -> tuple[str, ...]:
-    """取清单声明的命令名"""
+    """取代码声明里的命令名"""
     return tuple(
-        command.cmd for section in manifest.help_section for command in section.commands
+        command.cmd
+        for section in manifest.declaration.help
+        for command in section.commands
     )
 
 
 def enabled_manifests(state_path: Path) -> list[PluginManifestDTO]:
-    """读取启用插件的清单序列
+    """读取启用插件的加载记录序列
 
     - 注册表与帮助聚合共用本函数取序列
-    - 一根目录都定位不到或无清单返回空列表
+    - 一根目录都定位不到或无声明返回空列表
     - 外部根里名字撞上随包表的插件不进序列，改名单也不放行
     - 同名插件按根的顺序取先读到的，随包压住外部
     - 命令名被在场插件拿走的整只不进序列，互抢的多只表外插件一起不作数

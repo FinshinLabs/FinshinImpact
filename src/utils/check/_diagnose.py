@@ -8,7 +8,8 @@
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from finshin_sdk import AdapterParts, ConnectionPlan
+from finshin_sdk import AdapterParts
+from finshin_sdk.domain import ConnectionPlan
 from skin.messages import CheckMessage
 
 from .._config_manager import config_manager

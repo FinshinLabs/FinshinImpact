@@ -12,6 +12,8 @@ from typing import Any
 
 import net_channel
 
+from finshin_sdk import PROJECT_MANIFEST_FILE
+
 # 仓库根与产物目录（_cache 存放重复构建可复用的原料）
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
@@ -51,7 +53,6 @@ class PackLayout:
     MAIN_SCRIPT = "main.py"
     LAUNCHER_SCRIPT = "launcher.py"
     PACK_SPEC_SCRIPT = "pack_spec.py"
-    DECLARATION = "pyproject.toml"
     ICON = "app.ico"
     EMBED_ZIP = "python-embed.zip"
     UV_ZIP = "uv.zip"
@@ -65,7 +66,7 @@ class PackLayout:
 
 
 # 版本信息网页
-_PAGES_PYPROJECT_URL = f"{_PAGES_HOST}/{_MAIN_REPO}/{PackLayout.DECLARATION}"
+_PAGES_PYPROJECT_URL = f"{_PAGES_HOST}/{_MAIN_REPO}/{PROJECT_MANIFEST_FILE}"
 _RELEASE_API_URL = API_HOST + f"/repos/{_ACCOUNT}/{_MAIN_REPO}/releases/tags/v{{ver}}"
 _SDK_RELEASE_API_URL = (
     API_HOST + f"/repos/{_ACCOUNT}/{_SDK_REPO}/releases/tags/v{{ver}}"
@@ -130,7 +131,7 @@ def attach_source_path(root: Path) -> None:
 
 def _pyproject_data(root: Path) -> dict:
     """读取指定包根内 pyproject 的解析结果"""
-    with open(root / "pyproject.toml", "rb") as f:
+    with open(root / PROJECT_MANIFEST_FILE, "rb") as f:
         return tomllib.load(f)
 
 

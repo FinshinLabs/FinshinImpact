@@ -33,6 +33,8 @@ from pack_spec import (
     sdk_wheel_name,
 )
 
+from finshin_sdk import PROJECT_MANIFEST_FILE
+
 _PACKAGING_DIR = "packaging"
 
 # 应用图标取自 assets/app.ico，exe 与 GUI 任务栏共用这只
@@ -44,7 +46,7 @@ _COPY_DIRS = ("src", "assets")
 # 拷贝时一并跳过的名字：`.git` 进包等于把本机路径发出去
 _COPY_IGNORE = ("__pycache__", ".pytest_cache", "*.egg-info", ".git")
 _COPY_FILES = (
-    PackLayout.DECLARATION,
+    PROJECT_MANIFEST_FILE,
     "README.md",
     "CHANGELOG.md",
     "LICENSE",

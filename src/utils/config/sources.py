@@ -9,8 +9,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from finshin_sdk import ConnectionPlan
-from finshin_sdk.domain import ConfigValues, FieldSpec, SectionSpec
+from finshin_sdk.domain import ConfigValues, ConnectionPlan, FieldSpec, SectionSpec
 
 from ..logger import get_logger
 from .models import AppConfigData, NotesBySection, TabData

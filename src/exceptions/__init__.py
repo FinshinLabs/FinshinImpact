@@ -43,7 +43,6 @@ from ._plugins import (
     PluginEntryError,
     PluginImportError,
     PluginLoadError,
-    PluginManifestError,
     PluginMissingError,
     PluginRoleError,
     PluginsError,
@@ -94,7 +93,6 @@ __all__ = [
     "PluginDependencyError",
     "PluginImportError",
     "PluginLoadError",
-    "PluginManifestError",
     "PluginRoleError",
     # 适配器
     "AdapterError",

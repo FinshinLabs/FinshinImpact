@@ -4,7 +4,7 @@
 - 同名被两处钉了不同版本时交出说明行
 """
 
-from finshin_sdk.domain import PlatformCode, PluginManifestKeys
+from finshin_sdk.domain import PlatformCode
 from skin.messages import PluginMessage
 from system.distributions import SDK_DISTRIBUTION, installed_version
 from system.plugin_roster import is_plugin_enabled
@@ -92,12 +92,7 @@ def _merge_keep(
 
 
 def _enabled_deps_union() -> list[str]:
-    """汇总全部实例已启用插件的依赖并集"""
-    return _enabled_field_union(PluginManifestKeys.DEPS)
-
-
-def _enabled_field_union(field: str) -> list[str]:
-    """按清单字段汇总全实例的启用并集
+    """汇总全部实例已启用插件的依赖并集
 
     - 实例目录逐个子目录扫自描述文件，目录不存在返回空表
     """
@@ -111,6 +106,6 @@ def _enabled_field_union(field: str) -> list[str]:
             continue
         enabled = load_instance_enabled(path / INSTANCE_PROFILE_NAME, StateKeys.ENABLED)
         for manifest in manifests:
-            if is_plugin_enabled(manifest[PluginManifestKeys.NAME], enabled):
-                items.extend(manifest[field])
+            if is_plugin_enabled(manifest.name, enabled):
+                items.extend(manifest.deps)
     return items

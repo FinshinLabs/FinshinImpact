@@ -18,6 +18,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from finshin_sdk import PROJECT_MANIFEST_FILE
+
 _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parent
 
@@ -63,7 +65,7 @@ def _discover_subrepos(root: Path) -> tuple[_Subrepo, ...]:
     if not mounts.is_dir():
         return ()
     found: list[_Subrepo] = []
-    for cfg in sorted(mounts.rglob("pyproject.toml")):
+    for cfg in sorted(mounts.rglob(PROJECT_MANIFEST_FILE)):
         if _IGNORED_PARTS & set(cfg.relative_to(mounts).parts):
             continue
         dirs = _package_dirs(cfg)

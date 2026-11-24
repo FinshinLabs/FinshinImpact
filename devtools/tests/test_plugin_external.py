@@ -4,8 +4,8 @@
 - 外部插件的导入路径带外部顶层包名，目录内部的相对引用走得通
 - 同名插件以先读到的根为准，随包压住外部
 - 外部目录不存在时只剩随包一根
-- 插件交出的一切按契约收到：清单字段、路由、常驻协程、任务处理、时机订阅
-- 权限档对不上、缺清单、动作名不挂自己名下的插件记失败，不混进成功行
+- 插件交出的一切按契约收到：加载记录、路由、常驻协程、任务处理、时机订阅
+- 权限档对不上、缺入口类、动作名不挂自己名下的插件记失败，不混进成功行
 """
 
 import json
@@ -30,12 +30,7 @@ from exceptions import (  # noqa: E402
     PluginRoleError,
     describe_error,
 )
-from finshin_sdk.domain import (  # noqa: E402
-    HelpKeys,
-    PlatformMoment,
-    PluginClaim,
-    PluginManifestKeys,
-)
+from finshin_sdk.domain import PlatformMoment, PluginClaim  # noqa: E402
 from services.env_setup import deps_manifest  # noqa: E402
 from system.plugin_roster import (  # noqa: E402
     BUNDLED_PLUGINS_PKG,
@@ -46,12 +41,19 @@ from system.plugin_roster import (  # noqa: E402
 from utils.external_scope import check_external_imports  # noqa: E402
 from utils.plugin import _manifest, _register  # noqa: E402
 
-_MANIFEST = 'name = "{name}"\ntitle = "{title}"\nsummary = "外部目录装载用例"\n'
-# 清单里的命令声明，读侧按它做命令名抢占判定
-_COMMAND = '\n[[help]]\nsection = "样例"\n\n[[help.commands]]\ncmd = "{cmd}"\ndesc = "看一眼"\n'
+_MANIFEST = """from finshin_sdk.domain import CommandHelp, PluginDeclaration, SectionHelp
+
+DECLARATION = PluginDeclaration(
+    title="{title}",
+    summary="外部目录装载用例",
+    assets=(),
+    help=(SectionHelp(section="样例", commands=({commands})),),
+)
+"""
+_COMMAND = 'CommandHelp(cmd="{cmd}", desc="看一眼"),'
 # 入口引同目录的另一只文件，导入走不通即红
 _ENTRY = """
-from finshin_sdk import BasePlugin, MessageRoute
+from finshin_sdk.domain import BasePlugin, MessageRoute
 
 from ._inner import ROUTES
 
@@ -62,7 +64,7 @@ class DemoPlugin(BasePlugin):
 """
 
 _INNER = """
-from finshin_sdk import MessageRoute
+from finshin_sdk.domain import MessageRoute
 
 
 async def _never(raw: object, ctx: object) -> bool:
@@ -79,7 +81,7 @@ ROUTES = (MessageRoute(_never, _drop),)
 
 # 伸手本体内部的入口，闸要在导入之前就拦下
 _SCOPE_OFFENDER = """
-from finshin_sdk import BasePlugin
+from finshin_sdk.domain import BasePlugin
 from utils.speaker import media_mark
 
 
@@ -88,25 +90,27 @@ class OffenderPlugin(BasePlugin):
 """
 
 
-# 交出全套件的清单文本，role 为命令声明的权限档
-_CONTRACT_MANIFEST = """
-name = "demo"
-title = "契约样例"
-summary = "外部插件交出的那一套件"
-assets = ["playwright chromium-headless-shell"]
+# 交出全套件的代码声明，role 为命令声明的权限档
+_CONTRACT_MANIFEST = """from finshin_sdk.domain import CommandHelp, CommandRole, PluginDeclaration, SectionHelp
 
-[[help]]
-section = "样例"
-
-[[help.commands]]
-cmd = "ping"
-desc = "回一声"
-flags = []
-role = "{role}"
+DECLARATION = PluginDeclaration(
+    title="契约样例",
+    summary="外部插件交出的那一套件",
+    assets=("playwright chromium-headless-shell",),
+    help=(SectionHelp(section="样例", commands=(CommandHelp(
+        cmd="ping", desc="回一声", flags=(), role=CommandRole.{role},
+    ),)),),
+)
 """
 _CONTRACT_ENTRY = """
-from finshin_sdk import BasePlugin, BackgroundLoop, MessageRoute, QueuedAction
-from finshin_sdk.domain import PlatformMoment, MomentSubscription
+from finshin_sdk.domain import (
+    BackgroundLoop,
+    BasePlugin,
+    MessageRoute,
+    MomentSubscription,
+    PlatformMoment,
+    QueuedAction,
+)
 
 
 async def _hit(raw: object, ctx: object) -> bool:
@@ -145,7 +149,7 @@ class DemoPlugin(BasePlugin):
 
 # 动作名挂在别家名下的入口，装载侧应拒收
 _FOREIGN_ACTION_ENTRY = """
-from finshin_sdk import BasePlugin, QueuedAction
+from finshin_sdk.domain import BasePlugin, QueuedAction
 
 
 async def _task(ctx: object) -> None:
@@ -160,7 +164,7 @@ class ForeignPlugin(BasePlugin):
 
 # 陪跑一只必成功的插件，另两只失败时才轮不到整体上抛
 _MATE_ENTRY = """
-from finshin_sdk import BasePlugin
+from finshin_sdk.domain import BasePlugin
 
 
 class MatePlugin(BasePlugin):
@@ -169,9 +173,12 @@ class MatePlugin(BasePlugin):
 
 
 def _write_declaration(plugin_dir: Path, deps: tuple[str, ...] = ()) -> None:
-    """补一份只交代依赖的自家声明，外部那档缺它即整份不认"""
-    text = '[project]\nname = "x"\nversion = "0"\ndependencies = [{}]\n'.format(
-        ", ".join(f'"{pin}"' for pin in deps)
+    """补一份带名字与依赖的自家声明，外部那档缺它即整份不认"""
+    pins = ("finshin-sdk>=0.2.0,<0.4.0", *deps)
+    rendered = ", ".join(f'"{pin}"' for pin in pins)
+    text = (
+        f'[project]\nname = "finshin-plugin-{plugin_dir.name}"\n'
+        f'version = "0"\ndependencies = [{rendered}]\n'
     )
     (plugin_dir / "pyproject.toml").write_text(text, encoding="utf-8")
 
@@ -183,17 +190,16 @@ def _write_plugin(
     sources: dict[str, str] | None = None,
     commands: tuple[str, ...] = (),
 ) -> None:
-    """在根目录下摆一只带清单的插件目录
+    """在根目录下摆一只带代码声明的插件目录
 
-    - sources 为空只交清单，用于只看读取的用例
-    - commands 往清单里补命令声明，读侧据此做抢占判定
+    - sources 为空只交声明，用于只看读取的用例
+    - commands 往声明里补命令，读侧据此做抢占判定
     """
     plugin_dir = root / name
     plugin_dir.mkdir(parents=True)
-    text = _MANIFEST.format(name=name, title=title)
-    for cmd in commands:
-        text += _COMMAND.format(cmd=cmd)
-    (plugin_dir / "plugin.toml").write_text(text, encoding="utf-8")
+    declared = "".join(_COMMAND.format(cmd=cmd) for cmd in commands)
+    text = _MANIFEST.format(title=title, commands=declared)
+    (plugin_dir / "_declaration.py").write_text(text, encoding="utf-8")
     _write_declaration(plugin_dir)
     for file_name, body in (sources or {}).items():
         (plugin_dir / file_name).write_text(body, encoding="utf-8")
@@ -248,21 +254,21 @@ class ExternalRootCase(unittest.TestCase):
     def _register_installed(
         self, entries: dict[str, str], manifest: str, deps: tuple[str, ...] = ()
     ) -> tuple:
-        """按给定入口跑一轮注册，回清单序列、注册结果与挂上来的路由
+        """按给定入口跑一轮注册，回加载记录、注册结果与挂上来的路由
 
         - 同时陪跑一只必成功的插件，单只失败才轮不到整体上抛
         """
         demo = self.installed / "demo"
         demo.mkdir()
-        (demo / "plugin.toml").write_text(manifest, encoding="utf-8")
+        (demo / "_declaration.py").write_text(manifest, encoding="utf-8")
         _write_declaration(demo, deps)
         for file_name, body in entries.items():
             (demo / file_name).write_text(body, encoding="utf-8")
 
         mate = self.installed / "mate"
         mate.mkdir()
-        (mate / "plugin.toml").write_text(
-            _MANIFEST.format(name="mate", title="陪跑"), encoding="utf-8"
+        (mate / "_declaration.py").write_text(
+            _MANIFEST.format(title="陪跑", commands=""), encoding="utf-8"
         )
         _write_declaration(mate)
         (mate / "__init__.py").write_text(_MATE_ENTRY, encoding="utf-8")
@@ -277,7 +283,7 @@ class ExternalRootCase(unittest.TestCase):
 
 
 class TestExternalRootReads(ExternalRootCase):
-    """清单读取：两根都扫，同名定档"""
+    """加载记录读取：两根都扫，同名定档"""
 
     def test_external_manifest_gets_external_module(self) -> None:
         """外部目录的插件进表，导入路径带外部顶层包名
@@ -307,7 +313,7 @@ class TestExternalRootReads(ExternalRootCase):
         picked = _manifest.enabled_manifests(self.state)
 
         self.assertEqual(
-            [(m.title, m.module) for m in picked],
+            [(m.declaration.title, m.module) for m in picked],
             [("随包", f"{BUNDLED_PLUGINS_PKG}.dup")],
         )
 
@@ -333,7 +339,7 @@ class TestExternalRootReads(ExternalRootCase):
         picked = _manifest.enabled_manifests(self.state)
 
         self.assertEqual(
-            [(m.title, m.module) for m in picked],
+            [(m.declaration.title, m.module) for m in picked],
             [("随包", f"{BUNDLED_PLUGINS_PKG}.help")],
         )
 
@@ -360,7 +366,7 @@ class TestExternalRootReads(ExternalRootCase):
         picked = _manifest.enabled_manifests(self.state)
 
         self.assertEqual(
-            [(m.title, m.module) for m in picked],
+            [(m.declaration.title, m.module) for m in picked],
             [("随包", f"{BUNDLED_PLUGINS_PKG}.help")],
         )
 
@@ -372,8 +378,12 @@ class TestExternalRootReads(ExternalRootCase):
         )
         claims = [
             PluginClaim(
-                name=row[PluginManifestKeys.NAME],
-                commands=tuple(cmd for cmd, _ in row[HelpKeys.COMMANDS]),
+                name=row.name,
+                commands=tuple(
+                    command.cmd
+                    for section in row.declaration.help
+                    for command in section.commands
+                ),
             )
             for row in rows
         ]
@@ -434,22 +444,24 @@ class TestExternalContract(ExternalRootCase):
     """契约闸门：外部插件交出的一切从盘上收到装载侧"""
 
     def test_every_declared_piece_arrives(self) -> None:
-        """清单字段、路由、协程、任务处理与时机订阅一并收到
+        """加载记录、路由、协程、任务处理与时机订阅一并收到
 
         - 这条红了说明交出的形状改了，照这份写的外部插件装不上
         """
         manifests, (report, backgrounds, handlers, platform_moments), sink = (
             self._register_installed(
                 {"__init__.py": _CONTRACT_ENTRY},
-                _CONTRACT_MANIFEST.format(role="member"),
+                _CONTRACT_MANIFEST.format(role="MEMBER"),
                 deps=("httpx==0.28.1",),
             )
         )
         demo = manifests[0]
 
         self.assertEqual(demo.module, f"{INSTALLED_PLUGINS_PKG}.demo")
-        self.assertEqual(demo.deps, ("httpx==0.28.1",))
-        self.assertEqual(demo.assets, ("playwright chromium-headless-shell",))
+        self.assertEqual(demo.deps, ("finshin-sdk>=0.2.0,<0.4.0", "httpx==0.28.1"))
+        self.assertEqual(
+            demo.declaration.assets, ("playwright chromium-headless-shell",)
+        )
         self.assertEqual(
             [(m.name, error) for m, error in report], [("demo", None), ("mate", None)]
         )
@@ -460,24 +472,24 @@ class TestExternalContract(ExternalRootCase):
         self.assertEqual(len(platform_moments[PlatformMoment.BEFORE_ENGINE_RUN]), 1)
 
     def test_role_mismatch_recorded_as_failure(self) -> None:
-        """清单写的权限档与路由上的守卫对不上即记权限错
+        """代码声明写的权限档与路由上的守卫对不上即记权限错
 
         - 这条红了说明声明与拦截脱钩也照样放行
         """
         _, (report, _, _, _), _ = self._register_installed(
-            {"__init__.py": _CONTRACT_ENTRY}, _CONTRACT_MANIFEST.format(role="owner")
+            {"__init__.py": _CONTRACT_ENTRY}, _CONTRACT_MANIFEST.format(role="OWNER")
         )
 
         self.assertIsInstance(report[0][1], PluginRoleError)
         self.assertIsNone(report[1][1])
 
     def test_spec_missing_recorded_as_failure(self) -> None:
-        """插件没交出清单即记清单缺失
+        """插件没交出入口类即记失败
 
         - 这条红了说明空壳插件也算装载成功
         """
         _, (report, _, _, _), _ = self._register_installed(
-            {"__init__.py": "value = 1\n"}, _CONTRACT_MANIFEST.format(role="member")
+            {"__init__.py": "value = 1\n"}, _CONTRACT_MANIFEST.format(role="MEMBER")
         )
 
         self.assertIsInstance(report[0][1], PluginEntryError)
@@ -489,7 +501,7 @@ class TestExternalContract(ExternalRootCase):
         """
         _, (report, _, _, _), _ = self._register_installed(
             {"__init__.py": _FOREIGN_ACTION_ENTRY},
-            _CONTRACT_MANIFEST.format(role="member"),
+            _CONTRACT_MANIFEST.format(role="MEMBER"),
         )
 
         self.assertIsInstance(report[0][1], PluginLoadError)
@@ -497,7 +509,7 @@ class TestExternalContract(ExternalRootCase):
 
 # 只在方法体里伸手本体的入口，扫描同样要拦下
 _SCOPE_IN_METHOD = """
-from finshin_sdk import BasePlugin, MessageRoute
+from finshin_sdk.domain import BasePlugin, MessageRoute
 
 
 async def _hit(raw: object, ctx: object) -> bool:
@@ -525,7 +537,7 @@ class TestExternalScope(ExternalRootCase):
         - 这条红了说明闸没接进注册序列，外部件还能伸手进本体
         """
         _, (report, _, _, _), _ = self._register_installed(
-            {"__init__.py": _SCOPE_OFFENDER}, _CONTRACT_MANIFEST.format(role="member")
+            {"__init__.py": _SCOPE_OFFENDER}, _CONTRACT_MANIFEST.format(role="MEMBER")
         )
         reason = describe_error(report[0][1])
 
@@ -540,7 +552,7 @@ class TestExternalScope(ExternalRootCase):
         - 这条红了说明扫描只看模块开头，延迟导入能绕过闸
         """
         _, (report, _, _, _), _ = self._register_installed(
-            {"__init__.py": _SCOPE_IN_METHOD}, _CONTRACT_MANIFEST.format(role="member")
+            {"__init__.py": _SCOPE_IN_METHOD}, _CONTRACT_MANIFEST.format(role="MEMBER")
         )
 
         self.assertIsInstance(report[0][1], PluginImportError)

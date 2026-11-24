@@ -25,7 +25,8 @@ set_profile("tg.000000")
 
 import pack_spec  # noqa: E402
 
-from finshin_sdk.domain import PluginManifestKeys  # noqa: E402
+from finshin_sdk.domain import PluginDeclaration  # noqa: E402
+from finshin_sdk.dto import PluginManifestDTO  # noqa: E402
 from services import adapter_manifest  # noqa: E402
 from services.env_setup import deps_install, deps_keep, deps_startup  # noqa: E402
 
@@ -218,19 +219,23 @@ class TestInstanceEnabledUnion(unittest.TestCase):
         self.instances = Path(self._tmp.name)
         self.instance = self.instances / "tg.000001"
         self.instance.mkdir()
-        self.help_row = {
-            PluginManifestKeys.NAME: "help",
-            PluginManifestKeys.DEPS: ["foo==1.0"],
-        }
-        self.web_row = {
-            PluginManifestKeys.NAME: "webshot",
-            PluginManifestKeys.DEPS: ["markdown==3.10.2"],
-        }
+        self.help_row = PluginManifestDTO(
+            name="help",
+            module="bundled.help",
+            deps=("foo==1.0",),
+            declaration=PluginDeclaration(title="帮助", summary="帮助"),
+        )
+        self.web_row = PluginManifestDTO(
+            name="webshot",
+            module="plugin.webshot",
+            deps=("markdown==3.10.2",),
+            declaration=PluginDeclaration(title="截图", summary="截图"),
+        )
         patcher = patch.object(deps_keep, "INSTANCES_DIR", self.instances)
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def _union(self, manifests: list[dict]) -> list[str]:
+    def _union(self, manifests: list[PluginManifestDTO]) -> list[str]:
         """按给定的清单读数跑一遍启用并集"""
         with (
             patch.object(deps_keep, "plugins_roots", lambda: [self.instance]),

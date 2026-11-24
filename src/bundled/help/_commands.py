@@ -10,13 +10,14 @@
 import asyncio
 import time
 
-from finshin_sdk import HandlerContext, MessageRoute
+from finshin_sdk import HandlerContext
 from finshin_sdk.domain import (
     BindFailure,
     BoundCommand,
     ChatScope,
     CommandFlag,
     ContentKind,
+    MessageRoute,
     bind_command,
 )
 from finshin_sdk.dto import CommandDTO, OutboundPayloadDTO

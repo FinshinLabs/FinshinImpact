@@ -39,15 +39,16 @@ from exceptions import (  # noqa: E402
     AdapterOutOfDateError,
 )
 from finshin_sdk import (  # noqa: E402
+    PROJECT_MANIFEST_FILE,
     AdapterParts,
     BaseAdapter,
     CredentialSpec,
     PlatformAssembly,
 )
 from finshin_sdk.domain import (  # noqa: E402
-    ADAPTER_MANIFEST_FILE,
     ConfigPath,
     PlatformCode,
+    PluginDeclaration,
 )
 from finshin_sdk.dto import AdapterManifestDTO, PluginManifestDTO  # noqa: E402
 from services import adapter_manifest as manifest_mod  # noqa: E402
@@ -181,7 +182,7 @@ class TestAdapterHost(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             adapters_dir = Path(tmp)
             (adapters_dir / "telegram").mkdir()
-            (adapters_dir / "telegram" / ADAPTER_MANIFEST_FILE).write_text(
+            (adapters_dir / "telegram" / PROJECT_MANIFEST_FILE).write_text(
                 body, encoding="utf-8"
             )
             # 环境里那只已装适配器不参与，否则拒收用例会被它顶绿
@@ -648,7 +649,10 @@ class TestAdapterHost(unittest.TestCase):
         )
         seen: dict[str, object] = {}
         row = PluginManifestDTO(
-            name="help", module="bundled.help", title="帮助", summary=""
+            name="help",
+            module="bundled.help",
+            deps=(),
+            declaration=PluginDeclaration(title="帮助", summary=""),
         )
 
         def register(sink: object, builder: object) -> tuple:
@@ -711,7 +715,7 @@ class TestInstalledSource(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             adapters_dir = Path(tmp)
             (adapters_dir / "telegram").mkdir()
-            (adapters_dir / "telegram" / ADAPTER_MANIFEST_FILE).write_text(
+            (adapters_dir / "telegram" / PROJECT_MANIFEST_FILE).write_text(
                 body, encoding="utf-8"
             )
             with (

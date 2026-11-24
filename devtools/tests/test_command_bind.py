@@ -2,7 +2,7 @@
 
 - 覆盖开关吃值、默认值落位与按默认值类型转换
 - 覆盖缺值、未登记开关、重复开关与开关之后出现裸段
-- 覆盖清单声明下的位置参数落点与开关顺序
+- 覆盖命令声明下的位置参数落点与开关顺序
 """
 
 import sys
@@ -17,15 +17,21 @@ from system.profile_env import set_profile  # noqa: E402
 set_profile("tg.000000")
 
 from bundled.help import _commands  # noqa: E402
-from finshin_sdk.domain import BindFailure, BoundCommand, bind_command  # noqa: E402
-from finshin_sdk.dto import CommandDTO, HelpCommandDTO, HelpFlagDTO  # noqa: E402
+from finshin_sdk.domain import (  # noqa: E402
+    BindFailure,
+    BoundCommand,
+    CommandHelp,
+    FlagHelp,
+    bind_command,
+)
+from finshin_sdk.dto import CommandDTO  # noqa: E402
 
-# 一只纯开关与一只整数开关，与清单声明项同形
+# 一只纯开关与一只整数开关，与命令声明项同形
 _FLAGS = (("-i", None), ("-t", 0.0))
 
 
 class TestBindCommand(unittest.TestCase):
-    """按清单声明绑定片段"""
+    """按命令声明绑定片段"""
 
     def _bound(self, *pieces: str, takes_args: bool = False) -> BoundCommand:
         bound = bind_command(pieces, _FLAGS, takes_args)
@@ -93,16 +99,16 @@ class TestBindCommand(unittest.TestCase):
 
 
 class TestBindAgainstSpecs(unittest.TestCase):
-    """帮助插件按这条命令的清单声明绑定"""
+    """帮助插件按这条命令的声明绑定"""
 
     def setUp(self) -> None:
         specs = {
-            "demo": HelpCommandDTO(
+            "demo": CommandHelp(
                 cmd="demo",
                 desc="演示命令",
                 flags=(
-                    HelpFlagDTO("-i", "不带值的开关"),
-                    HelpFlagDTO("-t", "带值的开关", 0.0),
+                    FlagHelp("-i", "不带值的开关"),
+                    FlagHelp("-t", "带值的开关", 0.0),
                 ),
                 args="要带的内容",
             )

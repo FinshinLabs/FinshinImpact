@@ -7,8 +7,6 @@
 - 点开明细的按钮与明细行文案都从这里交出，两类明细走同一只窗
 """
 
-from typing import Any
-
 from PySide6.QtCore import QPoint, QSize, Qt
 from PySide6.QtWidgets import (
     QListWidgetItem,
@@ -17,7 +15,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import CommandTaken, HelpKeys, PluginClaim, PluginManifestKeys
+from finshin_sdk.domain import CommandTaken, PluginClaim
+from finshin_sdk.dto import PluginManifestDTO
 from skin.messages import PluginMessage
 from skin.theme import PANEL, ButtonStyle
 
@@ -87,26 +86,31 @@ def clash_lines(taken: tuple[CommandTaken, ...], titles: dict[str, str]) -> list
     ]
 
 
-def claims_of(manifests: list[dict[str, Any]]) -> list[PluginClaim]:
+def claims_of(manifests: list[PluginManifestDTO]) -> list[PluginClaim]:
     """交出各插件声明的命令名"""
     return [
         PluginClaim(
-            name=manifest[PluginManifestKeys.NAME],
-            commands=tuple(cmd for cmd, _ in manifest[HelpKeys.COMMANDS]),
+            name=manifest.name,
+            commands=tuple(
+                command.cmd
+                for section in manifest.declaration.help
+                for command in section.commands
+            ),
         )
         for manifest in manifests
     ]
 
 
-def _command_lines(manifest: dict[str, Any]) -> list[str]:
+def _command_lines(manifest: PluginManifestDTO) -> list[str]:
     """写命令明细
 
     - 一条命令占一行
     - 一条都没声明时交一句说明
     """
     lines = [
-        PluginMessage.COMMAND_LINE.format(cmd=cmd, desc=desc)
-        for cmd, desc in manifest[HelpKeys.COMMANDS]
+        PluginMessage.COMMAND_LINE.format(cmd=command.cmd, desc=command.desc)
+        for section in manifest.declaration.help
+        for command in section.commands
     ]
     return lines or [PluginMessage.COMMAND_NONE]
 
@@ -121,10 +125,10 @@ def make_clash_button(parent: QWidget, lines: list[str], label: str) -> QPushBut
     return button
 
 
-def make_command_button(parent: QWidget, manifest: dict[str, Any]) -> QPushButton:
+def make_command_button(parent: QWidget, manifest: PluginManifestDTO) -> QPushButton:
     """命令明细按钮
 
-    - 点开逐条列出这份清单声明的命令名与说明
+    - 点开逐条列出这份加载记录声明的命令名与说明
     - 宽度只由样式表给，代码再定一次会被描边顶掉
     """
     button = make_button(PluginMessage.BTN_COMMAND, ButtonStyle.COMMAND)

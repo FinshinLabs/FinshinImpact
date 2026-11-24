@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+from finshin_sdk import PROJECT_MANIFEST_FILE
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "packaging"))
 
 import gen_catalog  # noqa: E402
@@ -55,7 +57,7 @@ def _decl(
 
 def _decl_at(repo: str, ref: str) -> str:
     """某仓某个 tag 检出点声明的假响应键"""
-    return f"{repo}/contents/{gen_release._DECL_FILE}?ref={ref}"
+    return f"{repo}/contents/{PROJECT_MANIFEST_FILE}?ref={ref}"
 
 
 def _asset(distribution: str, version: str, url: str, digest: str) -> dict[str, Any]:

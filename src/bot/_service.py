@@ -8,8 +8,7 @@ import asyncio
 import threading
 from typing import TYPE_CHECKING
 
-from finshin_sdk import BackgroundLoop
-from finshin_sdk.domain import MomentRun
+from finshin_sdk.domain import BackgroundLoop, MomentRun
 from skin.messages import EngineMessage
 from utils import get_logger, register_lifecycle, unregister_lifecycle
 from utils.network import link_report

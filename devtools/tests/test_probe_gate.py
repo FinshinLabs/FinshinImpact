@@ -24,13 +24,14 @@ from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QPushButton  # noqa: E402
 
-from finshin_sdk import (  # noqa: E402
+from finshin_sdk.domain import (  # noqa: E402
     ConnectionPlan,
     PlanVerdict,
+    ProbeChannel,
     ProbeOutcome,
     ProbeResult,
+    ProbeRow,
 )
-from finshin_sdk.domain import ProbeChannel, ProbeRow  # noqa: E402
 from skin.theme import ButtonSize, ButtonStyle, button_object_name  # noqa: E402
 from ui._bridge import gui_bridge  # noqa: E402
 from ui._dialogs import ConfigMode, Round, SettingsDialog  # noqa: E402

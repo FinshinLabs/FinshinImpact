@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCloseEvent, QFont, QKeyEvent, QShowEvent
 from PySide6.QtWidgets import QWidget
 
-from finshin_sdk import ConnectionPlan
+from finshin_sdk.domain import ConnectionPlan
 from skin.qss import build_error_label_qss, build_settings_dialog_qss
 from skin.theme import SETTINGS_DIALOG
 from utils.config import (

@@ -3,7 +3,7 @@
 - 交出全部业务路由的有序清单
 """
 
-from finshin_sdk import MessageRoute
+from finshin_sdk.domain import MessageRoute
 
 from . import _ai_chat, _history
 

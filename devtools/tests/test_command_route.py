@@ -36,12 +36,8 @@ from inbound_events import message  # noqa: E402
 from bundled._shared.filters import CommandMatch  # noqa: E402
 from bundled.help import _commands  # noqa: E402
 from finshin_sdk import HandlerContext  # noqa: E402
-from finshin_sdk.dto import (  # noqa: E402
-    HelpCommandDTO,
-    HelpFlagDTO,
-    MessageRefDTO,
-    OutboundPayloadDTO,
-)
+from finshin_sdk.domain import CommandHelp, FlagHelp  # noqa: E402
+from finshin_sdk.dto import MessageRefDTO, OutboundPayloadDTO  # noqa: E402
 
 _GROUP = _Chat(id=-100123, type="supergroup", title="测试群")
 _PRIVATE = _Chat(id=456, type="private")
@@ -235,16 +231,16 @@ class TestCommandFlagSpec(_VerdictMixin, unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
         specs = {
-            "demo": HelpCommandDTO(
+            "demo": CommandHelp(
                 cmd="demo",
                 desc="演示命令",
                 flags=(
-                    HelpFlagDTO("-i", "不带值的开关"),
-                    HelpFlagDTO("-t", "带值的开关", 0.0),
+                    FlagHelp("-i", "不带值的开关"),
+                    FlagHelp("-t", "带值的开关", 0.0),
                 ),
                 args="要带的内容",
             ),
-            "history": HelpCommandDTO(cmd="history", desc="显示历史记录"),
+            "history": CommandHelp(cmd="history", desc="显示历史记录"),
         }
         for name, value in (("help_list", _MENU), ("command_specs", specs)):
             patcher = patch.object(_commands, name, value)

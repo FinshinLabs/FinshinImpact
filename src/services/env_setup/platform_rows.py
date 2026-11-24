@@ -8,8 +8,9 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
+from finshin_sdk import PROJECT_MANIFEST_FILE
 from system.distributions import SDK_DISTRIBUTION, installed_version
-from system.profile_env import DECLARATION_FILE_NAME, ROOT_DIR
+from system.profile_env import ROOT_DIR
 from system.tool_settings import project_value
 from system.versions import is_upgrade
 
@@ -140,7 +141,7 @@ def _sdk_tree_name() -> str:
 
     - 挂载仓不在场交出空串
     """
-    return project_value("name", ROOT_DIR / _SDK_TREE_DIR / DECLARATION_FILE_NAME)
+    return project_value("name", ROOT_DIR / _SDK_TREE_DIR / PROJECT_MANIFEST_FILE)
 
 
 def _distribution_name(

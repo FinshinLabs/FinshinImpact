@@ -8,8 +8,7 @@ import importlib.metadata
 import re
 from collections.abc import Sequence
 
-# 分发名口径与在线目录生成侧同值，两处改名必须同步
-SDK_DISTRIBUTION = "finshin-sdk"
+from finshin_sdk import SDK_DISTRIBUTION as SDK_DISTRIBUTION
 
 # 包名归一只认连字符，点号与下划线按同一个分隔算
 _SEPARATOR_RUN = re.compile(r"[-_.]+")

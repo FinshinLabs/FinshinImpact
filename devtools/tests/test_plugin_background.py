@@ -86,7 +86,9 @@ def _register_modules(modules: dict[str, object], names: list[str]):
     dispatcher = _FakeDispatcher()
     manifests = [
         SimpleNamespace(
-            name=name, module=f"{BUNDLED_PLUGINS_PKG}.{name}", help_section=()
+            name=name,
+            module=f"{BUNDLED_PLUGINS_PKG}.{name}",
+            declaration=SimpleNamespace(help=()),
         )
         for name in names
     ]

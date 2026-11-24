@@ -1,9 +1,9 @@
 """插件注册表
 
-- 按清单与实例启用集决定加载序列
+- 按加载记录与实例启用集决定加载序列
 - 从插件模块里认那只入口类，实例化后收它交出的路由、循环、动作与时机
 - 入口类缺失或多只、外部件伸手本体内部、界面库或平台框架，都记失败并写明原因
-- 清单声明的命令权限与实际拦截对不上即记失败
+- 命令声明的权限与实际拦截对不上即记失败
 """
 
 import importlib
@@ -20,19 +20,17 @@ from exceptions import (
     PluginsError,
     PluginsMissingError,
 )
-from finshin_sdk import (
+from finshin_sdk import RouterBuilder
+from finshin_sdk.domain import (
     BackgroundLoop,
     BasePlugin,
+    CommandRole,
     MessageRoute,
+    MomentRun,
     MomentSubscription,
     PlatformMoment,
-    QueuedAction,
-    RouterBuilder,
-)
-from finshin_sdk.domain import (
-    CommandRole,
-    MomentRun,
     PluginMark,
+    QueuedAction,
     RouteSink,
     is_own_action,
 )
@@ -48,7 +46,7 @@ from ._manifest import enabled_manifests
 
 _logger = get_logger("Plugin")
 
-# 逐项报告：(插件清单, 失败异常)，成功那项异常记 None
+# 逐项报告：(插件加载记录, 失败异常)，成功那项异常记 None
 _PluginReport = list[tuple[PluginManifestDTO, PluginsError | None]]
 
 # 注册结果：逐项报告、待启动的常驻循环、动作清单、按时机归组的订阅
@@ -128,7 +126,7 @@ def register_plugins(
 
 
 def load_plugin(manifest: PluginManifestDTO) -> BasePlugin:
-    """导入清单点名的模块并实例化那一只入口类
+    """导入加载记录点名的模块并实例化那一只入口类
 
     - 外部件伸手本体内部、界面库或平台框架当场报错
     """
@@ -188,7 +186,7 @@ def _collect(
     tuple[QueuedAction, ...],
     tuple[MomentSubscription, ...],
 ]:
-    """入口类清单收取
+    """收取入口类产物
 
     - 交出路由、协程、动作与时机四样
     - 路由与动作的形态不对当场报错
@@ -282,13 +280,13 @@ def _resolve_plugins() -> list[PluginManifestDTO]:
 
 
 def _check_roles(manifest: PluginManifestDTO, routes: tuple[MessageRoute, ...]) -> None:
-    """校验清单声明的命令权限与实际拦截一致
+    """校验命令声明的权限与实际拦截一致
 
-    - 清单写了要什么档，路由上必须有同档守卫
-    - 清单写用户档的命令，路由上不带守卫
+    - 声明写了要什么档，路由上必须有同档守卫
+    - 声明写用户档的命令，路由上不带守卫
     """
     guarded = _guarded_roles(routes)
-    for section in manifest.help_section:
+    for section in manifest.declaration.help:
         for command in section.commands:
             if guarded.get(command.cmd, CommandRole.MEMBER) != command.role:
                 raise PluginRoleError(command.cmd)

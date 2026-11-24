@@ -8,8 +8,7 @@ import threading
 from pathlib import Path
 from typing import TypeAlias
 
-from finshin_sdk.domain import CommandFlag, CommandRole
-from finshin_sdk.dto import HelpCommandDTO, HelpFlagDTO
+from finshin_sdk.domain import CommandFlag, CommandHelp, CommandRole, FlagHelp
 from system.digest import lines_digest
 from system.profile_env import (
     ASSET_FONT_NAME,
@@ -24,7 +23,7 @@ from .._shared.messages import BotMessage
 from ._render import HelpRenderConfig, draw_menu
 
 # 菜单行三元组：行类型、行文本、命令清单项（非命令行留空）
-_MenuRow: TypeAlias = tuple[str, str, HelpCommandDTO | None]
+_MenuRow: TypeAlias = tuple[str, str, CommandHelp | None]
 
 # 菜单条目三元组：行类型、左列文本、右列说明
 _MenuEntry: TypeAlias = tuple[str, str, str]
@@ -61,7 +60,7 @@ _ROLE_NOTE: dict[CommandRole, str] = {
 }
 
 
-def _flag_label(flag: HelpFlagDTO) -> str:
+def _flag_label(flag: FlagHelp) -> str:
     """拼开关在帮助图与回执上的左列文本
 
     - 带默认值的开关在名后跟默认值
@@ -81,7 +80,7 @@ def _build_menu_data() -> list[_MenuRow]:
     rows: list[_MenuRow] = [*_MENU_HEAD]
     for manifest in enabled_manifests(PROFILE_DIR / INSTANCE_PROFILE_NAME):
         block: list[_MenuRow] = []
-        for section in manifest.help_section:
+        for section in manifest.declaration.help:
             if section.section:
                 block.append(("section", section.section, None))
             if section.note:
@@ -96,7 +95,7 @@ def _build_menu_data() -> list[_MenuRow]:
 
 
 def _build_help_menu() -> tuple[
-    dict[str, str], dict[str, HelpCommandDTO], list[_MenuEntry]
+    dict[str, str], dict[str, CommandHelp], list[_MenuEntry]
 ]:
     """构建帮助菜单数据
 
@@ -104,7 +103,7 @@ def _build_help_menu() -> tuple[
     - 权限档说明追加在描述尾部，用户档不带
     """
     help_list: dict[str, str] = {}
-    command_specs: dict[str, HelpCommandDTO] = {}
+    command_specs: dict[str, CommandHelp] = {}
     display_order: list[_MenuEntry] = []
 
     for item_type, content, command in _build_menu_data():
@@ -189,7 +188,7 @@ def resolve_usage_hint(name: str) -> str:
     return f"{BotMessage.CMD_USAGE_HINT.format(cmd=name)}\n{_usage_lines(spec)}"
 
 
-def _usage_lines(spec: HelpCommandDTO) -> str:
+def _usage_lines(spec: CommandHelp) -> str:
     """拼单命令的可用参数与可用开关
 
     - 参数行在前，开关行在后

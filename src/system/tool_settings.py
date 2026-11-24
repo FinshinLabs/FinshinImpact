@@ -7,13 +7,15 @@
 from pathlib import Path
 from typing import Any
 
-from .profile_env import DECLARATION_FILE_NAME, ROOT_DIR
+from finshin_sdk import PROJECT_MANIFEST_FILE
+
+from .profile_env import ROOT_DIR
 from .toml_read import read_toml
 
 # 两份声明的位置
-_ROOT_DECLARATION = ROOT_DIR / DECLARATION_FILE_NAME
+_ROOT_DECLARATION = ROOT_DIR / PROJECT_MANIFEST_FILE
 _DEVTOOLS_DIR = "devtools"
-DEVTOOLS_DECLARATION = ROOT_DIR / _DEVTOOLS_DIR / DECLARATION_FILE_NAME
+DEVTOOLS_DECLARATION = ROOT_DIR / _DEVTOOLS_DIR / PROJECT_MANIFEST_FILE
 
 # 解析结果按路径缓存
 _CACHE: dict[Path, dict[str, Any]] = {}

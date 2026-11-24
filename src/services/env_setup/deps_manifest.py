@@ -1,7 +1,8 @@
-"""插件依赖清单
+"""插件加载记录读取
 
-- 面板与启动判定读清单、算指纹、看要不要开面板
+- 面板与启动判定读取代码声明
 - 外部插件的库取自家声明的依赖表，随包插件的库在根声明里
+- 目录指纹只随名称、依赖与资源变化
 """
 
 import importlib.util
@@ -10,13 +11,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from finshin_sdk.domain import (
-    PLUGIN_MANIFEST_TABLE,
-    HelpKeys,
-    PluginFileName,
-    PluginManifestKeys,
-)
+from finshin_sdk.domain import PluginFileName
+from finshin_sdk.dto import PluginManifestDTO
 from system.digest import lines_digest
+from system.plugin_declaration import PluginDeclarationError, read_plugin_manifest
 from system.plugin_roster import (
     BUNDLED_PLUGINS,
     BUNDLED_PLUGINS_PKG,
@@ -24,29 +22,19 @@ from system.plugin_roster import (
     INSTALLED_PLUGINS_PKG,
 )
 from system.plugin_state import StateKeys, load_instance_catalog, state_path_of
-from system.profile_env import DECLARATION_FILE_NAME, ROOT_DIR
-from system.toml_read import read_toml
-from system.tool_settings import declared_dependencies
+from system.profile_env import ROOT_DIR
 
 # 依赖 pin 串顶层包名截断符，"playwright>=1.40" 切出 "playwright"
 _PIN_SPLIT = re.compile(r"[<>=!~\[;\s]+")
 
-# 面板与裁决所需的最小字段集，help 段只取命令名
-_MINIMAL_KEYS = frozenset(spec.key for spec in PLUGIN_MANIFEST_TABLE)
-
-_DEFAULTS: dict[str, Any] = {spec.key: spec.default for spec in PLUGIN_MANIFEST_TABLE}
-
 # 插件根：目录与这棵树的顶层包名
 _PluginRoot = tuple[Path, str]
-
-# 单条命令的必填两键，缺任一的条目不算命令名
-_COMMAND_KEYS = frozenset({HelpKeys.CMD, HelpKeys.DESC})
 
 
 def plugins_roots() -> list[_PluginRoot]:
     """列出插件根与各自的顶层包名
 
-    - 随包在前外部在后
+    - 随包在前外部而后
     - 外部目录不存在即不进表
     """
     roots: list[_PluginRoot] = []
@@ -64,107 +52,95 @@ def plugins_roots() -> list[_PluginRoot]:
     return roots
 
 
-def _scan_rows(roots: Sequence[_PluginRoot]) -> list[dict[str, Any]]:
-    """按目录顺序读取最小清单
+def _scan_rows(roots: Sequence[_PluginRoot]) -> list[PluginManifestDTO]:
+    """按目录顺序读取插件加载记录
 
-    - 无清单或名称非法的子目录跳过
-    - 外部那份的自家依赖表读不出即整份不认
-    - 每行带上帮助段声明的命令名与说明
+    - 无声明文件、形状不合法或接口包区间不满足的子目录跳过
+    - 外部插件缺项目声明或名字形状不符即跳过
     """
-    rows: list[dict[str, Any]] = []
+    rows: list[PluginManifestDTO] = []
     for plugins_path, pkg in roots:
         if not plugins_path.is_dir():
             continue
 
         for path in sorted(plugins_path.iterdir()):
-            data = read_toml(path / PluginFileName.MANIFEST)
-            if not data or not isinstance(data.get(PluginManifestKeys.NAME), str):
+            if not (path / PluginFileName.DECLARATION).is_file():
                 continue
-            deps = _deps_of(path, pkg)
-            if deps is None:
+            try:
+                rows.append(
+                    read_plugin_manifest(
+                        path,
+                        path.name,
+                        pkg,
+                        bundled=pkg == BUNDLED_PLUGINS_PKG,
+                    )
+                )
+            except PluginDeclarationError:
                 continue
-            row: dict[str, Any] = {PluginManifestKeys.DEPS: deps}
-            for key in _MINIMAL_KEYS:
-                row[key] = data.get(key, _DEFAULTS[key])
-            row[HelpKeys.COMMANDS] = _command_pairs(data)
-            rows.append(row)
 
     return rows
 
 
-def _deps_of(plugin_dir: Path, pkg: str) -> tuple[str, ...] | None:
-    """取一只插件的依赖表
-
-    - 随包插件交出空表
-    - 外部那份交出 None 即自家声明的依赖表读不出，整份不认
-    """
-    if pkg == BUNDLED_PLUGINS_PKG:
-        return ()
-
-    return declared_dependencies(plugin_dir / DECLARATION_FILE_NAME)
-
-
-def load_manifests(roots: Sequence[_PluginRoot]) -> list[dict[str, Any]]:
-    """扫描插件根目录聚合最小清单
+def load_manifests(roots: Sequence[_PluginRoot]) -> list[PluginManifestDTO]:
+    """扫描插件根目录聚合加载记录
 
     - 同名插件按根的顺序取先读到的，随包压住外部同名
     - 随包表里的先成一组，两组组内都按显示名的拼音序
     """
-    found: dict[str, dict[str, Any]] = {}
+    found: dict[str, PluginManifestDTO] = {}
     for row in _scan_rows(roots):
-        found.setdefault(row[PluginManifestKeys.NAME], row)
+        found.setdefault(row.name, row)
 
     return sorted(found.values(), key=_sort_key)
 
 
 def shadowed_manifests(
     roots: Sequence[_PluginRoot],
-) -> list[tuple[dict[str, Any], str]]:
-    """读出被同名前一份顶掉的插件行
+) -> list[tuple[PluginManifestDTO, str]]:
+    """读出被同名前一份顶掉的插件记录
 
-    - 交出 (被顶掉的清单, 插件名) 序列
+    - 交出 (被顶掉的加载记录, 插件名) 序列
     - 同一名字只在先读到的根里算一条
     """
     claimed: set[str] = set()
-    shadowed: list[tuple[dict[str, Any], str]] = []
+    shadowed: list[tuple[PluginManifestDTO, str]] = []
     for row in _scan_rows(roots):
-        name = row[PluginManifestKeys.NAME]
-        if name in claimed:
-            shadowed.append((row, name))
+        if row.name in claimed:
+            shadowed.append((row, row.name))
             continue
-        claimed.add(name)
+        claimed.add(row.name)
 
     return shadowed
 
 
-def catalog_digest(manifests: list[dict[str, Any]]) -> str:
+def catalog_digest(manifests: list[PluginManifestDTO]) -> str:
     """计算目录指纹
 
     - 只摘要名称、依赖与资源
     - 行序与扫描顺序无关，同集合必同摘要
     """
     items = sorted(
-        f"{m[PluginManifestKeys.NAME]}"
-        f"|{'|'.join(m[PluginManifestKeys.DEPS])}"
-        f"|{'|'.join(m[PluginManifestKeys.ASSETS])}"
-        for m in manifests
+        f"{manifest.name}"
+        f"|{'|'.join(manifest.deps)}"
+        f"|{'|'.join(manifest.declaration.assets)}"
+        for manifest in manifests
     )
     return lines_digest(items)
 
 
-def _sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
+def _sort_key(manifest: PluginManifestDTO) -> tuple[Any, ...]:
     """拼面板行序的排序键
 
     - 先分来源组，组内按显示名的拼音序
-    - 显示名取标题列，没填标题时退化成目录名
+    - 显示名取标题，没填标题时退化成目录名
     - 拼音相同再比显示名整串，仍相同比目录名
     """
-    display = row[PluginManifestKeys.TITLE] or row[PluginManifestKeys.NAME]
+    display = manifest.declaration.title or manifest.name
     return (
-        row[PluginManifestKeys.NAME] not in BUNDLED_PLUGINS,
+        manifest.name not in BUNDLED_PLUGINS,
         _pinyin_key(display),
         display.lower(),
-        row[PluginManifestKeys.NAME],
+        manifest.name,
     )
 
 
@@ -176,29 +152,6 @@ def _pinyin_key(text: str) -> tuple[str, ...]:
     from pypinyin import lazy_pinyin
 
     return tuple(piece.lower() for piece in lazy_pinyin(text))
-
-
-def _command_pairs(data: dict[str, Any]) -> tuple[tuple[str, str], ...]:
-    """读取命令名与说明
-
-    - 段与条目的形状不符即跳过该项
-    - 必填两键齐了才算一条
-    """
-    sections = data.get(PluginManifestKeys.HELP)
-    if not isinstance(sections, list):
-        return ()
-
-    commands: list[tuple[str, str]] = []
-    for section in sections:
-        if not isinstance(section, dict):
-            continue
-        for command in section.get(HelpKeys.COMMANDS, []):
-            if not isinstance(command, dict):
-                continue
-            if all(isinstance(command.get(key), str) for key in _COMMAND_KEYS):
-                commands.append((command[HelpKeys.CMD], command[HelpKeys.DESC]))
-
-    return tuple(commands)
 
 
 def panel_needed(code: str) -> bool:

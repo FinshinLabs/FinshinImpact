@@ -15,7 +15,9 @@ from exceptions import (
     RequestTimeoutError,
     describe_error,
 )
-from finshin_sdk import (
+from finshin_sdk.domain import (
+    ConfigPath,
+    ConfigValues,
     ConnectionPlan,
     PlanVerdict,
     ProbeChannel,
@@ -23,7 +25,6 @@ from finshin_sdk import (
     ProbeResult,
     ProbeRow,
 )
-from finshin_sdk.domain import ConfigPath, ConfigValues
 from utils import get_logger
 
 from .config import SOURCE, PluginKeys, PluginSections

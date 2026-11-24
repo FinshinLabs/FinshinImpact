@@ -1,6 +1,6 @@
 """授权插件的路由门面"""
 
-from finshin_sdk import BasePlugin, MessageRoute
+from finshin_sdk.domain import BasePlugin, MessageRoute
 
 from ._commands import ROUTES
 
