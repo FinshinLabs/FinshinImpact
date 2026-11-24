@@ -17,14 +17,14 @@ python -m pytest devtools/tests/test_grant_access.py -v
 - 收集范围写在 `pytest.ini` 的 `testpaths` 里。
   - `testpaths` 不展开通配，装载根那一棵只写根目录，pytest 自己走进去收各平台用例树。
   - 没挂载时那棵目录不在，收集范围少一条也不报错，只表现为用例数少一截。
-- 本体用例直接 import `src` 下的真实模块，不需要装发布物。
-- 用例侧共享件不带 `test_` 前缀，pytest 不收它们，只被用例 import。
-- 子仓用例按各自包名引用，接口包与引擎库从环境取。
 
 ## 文件规矩
 
 - 首行模块 docstring 用要点列出本文件证明的全部行为。
 - 本体用例开头自行把 `src` 挂进 `sys.path`。
+- 本体用例直接 import `src` 下的真实模块，不需要装发布物。
+- 用例侧共享件不带 `test_` 前缀，pytest 不收它们，只被用例 import。
+- 子仓用例按各自包名引用，接口包与引擎库从环境取。
 - 导入业务模块前先调 `set_profile` 落身份码。
 - 真库用例每例自开临时库，收尾合并 WAL 再删目录，例与例不共享状态。
 - 网络一律打桩，只验编排。
@@ -44,7 +44,7 @@ python -m pytest devtools/tests/test_grant_access.py -v
 风格上免这几处。
 
 - 规范扫描器的目录豁免见 [测试目录豁免](style-checker.md#测试目录豁免)。
-- 内部实现的访问范围见 [命名与门面导出](coding-style.md#命名与门面导出)。
+- 内部实现的访问范围见 [对外判据](coding-style.md#对外判据)。
 - 类型检查（pyright）在 `pyrightconfig.json` 里管两层。
   - `exclude` 让闸门跳过本目录。
   - 编辑器单开一个用例文件时 `exclude` 拦不住分析，另按目录配一套环境：`extraPaths` 补 `src` 与 `devtools`。

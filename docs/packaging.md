@@ -19,11 +19,17 @@ FinshinImpact\
 ├── src\                代码文件
 ```
 
-启动器首启：按指纹取接口包 → 解压嵌入式 Python → 放开 site-packages → 落位随包 uv → 装依赖 → 升级 `instances\` 下旧配置 → 拉起主程序。
+启动器首启：按钉死的版本取接口包并核指纹 → 解压嵌入式 Python → 放开 site-packages → 落位随包 uv → 装依赖 → 升级 `instances\` 下旧配置 → 拉起主程序。
 
 - 插件依赖与浏览器内核由引导层在启动前按需安装，不在首装链路。
 - 旧配置迁移按形状判定，写回前留 `config.toml.bak`（已有则不覆盖），单份失败只跳过。
 - 更新入口与触发方式见 [更新方式](development.md#更新方式)。
+
+### 接口包取件
+
+- 接口包 wheel 下载到包根 `_sdk`，核附件 sha256 后与核心依赖一起装进环境。
+- 安装成功后删除 `_sdk`，失败则保留供下次续装。
+- 升级整目录替换后，启动器按新包的版本号与指纹判一次，同指纹跳过，缺件或不符才重新取件。
 
 ### 升级换源码与启动器
 
@@ -43,7 +49,7 @@ FinshinImpact\
 
 - 要装的库出自 `pyproject.toml` 的核心依赖。
 - `runtime\.installed` 记依赖清单摘要，清单没变下次跳过安装。
-- 启动器装依赖只追加，删库入口见 [新增插件](development.md#新增插件清单驱动流程)。
+- 启动器装依赖只追加，删库入口见 [装卸纪律](development.md#装卸纪律)。
 
 ### 下载缓存
 
@@ -51,6 +57,8 @@ FinshinImpact\
 - 手动清理走选窗"环境维护"里的"清理下载缓存"。
 
 ## 构建
+
+### 构建命令
 
 版本定稿与构建次数见 [构建 zip](release-workflow.md#构建-zip)。
 zip 名取自 `pyproject.toml`。
@@ -67,6 +75,10 @@ python -m PyInstaller --version
 python packaging\build.py
 ```
 
+成功标志：末行打印 `完成：dist\FinshinImpact-vX.Y.Z.zip`。
+
+### 构建步骤
+
 构建做这几步：
 
 - 编译启动器。
@@ -77,9 +89,7 @@ python packaging\build.py
 - GitHub 加速镜像名单只在项目声明的 `github-mirrors` 键里维护。
 - 用随包嵌入式解释器预编暂存区 `src` 与 `main.py` 的字节码，取认内容不认时间的 checked-hash 模式，用户解压即热，首启不必现场编译。
 
-成功标志：末行打印 `完成：dist\FinshinImpact-vX.Y.Z.zip`。
-
-参数：
+### 参数
 
 - `--no-launcher`：跳过编译环节。
 - `--check`：逐行打印本地版本号、远端 tag、本地 zip（大小与 sha256 前缀）、在线版本页、发布包 gh-proxy 与 ghproxy.net 的镜像。
@@ -101,9 +111,6 @@ uv build finshin/sdk --wheel
 
 - 适配器产物名形如 `finshin_adapter_tg-0.1.0-py3-none-any.whl`。
 - 构建只核 `pyproject.toml` 钉死的接口包版本能走镜像从 GitHub release 取到且指纹一致，不把 wheel 打进发布包。
-- 首启由启动器按该版本下载接口包 wheel 到包根 `_sdk`，核附件 sha256 后与核心依赖一起装进环境。
-- 安装成功后删除 `_sdk`，失败则保留供下次续装。
-- 升级整目录替换后，启动器按新包的版本号与指纹判一次，同指纹跳过，缺件或不符才重新取件。
 
 ## 在线目录
 
@@ -130,7 +137,7 @@ python packaging/gen_catalog.py <输出路径>
 2. 双击 `FinshinImpact.exe`，等待环境安装完成。
 3. 验证首装：
    - 按 [环境搭建](development.md#环境搭建) 创建实例，完成向导后验证收发消息。
-   - 再开一次，确认依赖未变时跳过安装。
+   - 再开一次，确认走的是跳过安装那条路径，判据见 [依赖清单](#依赖清单)。
    - 确认 `payload\` 的清理结果，见 [按名字找的文件](#按名字找的文件)。
 4. 升级路径按 [旧版迁移](../README.md#旧版迁移) 验证。
 5. 测完删掉测试目录。
