@@ -4,13 +4,19 @@
 - SSE 解析
 """
 
+import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 import httpx
 
-from exceptions import ConnectionFailedError, HTTPStatusError, RequestTimeoutError
+from exceptions import (
+    ConnectionFailedError,
+    HTTPBodyError,
+    HTTPStatusError,
+    RequestTimeoutError,
+)
 
 # 请求默认超时：读、写与连接池三档共用
 _DEFAULT_TIMEOUT = 90.0
@@ -110,7 +116,10 @@ class BaseClient:
             except httpx.ConnectError as e:
                 raise ConnectionFailedError() from e
             cls._deal_with_exception(response, "POST")
-            return response.json()
+            try:
+                return response.json()
+            except json.JSONDecodeError as e:
+                raise HTTPBodyError(response.text) from e
 
     @classmethod
     async def get_content(
@@ -132,10 +141,18 @@ class BaseClient:
             timeout=timeout,
             connect_timeout=connect_timeout,
         ) as client:
-            response = await client.get(request_path)
+            try:
+                response = await client.get(request_path)
+            except httpx.TimeoutException as e:
+                raise RequestTimeoutError() from e
+            except httpx.ConnectError as e:
+                raise ConnectionFailedError() from e
             cls._deal_with_exception(response, "GET")
             if method == "json":
-                return response.json()
+                try:
+                    return response.json()
+                except json.JSONDecodeError as e:
+                    raise HTTPBodyError(response.text) from e
             if method == "bytes":
                 return response.content
             return response.text

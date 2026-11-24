@@ -12,7 +12,7 @@ from finshin_sdk.domain import ConfigPath
 from skin.messages import CheckMessage
 from ui import gui_bridge
 from utils import config_manager
-from utils.check import local_row, run_probe_round
+from utils.check import failure_note, local_row, run_probe_round
 from utils.config import (
     AppSchema,
     FieldErrors,
@@ -223,7 +223,6 @@ class SettingsManager(BaseManager):
     def _emit_advice(self, schema: AppSchema) -> bool:
         """发送结论帧
 
-        - 失败优先用结论句，没有才报字段数量
         - 明细由字段标红与悬浮提示显示
         """
         passed = not self.last_errors
@@ -234,8 +233,7 @@ class SettingsManager(BaseManager):
                 "detail": (
                     CheckMessage.ADVICE_OK
                     if passed
-                    else self.last_failure_detail
-                    or CheckMessage.VERIFY_ADVICE_FAIL.format(n=len(self.last_errors))
+                    else failure_note(self.last_failure_detail, self.last_errors)
                 ),
             }
         )

@@ -1,6 +1,8 @@
 """AI 客户端
 
 - 鉴权头注入与禁用代理
+- 探测请求的状态码失败原样上抛，由探测层决定怎么展示
+- 流式请求失败把状态码与正文写进日志
 """
 
 import json
@@ -134,6 +136,11 @@ class AIClient(BaseClient):
             raise err
         return {key: value for key, value in payload.items() if key != _REASONING_FIELD}
 
+    @staticmethod
+    def _log_stream_error(err: HTTPStatusError) -> None:
+        """流式失败把状态码与正文写进日志"""
+        _logger.error(f"流式请求失败：HTTP {err.status_code} {err.msg}")
+
     @classmethod
     async def stream_chat(
         cls,
@@ -150,9 +157,17 @@ class AIClient(BaseClient):
             async for delta in cls._stream_deltas(payload, usage):
                 yield delta
         except HTTPStatusError as e:
-            retry_payload = cls._without_reasoning(e, payload)
-            async for delta in cls._stream_deltas(retry_payload, usage):
-                yield delta
+            try:
+                retry_payload = cls._without_reasoning(e, payload)
+            except HTTPStatusError:
+                cls._log_stream_error(e)
+                raise
+            try:
+                async for delta in cls._stream_deltas(retry_payload, usage):
+                    yield delta
+            except HTTPStatusError as retry_error:
+                cls._log_stream_error(retry_error)
+                raise
             _remember_rejected()
 
     @classmethod
@@ -182,7 +197,20 @@ class AIClient(BaseClient):
                 continue
 
     @classmethod
-    async def chat_once(
+    async def list_models(cls, base_url: str, api_key: str) -> Any:
+        """取站点的模型列表
+
+        - 只用来确认地址和密钥是否已通，正文不解析
+        """
+        return await super().get_content(
+            "json",
+            base_url=base_url,
+            request_path="/models",
+            headers=cls._headers(api_key),
+        )
+
+    @classmethod
+    async def probe(
         cls,
         msg: list[dict[str, str]],
         max_tokens: int,
@@ -191,17 +219,42 @@ class AIClient(BaseClient):
         api_key: str | None = None,
         model: str | None = None,
     ) -> Any:
-        """AI 非流式请求
+        """AI 非流式探测请求
 
         - 传入的地址、密钥与模型名优先于配置值，探测值不必先落盘
+        - 状态码失败原样上抛，由探测层展示
+        - 调试日志只落状态码、地址与模型名
         """
         url = ai_config.base_url if base_url is None else base_url
+        model_name = ai_config.model_name if model is None else model
+        try:
+            return await cls._probe(
+                msg, max_tokens, base_url=url, api_key=api_key, model=model_name
+            )
+        except HTTPStatusError as e:
+            _logger.debug(f"接口返回 {e.status_code} 地址 {url} 模型 {model_name}")
+            raise
+
+    @classmethod
+    async def _probe(
+        cls,
+        msg: list[dict[str, str]],
+        max_tokens: int,
+        *,
+        base_url: str,
+        api_key: str | None,
+        model: str,
+    ) -> Any:
+        """按定好的地址与模型名发一次探测请求
+
+        - 接口不认推理强度开关时去掉该字段重发一次
+        """
         payload = cls._payload(
-            msg, stream=False, max_tokens=max_tokens, model=model, base_url=url
+            msg, stream=False, max_tokens=max_tokens, model=model, base_url=base_url
         )
         try:
             return await super().post_json(
-                base_url=url,
+                base_url=base_url,
                 request_path=ai_config.request_path,
                 headers=cls._headers(api_key),
                 payload=payload,
@@ -209,10 +262,10 @@ class AIClient(BaseClient):
         except HTTPStatusError as e:
             retry_payload = cls._without_reasoning(e, payload)
             result = await super().post_json(
-                base_url=url,
+                base_url=base_url,
                 request_path=ai_config.request_path,
                 headers=cls._headers(api_key),
                 payload=retry_payload,
             )
-            _remember_rejected(base_url=url, model=model)
+            _remember_rejected(base_url=base_url, model=model)
             return result

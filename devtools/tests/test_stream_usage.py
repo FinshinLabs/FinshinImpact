@@ -155,7 +155,7 @@ class TestReasoningRetry(unittest.IsolatedAsyncioTestCase):
             patch.object(_client, "ai_config", _config()),
             patch.object(_client.BaseClient, "post_json", _fake),
         ):
-            await AIClient.chat_once(_TURN, 1)
+            await AIClient.probe(_TURN, 1)
         return calls
 
     async def test_drops_field_and_remembers_after_success(self) -> None:
@@ -180,6 +180,29 @@ class TestReasoningRetry(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(_client._load_rejected(), set())
+
+
+class TestStreamErrorLog(unittest.IsolatedAsyncioTestCase):
+    """流式失败记日志"""
+
+    async def test_failure_logs_status_and_body(self) -> None:
+        """状态码与正文一起写进日志，异常原样上抛"""
+        logged: list[str] = []
+
+        async def _fail(*_args: Any, **_kwargs: Any):
+            raise HTTPStatusError(401, '{"error": "bad key"}')
+            yield {}
+
+        with (
+            patch.object(_client, "ai_config", _config()),
+            patch.object(_client.BaseClient, "stream_post", _fail),
+            patch.object(_client, "_logger", SimpleNamespace(error=logged.append)),
+        ):
+            with self.assertRaises(HTTPStatusError):
+                async for _ in AIClient.stream_chat(_TURN):
+                    pass
+
+        self.assertEqual(logged, ['流式请求失败：HTTP 401 {"error": "bad key"}'])
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ from ._gui import (
 )
 from ._network import (
     ConnectionFailedError,
+    HTTPBodyError,
     HTTPStatusError,
     NetworkError,
     RequestTimeoutError,
@@ -73,6 +74,7 @@ __all__ = [
     "ProfileMissingError",
     # 网络与 API
     "NetworkError",
+    "HTTPBodyError",
     "HTTPStatusError",
     "RequestTimeoutError",
     "ConnectionFailedError",

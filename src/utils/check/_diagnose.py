@@ -22,6 +22,7 @@ from ..network import (
     opening_rows,
 )
 from ..paths import PLATFORM
+from ._advice import failure_note
 from ._verify import run_probe_round
 
 # 诊断跑在后台线程的私有 loop，计时句走此器落 debug
@@ -111,7 +112,7 @@ async def diagnose_flow(
         {
             "id": RowId.ADVICE,
             "status": RowStatus.FAIL,
-            "detail": verdict.failure_detail,
+            "detail": failure_note(verdict.failure_detail, verdict.field_errors),
             FrameKey.BROKEN: verdict.field_errors,
         }
     )

@@ -43,6 +43,17 @@ class HTTPStatusError(NetworkError):
         super().__init__()
 
 
+class HTTPBodyError(NetworkError):
+    """响应正文不是 JSON
+
+    - body 留原样，由调用方决定怎么展示
+    """
+
+    def __init__(self, body: str) -> None:
+        self.body = body
+        super().__init__()
+
+
 def _cause_of(status_code: int, msg: str) -> str:
     """按状态码与正文里的信号归类那一句原因"""
     if status_code == 404:
@@ -59,4 +70,5 @@ NETWORK_MAP = {
     RequestTimeoutError: "请求超时",
     ConnectionFailedError: "连接失败",
     HTTPStatusError: "HTTP 状态码：{status_code}{cause}",
+    HTTPBodyError: "接口返回的内容不是预期的格式",
 }
