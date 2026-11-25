@@ -12,11 +12,12 @@
 
 ### ⚠️ Breaking Changes
 
+- **配置与领域类型改从公开子模块导入**：`FieldErrors`、`SourceKind`、`section_name`、`source_identity`、`source_values` 不再从 `utils.config` 取用，配置与标识类型统一直连 `utils.config.models`／`utils.config.sources` 或 `finshin_sdk.domain.config`／`finshin_sdk.domain.ids`。
 - **插件展示信息改由代码声明**：同目录 `plugin.toml` 不再读取，标题、说明、资源与帮助改写在 `_declaration.py`，外部插件名、依赖与 `finshin-sdk` 区间仍写在 `pyproject.toml`。
 
 ### ✨ Added
 
-- **向导里可以放弃改动回到盘上配置**：从编辑窗转进向导时底部多一颗「放弃改动」，点了回到盘上配置并转回编辑态，不用重启；这类向导退出提示改成「改动未保存，退出即丢弃」。
+- **向导里可以放弃改动回到盘上配置**：从编辑窗转进向导时底部多一颗「放弃改动」，点了回到盘上配置并转回编辑态，不用重启。这类向导退出提示改成「改动未保存，退出即丢弃」。
 - **每类配置各有「保存本类」**：点一下只校验并写这一类，机器人不重启。
 - **平台组件面板的「其他版本」窗**：每只适配器一颗钮，点开才取该仓的正式版本与发布正文，左清单逐版标本机状态，右栏摆那一版正文。选中当前使用或装不了的版，底部按钮写「不可安装」并置灰。
 

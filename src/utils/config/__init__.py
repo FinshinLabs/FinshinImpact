@@ -20,16 +20,12 @@ from ._source import (
     merge_source_config,
 )
 from ._validator import validate_types
-from .models import AppConfigData, AppSchema, FieldErrors
+from .models import AppConfigData, AppSchema
 from .sources import (
     ConfigPlan,
     ConfigSource,
-    SourceKind,
     assemble,
     current_plan,
-    section_name,
-    source_identity,
-    source_values,
     use_plan,
 )
 

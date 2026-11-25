@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
-from finshin_sdk.domain import PlatformCode
+from finshin_sdk.domain.ids import PlatformCode
 from skin.messages import CatalogMessage
 from system.links import GITHUB, HTTPS_SCHEME
 from utils.network import GitClient

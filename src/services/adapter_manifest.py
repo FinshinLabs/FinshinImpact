@@ -17,8 +17,8 @@ from finshin_sdk.domain import (
     ADAPTER_ENTRY_GROUP,
     ADAPTER_MANIFEST_TABLE,
     AdapterManifestKeys,
-    PlatformCode,
 )
+from finshin_sdk.domain.ids import PlatformCode
 from finshin_sdk.dto import AdapterManifestDTO
 from system.distributions import SDK_DISTRIBUTION, requires_of
 from system.profile_env import ROOT_DIR

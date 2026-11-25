@@ -26,13 +26,13 @@ from data import (  # noqa: E402
 from finshin_sdk.domain import (  # noqa: E402
     ChatRole,
     ContentKind,
-    PlatformCode,
     TaskPayload,
     TaskStatus,
 )
 from finshin_sdk.domain.ids import (  # noqa: E402
     ContainerCode,
     MessageId,
+    PlatformCode,
     SessionKey,
     TaskKey,
     UserId,

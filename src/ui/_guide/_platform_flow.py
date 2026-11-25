@@ -9,7 +9,7 @@ from collections.abc import Callable, Sequence
 
 from PySide6.QtWidgets import QWidget
 
-from finshin_sdk.domain import PlatformCode
+from finshin_sdk.domain.ids import PlatformCode
 from services.adapter_catalog import ReleaseRow
 from services.env_setup.deps_install import remove_distributions
 from services.env_setup.platform_apply import (

@@ -5,9 +5,10 @@
 - 插件装载不成的那一只不进配置
 """
 
-from finshin_sdk.domain import FieldSpec, SectionSpec, SourceDeclaration
+from finshin_sdk.domain.config import FieldSpec, SectionSpec, SourceDeclaration
 from system.profile_env import INSTANCE_PROFILE_NAME
-from utils.config import ConfigSource, CoreKeys, CoreSections, SourceKind
+from utils.config import CoreKeys, CoreSections
+from utils.config.sources import ConfigSource, SourceKind
 from utils.logger import get_logger
 from utils.paths import PLATFORM, PROFILE_DIR
 from utils.plugin import enabled_manifests, load_plugin

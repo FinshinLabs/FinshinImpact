@@ -15,7 +15,7 @@ from unittest.mock import Mock, patch
 from adapter_presence import adapter_present
 
 from bot._managers._config_sources import config_sources
-from finshin_sdk.domain import SectionSpec
+from finshin_sdk.domain.config import SectionSpec
 from utils.config import ensure_config
 
 _PARTS_TARGET = "bot._managers._config_sources.parts_for"

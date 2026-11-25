@@ -22,10 +22,11 @@ from config_plan import assemble_for_case  # noqa: E402
 
 from bundled.AI.services import _ai_chat, _cleanup  # noqa: E402
 from bundled.AI.utils import make_session_key  # noqa: E402
-from finshin_sdk.domain import ChatScope, PlatformCode, QueuedAction  # noqa: E402
+from finshin_sdk.domain import ChatScope, QueuedAction  # noqa: E402
 from finshin_sdk.domain.ids import (  # noqa: E402
     ContainerCode,
     MessageId,
+    PlatformCode,
     SessionKey,
     UserId,
 )

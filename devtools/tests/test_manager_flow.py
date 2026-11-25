@@ -36,12 +36,9 @@ from bot._managers import BotManager, _apply  # noqa: E402
 from bot._service import AdapterRuntime  # noqa: E402
 from exceptions import ConfigOutputError  # noqa: E402
 from finshin_sdk import CapabilityCall  # noqa: E402
-from finshin_sdk.domain import (  # noqa: E402
-    ConfigPath,
-    PlatformCode,
-    PlatformMoment,
-    SourceCode,
-)
+from finshin_sdk.domain import PlatformMoment  # noqa: E402
+from finshin_sdk.domain.config import ConfigPath  # noqa: E402
+from finshin_sdk.domain.ids import PlatformCode, SourceCode  # noqa: E402
 from skin.messages import DialogMessage  # noqa: E402
 from ui import gui_bridge  # noqa: E402
 from utils.config import SourceSaveRequest  # noqa: E402

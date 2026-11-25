@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (
 )
 
 from finshin_sdk import CredentialSpec
-from finshin_sdk.domain import PlatformCode, ProfileKey, platform_of_key
+from finshin_sdk.domain import platform_of_key
+from finshin_sdk.domain.ids import PlatformCode, ProfileKey
 from services.adapter_credential import credential_of
 from services.env_setup.platform_rows import present_platforms
 from services.profile_store import create_profile, update_profile

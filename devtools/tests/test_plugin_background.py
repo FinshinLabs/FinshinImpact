@@ -40,10 +40,10 @@ from finshin_sdk.domain import (  # noqa: E402
     BasePlugin,
     MessageRoute,
     MomentSubscription,
-    PlatformCode,
     PlatformMoment,
     QueuedAction,
 )
+from finshin_sdk.domain.ids import PlatformCode  # noqa: E402
 from system.plugin_roster import BUNDLED_PLUGINS_PKG  # noqa: E402
 from utils.plugin import _register  # noqa: E402
 

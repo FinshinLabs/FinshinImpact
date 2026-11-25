@@ -14,7 +14,8 @@ from PySide6.QtWidgets import QDialog, QWidget
 from finshin_sdk.domain import ConnectionPlan, PlanVerdict, ProbeOutcome
 from skin.messages import CheckMessage
 from utils.check import failure_note, run_probe_round
-from utils.config import FieldErrors, ProbeRecord
+from utils.config import ProbeRecord
+from utils.config.models import FieldErrors
 from utils.logger import get_logger
 from utils.network import FrameKey, RowId, RowStatus, opening_rows
 

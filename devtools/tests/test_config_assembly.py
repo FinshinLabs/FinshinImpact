@@ -24,7 +24,7 @@ from config_plan import adapter_sections, fake_adapter_parts  # noqa: E402
 
 from bot._managers._config_sources import config_sources  # noqa: E402
 from bundled.AI.config import CONFIG_SOURCE  # noqa: E402
-from finshin_sdk.domain import (  # noqa: E402
+from finshin_sdk.domain.config import (  # noqa: E402
     ConfigPath,
     FieldSpec,
     SectionSpec,

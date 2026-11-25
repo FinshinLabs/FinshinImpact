@@ -38,13 +38,16 @@ from ui._dialogs import ConfigMode, Round, SettingsDialog  # noqa: E402
 from ui._windows._controllers import _save, _source_probe, _verify  # noqa: E402
 from utils import config_manager  # noqa: E402
 from utils.config import (  # noqa: E402
-    FieldErrors,
     ProbeRecord,
     changed_groups,
     changed_sections,
     validate_types,
 )
-from utils.config.models import FieldSchema, TabSchema  # noqa: E402
+from utils.config.models import (  # noqa: E402
+    FieldErrors,  # noqa: E402
+    FieldSchema,
+    TabSchema,
+)
 
 _GROUP = "plugin.AI"
 _CORE = "core"

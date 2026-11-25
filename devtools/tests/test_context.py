@@ -16,8 +16,13 @@ from system.profile_env import set_profile  # noqa: E402
 set_profile("tg.000000")
 
 from finshin_sdk import HandlerContext, InteractionPort  # noqa: E402
-from finshin_sdk.domain import ChatScope, ContentKind, PlatformCode  # noqa: E402
-from finshin_sdk.domain.ids import ContainerCode, MessageId, UserId  # noqa: E402
+from finshin_sdk.domain import ChatScope, ContentKind  # noqa: E402
+from finshin_sdk.domain.ids import (  # noqa: E402
+    ContainerCode,
+    MessageId,
+    PlatformCode,
+    UserId,
+)
 from finshin_sdk.dto import (  # noqa: E402
     ContentDTO,
     InboundEventDTO,

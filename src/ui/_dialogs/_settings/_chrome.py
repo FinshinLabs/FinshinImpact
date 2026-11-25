@@ -21,10 +21,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import ConfigPath
+from finshin_sdk.domain.config import ConfigPath
 from skin.theme import GLOBAL, SETTINGS_DIALOG, ButtonStyle, ObjectName
-from utils.config import AppSchema, FieldErrors, owner_field
-from utils.config.models import TabSchema, tabs_by_group
+from utils.config import owner_field
+from utils.config.models import AppSchema, FieldErrors, TabSchema, tabs_by_group
 
 from ..._primitives import (
     ButtonBar,

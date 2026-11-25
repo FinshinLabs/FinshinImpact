@@ -14,15 +14,15 @@ from PySide6.QtWidgets import QWidget
 from finshin_sdk.domain import ConnectionPlan
 from skin.qss import build_error_label_qss, build_settings_dialog_qss
 from skin.theme import SETTINGS_DIALOG
-from utils.config import (
+from utils.config import changed_groups, changed_sections, merge_source_config
+from utils.config.models import (
     AppConfigData,
     AppSchema,
     FieldErrors,
-    changed_groups,
-    changed_sections,
-    merge_source_config,
+    group_values,
+    probe_of,
+    tabs_by_group,
 )
-from utils.config.models import group_values, probe_of, tabs_by_group
 
 from ..._bridge import gui_bridge
 from ..._primitives import BaseDialog

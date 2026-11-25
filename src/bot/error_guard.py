@@ -11,7 +11,7 @@ from exceptions import ConfigAttrError, ConfigPathMissingError, describe_error
 from finshin_sdk.exceptions import BotError
 from skin.messages import ConfigMessage, MiscMessage
 from ui import gui_bridge
-from utils.config import FieldErrors
+from utils.config.models import FieldErrors
 from utils.error_guard import guard
 from utils.logger import get_logger
 

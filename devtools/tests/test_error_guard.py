@@ -76,7 +76,7 @@ class TestErrorGuard(unittest.TestCase):
 
         - 供面板按同一身份标红
         """
-        from finshin_sdk.domain import ConfigPath
+        from finshin_sdk.domain.config import ConfigPath
 
         item = ConfigPath(source="plugin.AI", section="model", key="api_key")
 
@@ -94,7 +94,7 @@ class TestErrorGuard(unittest.TestCase):
         - 键是配置项身份，悬浮文案取异常那句
         """
         from exceptions import ConfigAttrError
-        from finshin_sdk.domain import ConfigPath
+        from finshin_sdk.domain.config import ConfigPath
 
         item = ConfigPath(source="adapter.tg", section="proxy", key="proxy_mode")
 
@@ -111,7 +111,7 @@ class TestErrorGuard(unittest.TestCase):
 
         - 向导错误表的键是配置项身份
         """
-        from finshin_sdk.domain import ConfigPath
+        from finshin_sdk.domain.config import ConfigPath
 
         item = ConfigPath(source="plugin.AI", section="chore", key="owner")
 

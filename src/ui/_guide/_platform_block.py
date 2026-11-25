@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import PlatformCode
+from finshin_sdk.domain.ids import PlatformCode
 from services.adapter_catalog import ReleaseRow
 from services.env_setup.platform_rows import (
     ComponentBucket,

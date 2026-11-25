@@ -5,7 +5,7 @@
 
 from typing import Any
 
-from finshin_sdk.domain import ConfigPath
+from finshin_sdk.domain.config import ConfigPath
 from finshin_sdk.exceptions import BotError
 
 

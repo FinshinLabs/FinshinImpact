@@ -9,8 +9,8 @@ from typing import cast
 import aiosqlite
 
 from core import SessionRepository
-from finshin_sdk.domain import ChatRole, PlatformCode
-from finshin_sdk.domain.ids import ContainerCode, SessionKey, UserId
+from finshin_sdk.domain import ChatRole
+from finshin_sdk.domain.ids import ContainerCode, PlatformCode, SessionKey, UserId
 from finshin_sdk.dto import MessageDTO, SessionDTO, SessionPatchDTO
 
 

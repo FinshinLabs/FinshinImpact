@@ -8,8 +8,7 @@ import time
 import aiosqlite
 
 from core import PrincipalRepository
-from finshin_sdk.domain import PlatformCode
-from finshin_sdk.domain.ids import ContainerCode, UserId
+from finshin_sdk.domain.ids import ContainerCode, PlatformCode, UserId
 from finshin_sdk.dto import PrincipalDTO
 
 _SELECT_COLUMNS = "platform, container, user"

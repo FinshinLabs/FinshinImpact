@@ -13,7 +13,7 @@ from exceptions import (
     AdapterOutOfDateError,
 )
 from finshin_sdk import SDK_VERSION, AdapterParts
-from finshin_sdk.domain import PlatformCode
+from finshin_sdk.domain.ids import PlatformCode
 from services.adapter_manifest import load_adapter_manifests
 from system.versions import requires_met
 from utils.external_scope import check_external_imports

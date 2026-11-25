@@ -30,11 +30,11 @@ from finshin_sdk.domain import (  # noqa: E402
     ChatScope,
     CommandRole,
     ContentKind,
-    PlatformCode,
 )
 from finshin_sdk.domain.ids import (  # noqa: E402
     ContainerCode,
     MessageId,
+    PlatformCode,
     UserId,
 )
 from finshin_sdk.dto import (  # noqa: E402

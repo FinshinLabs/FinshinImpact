@@ -22,14 +22,11 @@ from data import (  # noqa: E402
     run_migrations,
 )
 from finshin_sdk import HandlerContext  # noqa: E402
-from finshin_sdk.domain import (  # noqa: E402
-    ChatScope,
-    PlatformCode,
-    TaskStatus,
-)
+from finshin_sdk.domain import ChatScope, TaskStatus  # noqa: E402
 from finshin_sdk.domain.ids import (  # noqa: E402
     ContainerCode,
     MessageId,
+    PlatformCode,
     SessionKey,
     TaskKey,
     UserId,

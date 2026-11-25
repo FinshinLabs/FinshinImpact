@@ -5,7 +5,8 @@
 """
 
 from exceptions import PlatformMissingError, ProfileMissingError
-from finshin_sdk.domain import ProfileKey, platform_of_key
+from finshin_sdk.domain import platform_of_key
+from finshin_sdk.domain.ids import ProfileKey
 from system.profile_env import (
     ASSET_PERSONA_EXAMPLE_NAME,
     ASSETS_DIR,

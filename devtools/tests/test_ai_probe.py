@@ -27,7 +27,8 @@ from exceptions import (  # noqa: E402
     HTTPStatusError,
     RequestTimeoutError,
 )
-from finshin_sdk.domain import ConfigPath, ProbeOutcome, ProbeResult  # noqa: E402
+from finshin_sdk.domain import ProbeOutcome, ProbeResult  # noqa: E402
+from finshin_sdk.domain.config import ConfigPath  # noqa: E402
 
 _FORMAT_ERROR = "接口返回的内容不是预期的格式，请检查地址"
 _MODEL_NOTE = "地址和 Key 已通，问题多半在模型"

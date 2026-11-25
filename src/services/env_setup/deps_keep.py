@@ -4,7 +4,7 @@
 - 同名被两处钉了不同版本时交出说明行
 """
 
-from finshin_sdk.domain import PlatformCode
+from finshin_sdk.domain.ids import PlatformCode
 from skin.messages import PluginMessage
 from system.distributions import SDK_DISTRIBUTION, installed_version
 from system.plugin_roster import is_plugin_enabled

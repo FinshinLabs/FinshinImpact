@@ -8,10 +8,11 @@ from copy import deepcopy
 from typing import Any, TypeVar, cast, get_origin
 
 from exceptions import ConfigAttrError, ConfigPathMissingError
-from finshin_sdk.domain import ConfigPath
+from finshin_sdk.domain.config import ConfigPath
 
-from .config import AppConfigData, AppSchema, get_schema, section_name
-from .config.models import ConfigValue, TabData, is_blank
+from .config import get_schema
+from .config.models import AppConfigData, AppSchema, ConfigValue, TabData, is_blank
+from .config.sources import section_name
 
 T = TypeVar("T")
 

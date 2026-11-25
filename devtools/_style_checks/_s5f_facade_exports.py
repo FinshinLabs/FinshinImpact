@@ -3,6 +3,7 @@
 - 仅被自家包门面导入的子模块应带 `_` 前缀
 - `_` 前缀模块被包外直接导入提示转正
 - 惰性门面表不得把符号指向公开模块，消费方直连该模块
+- 包外不得经门面取用同包公开子模块代发的符号
 - 门面不声明 `__all__`，导入即出口
 """
 
@@ -22,6 +23,7 @@ def check(files: list[FileData], graph: ImportGraph) -> list[Finding]:
     findings: list[Finding] = []
     findings.extend(_check_module_prefix(files, graph))
     findings.extend(_check_lazy_targets(files))
+    findings.extend(_check_public_forwarding(files, graph))
     findings.extend(_check_all_declared(files))
     return findings
 
@@ -136,6 +138,61 @@ def _string_literal(node: ast.expr | None) -> str | None:
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
     return None
+
+
+def _check_public_forwarding(
+    files: list[FileData], graph: ImportGraph
+) -> list[Finding]:
+    """包外经门面取用公开子模块符号报硬性"""
+    findings: list[Finding] = []
+    for file in files:
+        if file.parse_error or not file.is_init:
+            continue
+        forwarded = _public_forwarders(file)
+        for consumer, symbols in sorted(graph.consumers.get(file.module, {}).items()):
+            if consumer == file.module or _is_ancestor_package(consumer, file.package):
+                continue
+            for name, (source, line) in sorted(forwarded.items()):
+                if name in symbols:
+                    findings.append(
+                        _f(
+                            file,
+                            line,
+                            f"门面代发公开子模块符号 `{name}`（{consumer} 经本模块取用），"
+                            f"消费方应直连 `{source}`",
+                            hard=True,
+                        )
+                    )
+    return findings
+
+
+def _public_forwarders(file: FileData) -> dict[str, tuple[str, int]]:
+    """门面从同包公开子模块导入的别名到来源与行号"""
+    forwarded: dict[str, tuple[str, int]] = {}
+    for node in file.tree.body:
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        source = _from_module(file, node)
+        if source.rpartition(".")[0] != file.package:
+            continue
+        if source.rpartition(".")[2].startswith("_"):
+            continue
+        for alias in node.names:
+            if alias.name != "*":
+                forwarded.setdefault(alias.asname or alias.name, (source, node.lineno))
+    return forwarded
+
+
+def _from_module(file: FileData, node: ast.ImportFrom) -> str:
+    """把门面里的相对导入折算成点分模块名"""
+    if not node.level:
+        return node.module or ""
+    parts = file.package.split(".") if file.package else []
+    up = node.level - 1
+    if up > len(parts):
+        return ""
+    base = ".".join(parts[: len(parts) - up]) if up else file.package
+    return f"{base}.{node.module}" if node.module else base
 
 
 def _check_all_declared(files: list[FileData]) -> list[Finding]:

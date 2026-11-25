@@ -13,7 +13,7 @@ from finshin_sdk.domain import ConnectionPlan
 from skin.messages import CheckMessage
 
 from .._config_manager import config_manager
-from ..config import SourceKind, source_identity, source_values
+from ..config.sources import SourceKind, source_identity, source_values
 from ..logger import get_logger
 from ..network import (
     FrameKey,

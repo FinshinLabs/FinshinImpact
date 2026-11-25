@@ -33,13 +33,11 @@ from data import (  # noqa: E402
     run_migrations,
 )
 from finshin_sdk import CapabilityCall  # noqa: E402
-from finshin_sdk.domain import (  # noqa: E402
-    PlatformCode,
-    TaskStatus,
-)
+from finshin_sdk.domain import TaskStatus  # noqa: E402
 from finshin_sdk.domain.ids import (  # noqa: E402
     ContainerCode,
     MessageId,
+    PlatformCode,
     TaskKey,
     UserId,
 )

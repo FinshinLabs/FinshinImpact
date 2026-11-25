@@ -7,24 +7,22 @@
 import time
 from collections.abc import Callable
 
-from finshin_sdk.domain import ConfigPath, ConnectionPlan, PlanVerdict
+from finshin_sdk.domain import ConnectionPlan, PlanVerdict
+from finshin_sdk.domain.config import ConfigPath
 from skin.messages import CheckMessage
 from ui import gui_bridge
 from utils import config_manager
 from utils.check import failure_note, local_row, run_probe_round
 from utils.config import (
-    AppSchema,
-    FieldErrors,
     ProbeRecord,
-    SourceKind,
     ensure_config,
     get_schema,
     load_config,
     owner_item,
-    source_identity,
-    source_values,
     validate_types,
 )
+from utils.config.models import AppSchema, FieldErrors
+from utils.config.sources import SourceKind, source_identity, source_values
 from utils.network import (
     FrameKey,
     RowId,

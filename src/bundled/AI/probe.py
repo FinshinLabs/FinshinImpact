@@ -16,7 +16,6 @@ from exceptions import (
     describe_error,
 )
 from finshin_sdk.domain import (
-    ConfigPath,
     ConfigValues,
     ConnectionPlan,
     PlanVerdict,
@@ -25,6 +24,7 @@ from finshin_sdk.domain import (
     ProbeResult,
     ProbeRow,
 )
+from finshin_sdk.domain.config import ConfigPath
 from utils.logger import get_logger
 
 from .config import SOURCE, PluginKeys, PluginSections

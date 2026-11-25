@@ -21,7 +21,7 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import PlatformCode  # noqa: E402
+from finshin_sdk.domain.ids import PlatformCode  # noqa: E402
 from services import adapter_catalog as catalog_mod  # noqa: E402
 from skin.messages import CatalogMessage  # noqa: E402
 

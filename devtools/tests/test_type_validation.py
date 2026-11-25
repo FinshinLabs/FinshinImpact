@@ -18,13 +18,13 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import (  # noqa: E402
+from finshin_sdk.domain.config import (  # noqa: E402
     ConfigPath,
     FieldCondition,
     FieldSpec,
-    PlatformCode,
     SectionSpec,
 )
+from finshin_sdk.domain.ids import PlatformCode  # noqa: E402
 from skin.messages import CheckMessage, ConfigMessage  # noqa: E402
 from utils._config_manager import _ConfigManager  # noqa: E402
 from utils.check import local_row  # noqa: E402

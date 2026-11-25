@@ -9,16 +9,15 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from bot.error_guard import error_guard
-from finshin_sdk.domain import (
+from finshin_sdk.domain import ConfigValues, ConnectionPlan
+from finshin_sdk.domain.config import (
     ConfigPath,
-    ConfigValues,
-    ConnectionPlan,
     FieldCondition,
     FieldSpec,
     SectionSpec,
-    SourceCode,
     SourceDeclaration,
 )
+from finshin_sdk.domain.ids import SourceCode
 from utils import config_manager
 from utils.config import OWNER_TAG, CoreKeys, core_item
 from utils.paths import RECORDS_DIR

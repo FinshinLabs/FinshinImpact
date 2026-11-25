@@ -9,16 +9,15 @@ from typing import TYPE_CHECKING
 from skin.messages import CheckMessage, DialogMessage
 from utils import config_manager
 from utils.config import (
-    AppConfigData,
-    FieldErrors,
     ProbeRecord,
     SourceSaveRequest,
     compare_configs,
     merge_source_config,
     owner_item,
-    section_name,
     validate_types,
 )
+from utils.config.models import AppConfigData, FieldErrors
+from utils.config.sources import section_name
 
 from ..._bridge import gui_bridge
 from ..._dialogs import ChangeConfirmDialog, NoticeDialog, SettingsDialog

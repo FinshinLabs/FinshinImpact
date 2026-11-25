@@ -8,7 +8,8 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-from finshin_sdk.domain import PlatformCode, ProfileKey, platform_of_key
+from finshin_sdk.domain import platform_of_key
+from finshin_sdk.domain.ids import PlatformCode, ProfileKey
 from skin.messages import PlatformMessage
 from system.distributions import SDK_DISTRIBUTION, installed_version
 from system.versions import requires_met

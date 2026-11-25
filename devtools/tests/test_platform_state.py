@@ -29,7 +29,7 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import PlatformCode  # noqa: E402
+from finshin_sdk.domain.ids import PlatformCode  # noqa: E402
 from services.adapter_catalog import Catalog, ReleaseRow  # noqa: E402
 from services.adapter_manifest import InstalledAdapter  # noqa: E402
 from services.env_setup import platform_rows as rows_mod  # noqa: E402

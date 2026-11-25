@@ -13,8 +13,8 @@ from finshin_sdk.domain import (
     MomentSubscription,
     PlatformMoment,
     QueuedAction,
-    SourceDeclaration,
 )
+from finshin_sdk.domain.config import SourceDeclaration
 
 from .config import CONFIG_SOURCE
 from .core import purge_on_identity_changed

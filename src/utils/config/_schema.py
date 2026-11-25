@@ -5,7 +5,7 @@
 
 from collections.abc import Sequence
 
-from finshin_sdk.domain import FieldSpec
+from finshin_sdk.domain.config import FieldSpec
 
 from .models import AppSchema, FieldSchema, TabSchema
 from .sources import AssembledSection

@@ -13,7 +13,6 @@ from system.profile_env import get_profile, read_token
 from ui import gui_bridge
 from utils import config_manager
 from utils.config import (
-    FieldErrors,
     ProbeRecord,
     SourceSaveRequest,
     load_config,
@@ -21,6 +20,7 @@ from utils.config import (
     owner_item,
     save_config,
 )
+from utils.config.models import FieldErrors
 from utils.init_files import save_persona_text
 from utils.network import link_report
 from utils.paths import PLATFORM

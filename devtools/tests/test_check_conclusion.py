@@ -16,7 +16,8 @@ from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
 
-from finshin_sdk.domain import ConfigPath, SourceCode  # noqa: E402
+from finshin_sdk.domain.config import ConfigPath  # noqa: E402
+from finshin_sdk.domain.ids import SourceCode  # noqa: E402
 from skin.messages import CheckMessage  # noqa: E402
 from utils.check import display_note, failure_note  # noqa: E402
 

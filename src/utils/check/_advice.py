@@ -9,7 +9,7 @@ from html.parser import HTMLParser
 
 from skin.messages import CheckMessage, DialogMessage
 
-from ..config import FieldErrors
+from ..config.models import FieldErrors
 
 _PAGE_HEADS = ("<!doctype", "<html")
 _STATUS_PREFIX = re.compile(r"^(HTTP \d{3})\s+")

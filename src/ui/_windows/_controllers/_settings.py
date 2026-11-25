@@ -8,7 +8,8 @@
 from skin.messages import CheckMessage, DialogMessage
 from skin.theme import SETTINGS_DIALOG
 from utils import config_manager
-from utils.config import FieldErrors, ProbeRecord, validate_types
+from utils.config import ProbeRecord, validate_types
+from utils.config.models import FieldErrors
 
 from ..._bridge import gui_bridge
 from ..._dialogs import (

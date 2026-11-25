@@ -13,7 +13,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
 from finshin_sdk import CredentialSpec  # noqa: E402
-from finshin_sdk.domain import ConfigPath, PlatformCode  # noqa: E402
+from finshin_sdk.domain.config import ConfigPath  # noqa: E402
+from finshin_sdk.domain.ids import PlatformCode  # noqa: E402
 from finshin_sdk.dto import AdapterManifestDTO  # noqa: E402
 from services import adapter_credential as credential_mod  # noqa: E402
 

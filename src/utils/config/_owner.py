@@ -3,7 +3,8 @@
 from collections.abc import Sequence
 from typing import Protocol, TypeVar
 
-from finshin_sdk.domain import ConfigPath, SourceCode
+from finshin_sdk.domain.config import ConfigPath
+from finshin_sdk.domain.ids import SourceCode
 
 from .sources import current_plan
 

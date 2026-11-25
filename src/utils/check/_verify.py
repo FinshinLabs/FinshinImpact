@@ -11,7 +11,8 @@ from collections.abc import Callable, Sequence
 from finshin_sdk.domain import ProbeChannel, ProbeOutcome, ProbeResult
 from skin.messages import CheckMessage
 
-from ..config import AppConfigData, AppSchema, FieldErrors, validate_types
+from ..config import validate_types
+from ..config.models import AppConfigData, AppSchema, FieldErrors
 from ..logger import get_logger
 from ..network import CHECKING, RowId, RowStatus
 

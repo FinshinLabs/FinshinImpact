@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import ConfigPath
+from finshin_sdk.domain.config import ConfigPath
 from skin.theme import SETTINGS_DIALOG, ButtonStyle
 from utils.config.models import ConfigValue, FieldSchema
 

@@ -9,15 +9,11 @@ from typing import cast
 import aiosqlite
 
 from core import TaskRepository
-from finshin_sdk.domain import (
-    ChatRole,
-    PlatformCode,
-    TaskPayload,
-    TaskStatus,
-)
+from finshin_sdk.domain import ChatRole, TaskPayload, TaskStatus
 from finshin_sdk.domain.ids import (
     ContainerCode,
     MessageId,
+    PlatformCode,
     PrincipalKey,
     TaskKey,
     UserId,

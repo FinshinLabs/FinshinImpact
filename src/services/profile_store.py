@@ -8,7 +8,8 @@ import shutil
 import time
 from typing import Any
 
-from finshin_sdk.domain import ProfileKey, platform_of_key
+from finshin_sdk.domain import platform_of_key
+from finshin_sdk.domain.ids import ProfileKey
 from system.atomic_write import write_bytes_atomic
 from system.profile_env import (
     ASSET_PERSONA_EXAMPLE_NAME,

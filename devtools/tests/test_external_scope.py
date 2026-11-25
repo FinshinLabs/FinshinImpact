@@ -25,7 +25,7 @@ set_profile("tg.000000")
 from adapter_presence import adapter_present  # noqa: E402
 
 from exceptions import AdapterImportError, PluginImportError  # noqa: E402
-from finshin_sdk.domain import PlatformCode  # noqa: E402
+from finshin_sdk.domain.ids import PlatformCode  # noqa: E402
 from services.adapter_manifest import load_adapter_manifests  # noqa: E402
 from system.plugin_roster import BUNDLED_PLUGINS_PKG  # noqa: E402
 from utils.external_scope import check_external_imports  # noqa: E402

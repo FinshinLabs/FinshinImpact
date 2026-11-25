@@ -4,7 +4,7 @@
 """
 
 from finshin_sdk import PlatformAssembly
-from finshin_sdk.domain import PlatformCode
+from finshin_sdk.domain.ids import PlatformCode
 from utils.middleware import LoggingMiddleware
 from utils.plugin import register_plugins
 

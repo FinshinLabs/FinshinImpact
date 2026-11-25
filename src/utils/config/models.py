@@ -7,14 +7,9 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
-from finshin_sdk.domain import (
-    ConfigPath,
-    ConfigValue,
-    ConfigValues,
-    ConnectionPlan,
-    FieldCondition,
-    SourceCode,
-)
+from finshin_sdk.domain import ConfigValues, ConnectionPlan
+from finshin_sdk.domain.config import ConfigPath, ConfigValue, FieldCondition
+from finshin_sdk.domain.ids import SourceCode
 
 # 一个标签页的键值表，键为配置键名
 TabData = dict[str, ConfigValue]

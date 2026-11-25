@@ -16,11 +16,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 from finshin_sdk.domain import (  # noqa: E402
     ChatScope,
     ContentKind,
-    PlatformCode,
     is_flag_name,
     make_container,
 )
-from finshin_sdk.domain.ids import ChatId, MessageId, UserId  # noqa: E402
+from finshin_sdk.domain.ids import ChatId, MessageId, PlatformCode, UserId  # noqa: E402
 from finshin_sdk.dto import (  # noqa: E402
     CommandDTO,
     ContentDTO,

@@ -9,7 +9,7 @@
 - 文档写法两条判据各命中一次，代码区里的链接字面不报
 - 分号只放行 docstring 里单个分号的引用形状，md 围栏与行内代码段照报
 - 模块级别名按消费者定私有性，类型构造与被他模块取用的别名不判
-- 门面出口三类硬性各命中一次：私有模块转发公开符号、惰性表指向公开模块、声明 `__all__`
+- 门面出口四类硬性各命中一次：私有模块转发公开符号、惰性表指向公开模块、包外经门面取公开子模块符号、声明 `__all__`
 - 豁免清单只罩待核，条目须可解析，本轮装载到的路径没命中才判失效转硬性
 - devtools 树可直连私有模块：不报越界，其引用不把 src 公共名算成对外
 - 扫描目标路径写错即报错退出
@@ -594,7 +594,7 @@ class TestAliasPrivacy(unittest.TestCase):
 
 
 class TestFacadeOutlets(unittest.TestCase):
-    """门面出口三类硬性"""
+    """门面出口四类硬性"""
 
     _LAZY = (
         "import importlib\n\n"
@@ -663,6 +663,46 @@ class TestFacadeOutlets(unittest.TestCase):
             ]
         )
         self.assertTrue(any("转发公开符号 `StrEnum`" in text for text in found), found)
+
+    def test_public_module_forwarding_flagged(self) -> None:
+        """包外经门面取公开子模块符号报硬性"""
+        facade = "src/ui/__init__.py"
+        found = self._naming(
+            [
+                (facade, _skeleton(facade) + "from .thing import Thing\n"),
+                (
+                    "src/ui/thing.py",
+                    _skeleton("src/ui/thing.py") + "class Thing:\n" + _CLASS_DOC,
+                ),
+                (
+                    "src/core/use.py",
+                    _skeleton("src/core/use.py")
+                    + "from ui import Thing\n\n_USE = Thing\n",
+                ),
+            ]
+        )
+        self.assertTrue(
+            any("门面代发公开子模块符号 `Thing`" in text for text in found), found
+        )
+
+    def test_public_module_direct_import_passes(self) -> None:
+        """包外直连公开子模块不报转发"""
+        facade = "src/ui/__init__.py"
+        found = self._naming(
+            [
+                (facade, _skeleton(facade) + "from .thing import Thing\n"),
+                (
+                    "src/ui/thing.py",
+                    _skeleton("src/ui/thing.py") + "class Thing:\n" + _CLASS_DOC,
+                ),
+                (
+                    "src/core/use.py",
+                    _skeleton("src/core/use.py")
+                    + "from ui.thing import Thing\n\n_USE = Thing\n",
+                ),
+            ]
+        )
+        self.assertFalse(any("门面代发公开子模块符号" in text for text in found), found)
 
     def test_private_module_own_definition_passes(self) -> None:
         """私有模块自己定义的名字被取用不报"""

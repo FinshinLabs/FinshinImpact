@@ -17,11 +17,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from finshin_sdk.domain import ConfigPath
+from finshin_sdk.domain.config import ConfigPath
 from skin.qss import build_error_label_qss
 from skin.theme import SETTINGS_DIALOG
-from utils.config import AppConfigData, AppSchema, FieldErrors
-from utils.config.models import ConfigValue, FieldSchema, TabData, TabSchema, is_blank
+from utils.config.models import (
+    AppConfigData,
+    AppSchema,
+    ConfigValue,
+    FieldErrors,
+    FieldSchema,
+    TabData,
+    TabSchema,
+    is_blank,
+)
 
 from ..._primitives import make_combo, set_margins
 from ._list_widget import ConfigListRow

@@ -7,7 +7,7 @@
 from importlib import import_module
 
 from finshin_sdk import CredentialSpec
-from finshin_sdk.domain import PlatformCode
+from finshin_sdk.domain.ids import PlatformCode
 
 from .adapter_manifest import load_adapter_manifests
 

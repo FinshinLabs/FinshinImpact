@@ -45,11 +45,9 @@ from finshin_sdk import (  # noqa: E402
     CredentialSpec,
     PlatformAssembly,
 )
-from finshin_sdk.domain import (  # noqa: E402
-    ConfigPath,
-    PlatformCode,
-    PluginDeclaration,
-)
+from finshin_sdk.domain import PluginDeclaration  # noqa: E402
+from finshin_sdk.domain.config import ConfigPath  # noqa: E402
+from finshin_sdk.domain.ids import PlatformCode  # noqa: E402
 from finshin_sdk.dto import AdapterManifestDTO, PluginManifestDTO  # noqa: E402
 from services import adapter_manifest as manifest_mod  # noqa: E402
 from ui import gui_bridge  # noqa: E402
@@ -58,7 +56,7 @@ _PARTS_KEYS = ("assemble", "plan_for", "engine_preload")
 
 # 交出整套件的假入口件源码，形状照接口包那份 AdapterParts
 _PARTS_SOURCE = """from finshin_sdk import AdapterParts, CredentialSpec
-from finshin_sdk.domain import ConfigPath
+from finshin_sdk.domain.config import ConfigPath
 
 
 def parts():

@@ -120,6 +120,7 @@ python devtools\check_coding_style.py --section 注释
 
 - 私有模块的模块级 `from` 导入表与消费方取用名求交集，命中报硬性，消费方应改从来源模块直连（`_s5_naming`）。
 - 惰性门面的 `_SYMBOL_MODULES` 指向公开模块报硬性，消费方应直连该模块（`_s5f_facade_exports`）。
+- 包外经门面取用同包公开子模块代发的符号报硬性，消费方应直连该子模块（`_s5f_facade_exports`）。
 - 门面声明 `__all__` 报硬性，导入即出口（`_s5f_facade_exports`）。
 
 ## 回调形参查什么
