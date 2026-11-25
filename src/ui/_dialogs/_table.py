@@ -7,6 +7,7 @@
 import html
 from typing import Any
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QTextEdit, QWidget
 
@@ -16,6 +17,7 @@ from utils.network import CHECKING, FrameKey, RowStatus
 from .._lifecycle import Ticker
 
 _CLOCK_MS = 1000  # 倒计时步进：一秒一跳，与探测预算的秒刻度对齐
+_HEIGHT_SCREEN_RATIO = 0.35  # 表格占可用屏幕高度的上限，加上窗头与按钮约占四成多
 
 
 def _state_map(cfg: FiveStateDialogTheme) -> dict[str, tuple[str, str]]:
@@ -53,6 +55,7 @@ class RowTable(QTextEdit):
         self._elapsed: dict[str, int] = {}
         self.setObjectName(ObjectName.ROW_VIEW)
         self.setReadOnly(True)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         self._clock = Ticker(self, _CLOCK_MS, self._advance_clock)
 
@@ -139,9 +142,9 @@ class RowTable(QTextEdit):
         self._fit_height()
 
     def _fit_height(self) -> None:
-        """按文档实际高度固定控件高度
+        """按文档高度固定控件高度
 
-        - 窗口随行数与换行自动伸缩，不出现滚动条
+        - 高度随内容增长，超过可用屏幕高度的上限即在控件内滚动
         """
         doc = self.document()
         doc.setTextWidth(self.viewport().width())
@@ -151,7 +154,8 @@ class RowTable(QTextEdit):
             + 2 * self.frameWidth()
             + 2
         )
-        self.setFixedHeight(height)
+        cap = int(self.screen().availableGeometry().height() * _HEIGHT_SCREEN_RATIO)
+        self.setFixedHeight(min(height, cap))
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         """宽度变化时改变换行并重算高度"""
