@@ -57,6 +57,7 @@ class ChromeBuilder:
         error_font: QFont,
         on_exit: Callable[[], None],
         on_save: Callable[[], None],
+        on_discard: Callable[[], None],
         actions: SourceButtons,
     ) -> None:
         self._host = host
@@ -66,6 +67,7 @@ class ChromeBuilder:
         self._error_font = error_font
         self._on_exit = on_exit
         self._on_save = on_save
+        self._on_discard = on_discard
         self._actions = actions
 
         # 根布局/按钮条引用：原地切模式只拆可再生部件，表单永不重建
@@ -85,7 +87,11 @@ class ChromeBuilder:
         self.save_btn: QPushButton | None = None
 
     def build(
-        self, schema: AppSchema, is_setup: bool, error_sections: set[str]
+        self,
+        schema: AppSchema,
+        is_setup: bool,
+        can_discard: bool,
+        error_sections: set[str],
     ) -> None:
         """构建界面"""
         root_layout = QVBoxLayout(self._host)
@@ -97,17 +103,17 @@ class ChromeBuilder:
 
         root_layout.addLayout(self._build_nav(schema), stretch=1)
         self.set_error_marks(error_sections, [], [], set())
-        self.bottom_layout = self._build_bottom_buttons(is_setup)
+        self.bottom_layout = self._build_bottom_buttons(is_setup, can_discard)
         root_layout.addLayout(self.bottom_layout)
 
-    def rebuild(self, is_setup: bool) -> None:
+    def rebuild(self, is_setup: bool, can_discard: bool) -> None:
         """拆建底排提示与按钮条"""
         if self.root_layout is None:
             return
         if self.bottom_layout is not None:
             self.root_layout.removeItem(self.bottom_layout)
             clear_layout(self.bottom_layout)
-        self.bottom_layout = self._build_bottom_buttons(is_setup)
+        self.bottom_layout = self._build_bottom_buttons(is_setup, can_discard)
         self.set_error_marks(
             set(), self.dirty_groups, self.dirty_sections, self.warning_groups
         )
@@ -270,17 +276,26 @@ class ChromeBuilder:
             return
         layout.addWidget(row)
 
-    def _build_bottom_buttons(self, is_setup: bool) -> QHBoxLayout:
+    def _build_bottom_buttons(self, is_setup: bool, can_discard: bool) -> QHBoxLayout:
         """按模式构建底部按钮"""
         # 发信号而非 accept：校验通过才关窗，失败则原窗保留已填内容
         if is_setup:
-            specs = [
+            specs = []
+            if can_discard:
+                specs.append(
+                    ButtonSpec(
+                        SETTINGS_DIALOG.discard_text,
+                        ButtonStyle.OUTLINE,
+                        on_click=self._on_discard,
+                    )
+                )
+            specs.append(
                 ButtonSpec(
                     SETTINGS_DIALOG.exit_text,
                     ButtonStyle.OUTLINE,
                     on_click=self._on_exit,
                 )
-            ]
+            )
         else:
             specs = [
                 ButtonSpec(

@@ -64,6 +64,7 @@ class SettingsDialogTheme:
     confirm_text: str = DialogMessage.BTN_CONFIRM
     exit_text: str = DialogMessage.BTN_EXIT
     finish_text: str = DialogMessage.BTN_DONE
+    discard_text: str = DialogMessage.SETUP_DISCARD
     validating_text: str = DialogMessage.BTN_VALIDATING
     reset_text: str = DialogMessage.SETUP_RESET
     reset_icon: str = DialogMessage.SETUP_RESET_ICON

@@ -1,7 +1,6 @@
 """配置向导
 
 - 左侧大类与上排页签的两级表单、错误标红
-- 按来源保存、脏标记与完成判定共用同一实例
 - 变更确认窗由本包一并交出
 """
 
@@ -78,6 +77,7 @@ class SettingsDialog(BaseDialog):
         self._dirty_sections: list[str] = []
         self._warning_groups: set[str] = set()
         self._field_errors: FieldErrors = dict(field_errors or {})
+        self._can_discard = False
         self.setStyleSheet(build_settings_dialog_qss())
 
         self._fields = FieldBuilder(current_config)
@@ -90,6 +90,7 @@ class SettingsDialog(BaseDialog):
             error_font=_ERROR_FONT,
             on_exit=self._on_exit_clicked,
             on_save=self.finish_requested.emit,
+            on_discard=self.discard_changes,
             actions=self._actions,
         )
 
@@ -98,6 +99,7 @@ class SettingsDialog(BaseDialog):
         self._chrome.build(
             schema,
             self._mode == ConfigMode.SETUP,
+            self._can_discard,
             _sections_with_errors(schema, self._field_errors),
         )
         self._fields.watch(self.refresh_dirty)
@@ -133,6 +135,11 @@ class SettingsDialog(BaseDialog):
     def is_setup(self) -> bool:
         """当前是否向导态"""
         return self._mode == ConfigMode.SETUP
+
+    @property
+    def can_discard(self) -> bool:
+        """盘上有好配置可回"""
+        return self._can_discard
 
     @property
     def dirty_groups(self) -> list[str]:
@@ -209,15 +216,23 @@ class SettingsDialog(BaseDialog):
     def switch_to_setup(self, field_errors: FieldErrors | None) -> None:
         """EDIT 原地转 SETUP，已填内容不丢"""
         self._mode = ConfigMode.SETUP
+        self._can_discard = True
         self._field_errors = dict(field_errors or {})
-        self._chrome.rebuild(True)
+        self._chrome.rebuild(True, self._can_discard)
         self.apply_errors(self._field_errors)
 
     def switch_to_edit(self) -> None:
         """SETUP 原地转 EDIT，已填内容不丢"""
         self._mode = ConfigMode.EDIT
-        self._chrome.rebuild(False)
+        self._chrome.rebuild(False, self._can_discard)
         self.apply_errors(self._field_errors)
+
+    def discard_changes(self) -> None:
+        """回到盘上值并转回编辑态"""
+        self.restore_disk()
+        self._warning_groups.clear()
+        self._field_errors.clear()
+        self.switch_to_edit()
 
     def get_modified_config(self) -> AppConfigData:
         """从输入控件提取配置字典"""

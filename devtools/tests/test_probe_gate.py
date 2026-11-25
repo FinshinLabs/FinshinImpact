@@ -506,6 +506,29 @@ class SettingsDialogMarksTest(unittest.TestCase):
             [button.text() for button in bar.findChildren(QPushButton)], ["完成"]
         )
 
+    def test_switched_setup_discards_back_to_disk(self) -> None:
+        """编辑态转向导后可放弃改动回盘上值"""
+        dialog = SettingsDialog(self.schema, self.disk, mode=ConfigMode.EDIT)
+        dialog.show()
+        self.app.processEvents()
+        item = self.schema[0].path_of(self.schema[0].fields[0])
+        dialog._fields.inputs[item].setText("http://bad")
+        self.app.processEvents()
+
+        dialog.switch_to_setup({})
+        bar = dialog._chrome.bottom_layout.itemAt(1).widget()
+        buttons = bar.findChildren(QPushButton)
+        self.assertEqual(
+            [button.text() for button in buttons], ["放弃改动", "退出程序"]
+        )
+
+        next(button for button in buttons if button.text() == "放弃改动").click()
+        self.assertFalse(dialog.is_setup)
+        self.assertEqual(dialog._fields.inputs[item].text(), "")
+        self.assertEqual(dialog.dirty_groups, [])
+        dialog.deleteLater()
+        self.app.processEvents()
+
     def test_source_saved_keeps_setup_until_last_warning_clears(self) -> None:
         core_schema = self.schema[1]
         core_item = core_schema.path_of(core_schema.fields[0])

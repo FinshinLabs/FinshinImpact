@@ -68,11 +68,14 @@ class ShutdownController(BaseController):
 
         # 在弹出确认框之前标记关闭意向，阻止关闭期间再弹强制配置
         gui_bridge.set_shutdown_pending(True)
-        message = (
-            DialogMessage.SETUP_EXIT_UNFINISHED
-            if isinstance(source, SettingsDialog) and source.is_setup
-            else SHUTDOWN_DIALOG.message
-        )
+        if isinstance(source, SettingsDialog) and source.is_setup:
+            message = (
+                DialogMessage.SETUP_EXIT_UNSAVED
+                if source.can_discard
+                else DialogMessage.SETUP_EXIT_UNFINISHED
+            )
+        else:
+            message = SHUTDOWN_DIALOG.message
         dialog = ShutdownDialog(parent=source or self.gui, message=message)
         reply = dialog.exec()
 
