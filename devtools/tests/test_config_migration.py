@@ -1,6 +1,7 @@
 """旧配置迁移测试
 
 - 裸段按对照表搬进来源块，键名与值不改
+- core.data 搬进 plugin.AI.data，新位置已有值为准
 - 新段已有键时旧值不采用
 - 已是来源块的配置不写盘
 - 旧插件状态并进实例自描述文件，旧文件改名留底
@@ -43,6 +44,7 @@ api_key = "sk-test"
 
 [data]
 record_keep = 30.0
+waiting = 4.0
 """
 
 _NEW = """[[source]]
@@ -52,12 +54,27 @@ id = "plugin.AI"
 api_key = "sk-new"
 """
 
+_CORE_DATA = """[[source]]
+id = "core"
+
+[source.data]
+record_keep = 12.0
+waiting = 2.0
+"""
+
+_AI_DATA = """[[source]]
+id = "plugin.AI"
+
+[source.data]
+record_keep = 99.0
+"""
+
 
 class TestBareSections(unittest.TestCase):
     """裸段搬进来源块的条件与结果"""
 
     def test_moves_bare_sections(self) -> None:
-        """旧写法搬成三块来源，值跟着走"""
+        """旧写法搬成两类来源，值跟着走"""
         document = tomllib.loads(_OLD)
 
         self.assertTrue(matches(_instance(document)))
@@ -68,9 +85,40 @@ class TestBareSections(unittest.TestCase):
         self.assertNotIn("model", document)
         self.assertNotIn("data", document)
         blocks = {block["id"]: block for block in document["source"]}
-        self.assertEqual(sorted(blocks), ["adapter.tg", "core", "plugin.AI"])
+        self.assertEqual(sorted(blocks), ["adapter.tg", "plugin.AI"])
         self.assertEqual(blocks["plugin.AI"]["model"]["api_key"], "sk-test")
+        self.assertEqual(
+            blocks["plugin.AI"]["data"], {"record_keep": 30.0, "waiting": 4.0}
+        )
         self.assertTrue(any("取旧值" in line for line in notes))
+
+    def test_moves_core_data_to_ai(self) -> None:
+        """dev8 的 core.data 搬进 AI 数据段，旧来源块撤掉"""
+        document = tomllib.loads(_CORE_DATA)
+
+        self.assertTrue(matches(_instance(document)))
+        changed, notes = apply(_instance(document))
+        self.assertTrue(changed)
+
+        self.assertEqual([block["id"] for block in document["source"]], ["plugin.AI"])
+        self.assertEqual(
+            document["source"][0]["data"], {"record_keep": 12.0, "waiting": 2.0}
+        )
+        self.assertTrue(any("core.data -> plugin.AI.data" in line for line in notes))
+
+    def test_ai_data_wins_over_both_legacy_shapes(self) -> None:
+        """AI 新值先保留，core.data 次之，裸 data 只补缺"""
+        document = tomllib.loads(_OLD + _CORE_DATA + _AI_DATA)
+
+        changed, notes = apply(_instance(document))
+        self.assertTrue(changed)
+
+        blocks = {block["id"]: block for block in document["source"]}
+        self.assertNotIn("core", blocks)
+        self.assertEqual(
+            blocks["plugin.AI"]["data"], {"record_keep": 99.0, "waiting": 2.0}
+        )
+        self.assertTrue(any("旧值不采用" in line for line in notes))
 
     def test_existing_value_wins(self) -> None:
         """新段已有的键保留新值"""
@@ -84,8 +132,9 @@ class TestBareSections(unittest.TestCase):
         self.assertTrue(any("旧值不采用" in line for line in notes))
 
     def test_new_shape_not_matched(self) -> None:
-        """已是来源块的配置不再命中"""
+        """已是当前来源块的配置不命中"""
         self.assertFalse(matches(_instance(tomllib.loads(_NEW))))
+        self.assertFalse(matches(_instance(tomllib.loads(_AI_DATA))))
 
 
 class TestRunner(unittest.TestCase):
@@ -103,9 +152,32 @@ class TestRunner(unittest.TestCase):
             migrated = tomllib.loads(config.read_text(encoding="utf-8"))
             self.assertEqual(
                 [block["id"] for block in migrated["source"]],
-                ["adapter.tg", "plugin.AI", "core"],
+                ["adapter.tg", "plugin.AI"],
             )
             self.assertTrue((instance / "config.toml.bak").is_file())
+            self.assertEqual(run_all(Path(tmp), report=lambda _: None), 0)
+
+    def test_core_data_writes_once_with_backup(self) -> None:
+        """core.data 写回一次并留备份，再跑不动"""
+        with tempfile.TemporaryDirectory() as tmp:
+            instance = Path(tmp) / "tg.000001"
+            instance.mkdir()
+            config = instance / "config.toml"
+            config.write_text(_CORE_DATA, encoding="utf-8")
+
+            self.assertEqual(run_all(Path(tmp), report=lambda _: None), 1)
+            migrated = tomllib.loads(config.read_text(encoding="utf-8"))
+            self.assertEqual(
+                [block["id"] for block in migrated["source"]], ["plugin.AI"]
+            )
+            self.assertEqual(
+                migrated["source"][0]["data"],
+                {"record_keep": 12.0, "waiting": 2.0},
+            )
+            self.assertEqual(
+                (instance / "config.toml.bak").read_text(encoding="utf-8"),
+                _CORE_DATA,
+            )
             self.assertEqual(run_all(Path(tmp), report=lambda _: None), 0)
 
     def test_backup_keeps_first_original(self) -> None:

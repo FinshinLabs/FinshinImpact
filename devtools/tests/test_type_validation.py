@@ -499,7 +499,7 @@ class TestPlatformSchema(unittest.TestCase):
             ensure_config(config_sources())
         data = ConfigIO(path).load()
         self.assertIn("plugin.AI.chore", data)
-        self.assertEqual(data["core.data"]["record_keep"], 30.0)
+        self.assertEqual(data["plugin.AI.data"]["record_keep"], 30.0)
 
 
 if __name__ == "__main__":

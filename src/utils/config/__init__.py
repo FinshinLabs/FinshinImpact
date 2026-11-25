@@ -7,7 +7,6 @@
 from collections.abc import Sequence
 
 from ..paths import CONFIG_FILE
-from ._core import CoreKeys, CoreSections, core_item
 from ._differ import compare_configs
 from ._io import ConfigIO
 from ._owner import OWNER_TAG, owner_field, owner_item

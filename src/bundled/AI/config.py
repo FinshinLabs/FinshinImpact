@@ -19,7 +19,7 @@ from finshin_sdk.domain.config import (
 )
 from finshin_sdk.domain.ids import SourceCode
 from utils import config_manager
-from utils.config import OWNER_TAG, CoreKeys, core_item
+from utils.config import OWNER_TAG
 from utils.paths import RECORDS_DIR
 from utils.persona import build_persona
 
@@ -46,6 +46,7 @@ class PluginSections(StrEnum):
 
     MODEL = "model"
     CHORE = "chore"
+    DATA = "data"
 
 
 class PluginKeys(StrEnum):
@@ -62,6 +63,8 @@ class PluginKeys(StrEnum):
     OWNER = "owner"
     TRIGGERS = "triggers"
     LOST_LINES = "lost_lines"
+    RECORD_KEEP = "record_keep"
+    WAITING = "waiting"
 
 
 def _path(key: PluginKeys, section: PluginSections) -> ConfigPath:
@@ -69,6 +72,7 @@ def _path(key: PluginKeys, section: PluginSections) -> ConfigPath:
     return ConfigPath(source=SOURCE, section=section, key=key)
 
 
+# 配置页字段声明
 _MODEL_SECTION = SectionSpec(
     section=PluginSections.MODEL,
     title="模型",
@@ -157,6 +161,31 @@ _CHORE_SECTION = SectionSpec(
     ),
 )
 
+_DATA_SECTION = SectionSpec(
+    section=PluginSections.DATA,
+    title="记录与运维",
+    fields=(
+        FieldSpec(
+            section=PluginSections.DATA,
+            key=PluginKeys.RECORD_KEEP,
+            value_type=float,
+            default=30.0,
+            label="记录保留（天）",
+            desc="取值范围 1~3650，闲置超过这个天数的对话记录与群上下文一并删除",
+            bounds=(1.0, 3650.0),
+        ),
+        FieldSpec(
+            section=PluginSections.DATA,
+            key=PluginKeys.WAITING,
+            value_type=float,
+            default=0.5,
+            label="过期检测间隔（小时）",
+            desc="取值范围 0.1~720，每隔多久检查一次过期记录并清理",
+            bounds=(0.1, 720.0),
+        ),
+    ),
+)
+
 
 def _probe_plan(values: ConfigValues) -> ConnectionPlan:
     """按给定值造一份接口检测计划"""
@@ -168,7 +197,7 @@ def _probe_plan(values: ConfigValues) -> ConnectionPlan:
 
 CONFIG_SOURCE = SourceDeclaration(
     title="AI 设置",
-    sections=(_MODEL_SECTION, _CHORE_SECTION),
+    sections=(_MODEL_SECTION, _CHORE_SECTION, _DATA_SECTION),
     probe=_probe_plan,
 )
 
@@ -235,13 +264,13 @@ class _DynamicAIConfig:
     @property
     def keep_seconds(self) -> float:
         """记录保留时长"""
-        days = self._read(core_item(CoreKeys.RECORD_KEEP), float)
+        days = self._read(_path(PluginKeys.RECORD_KEEP, PluginSections.DATA), float)
         return days * _DAY_SECONDS
 
     @property
     def waiting_time(self) -> float:
         """清理轮间隔"""
-        hours = self._read(core_item(CoreKeys.WAITING), float)
+        hours = self._read(_path(PluginKeys.WAITING, PluginSections.DATA), float)
         return hours * _HOUR_SECONDS
 
     @property

@@ -50,7 +50,7 @@ from utils.config.models import (  # noqa: E402
 )
 
 _GROUP = "plugin.AI"
-_CORE = "core"
+_OTHER = "plugin.help"
 _TITLE = "AI 设置"
 _ITEM = "plugin.AI.model.url"
 
@@ -90,7 +90,7 @@ def _plan(reuse_key: object = "http://a") -> ConnectionPlan:
 
 
 def _schema() -> list[TabSchema]:
-    """AI 与 core 两类"""
+    """AI 与帮助两类"""
     return [
         TabSchema(
             "模型",
@@ -102,21 +102,12 @@ def _schema() -> list[TabSchema]:
             probe=lambda _values: _plan(),
         ),
         TabSchema(
-            "Bot",
-            "core.bot",
-            _CORE,
-            "Bot 设置",
-            "bot",
-            [
-                FieldSchema(
-                    "debug",
-                    "调试",
-                    "",
-                    False,
-                    bool,
-                    (("False", "关闭"), ("True", "开启")),
-                )
-            ],
+            "帮助",
+            "plugin.help.basic",
+            _OTHER,
+            "帮助",
+            "basic",
+            [FieldSchema("mode", "模式", "", "off", str)],
         ),
     ]
 
@@ -153,7 +144,7 @@ class _Dialog:
         return _plan((data or self.values)["plugin.AI.model"]["url"])
 
     def group_title(self, group: str) -> str:
-        return _TITLE if group == _GROUP else "Bot 设置"
+        return _TITLE if group == _GROUP else "帮助"
 
     def set_busy(self, _busy: bool) -> None:
         pass
@@ -225,7 +216,7 @@ class SourceSaveTest(unittest.TestCase):
         config_manager._schema = _schema()
         self.disk = {
             "plugin.AI.model": {"url": "http://a"},
-            "core.bot": {"debug": False},
+            "plugin.help.basic": {"mode": "off"},
         }
         config_manager._config = deepcopy(self.disk)
         self.dialog = _Dialog(config_manager._schema, self.disk, deepcopy(self.disk))
@@ -284,11 +275,11 @@ class SourceSaveTest(unittest.TestCase):
         self.assertFalse(self.requests[0].write)
         self.assertFalse(hasattr(self.requests[0], "restart"))
 
-    def test_core_save_does_not_restart_edit_service(self) -> None:
+    def test_other_source_save_does_not_restart_edit_service(self) -> None:
         self.dialog.is_setup = False
-        self.dialog.values["core.bot"]["debug"] = True
+        self.dialog.values["plugin.help.basic"]["mode"] = "on"
         with patch.object(_save.ChangeConfirmDialog, "confirm", return_value=True):
-            self.save.requested(self.dialog, _CORE)
+            self.save.requested(self.dialog, _OTHER)
         self.assertTrue(self.requests[0].write)
         self.assertFalse(hasattr(self.requests[0], "restart"))
         self.assertEqual(self.host._probe.started, [])
@@ -395,7 +386,7 @@ class SourceDiffTest(unittest.TestCase):
         disk = {
             "plugin.AI.model": {"url": "http://a"},
             "plugin.AI.advanced": {"mode": "auto"},
-            "core.bot": {"debug": False},
+            "plugin.help.basic": {"mode": "off"},
         }
         one = deepcopy(disk)
         one["plugin.AI.model"]["url"] = "http://b"
@@ -423,7 +414,7 @@ class SettingsDialogMarksTest(unittest.TestCase):
         self.schema = _schema()
         self.disk = {
             "plugin.AI.model": {"url": ""},
-            "core.bot": {"debug": False},
+            "plugin.help.basic": {"mode": "off"},
         }
         errors = validate_types(self.schema, self.disk)
         self.dialog = SettingsDialog(
@@ -533,12 +524,12 @@ class SettingsDialogMarksTest(unittest.TestCase):
         self.app.processEvents()
 
     def test_source_saved_keeps_setup_until_last_warning_clears(self) -> None:
-        core_schema = self.schema[1]
-        core_item = core_schema.path_of(core_schema.fields[0])
+        other_schema = self.schema[1]
+        other_item = other_schema.path_of(other_schema.fields[0])
         self.dialog.apply_errors(
-            {**self.dialog._field_errors, core_item: "Bot 设置未通过"}
+            {**self.dialog._field_errors, other_item: "帮助未通过"}
         )
-        self.assertEqual(self.dialog.warning_groups, {_GROUP, _CORE})
+        self.assertEqual(self.dialog.warning_groups, {_GROUP, _OTHER})
 
         self.dialog._fields.inputs[
             self.schema[0].path_of(self.schema[0].fields[0])
@@ -547,23 +538,21 @@ class SettingsDialogMarksTest(unittest.TestCase):
         self.dialog.source_saved(_GROUP, self.dialog.get_modified_config())
 
         self.assertTrue(self.dialog.is_setup)
-        self.assertEqual(self.dialog.warning_groups, {_CORE})
+        self.assertEqual(self.dialog.warning_groups, {_OTHER})
         self.assertEqual(self.dialog._chrome._group_tabs[_GROUP].tabText(0), "模型")
-        self.assertEqual(self.dialog._chrome._group_tabs[_CORE].tabText(0), "⚠ Bot")
+        self.assertEqual(self.dialog._chrome._group_tabs[_OTHER].tabText(0), "⚠ 帮助")
         self.assertEqual(
-            self.dialog._chrome._category_items[_CORE][0].text(), "⚠ Bot 设置"
+            self.dialog._chrome._category_items[_OTHER][0].text(), "⚠ 帮助"
         )
-        self.assertNotEqual(self.dialog._fields.labels[core_item][0].styleSheet(), "")
+        self.assertNotEqual(self.dialog._fields.labels[other_item][0].styleSheet(), "")
 
-        self.dialog.source_saved(_CORE, self.dialog.get_modified_config())
+        self.dialog.source_saved(_OTHER, self.dialog.get_modified_config())
 
         self.assertFalse(self.dialog.is_setup)
         self.assertEqual(self.dialog.warning_groups, set())
         self.assertEqual(self.dialog._field_errors, {})
-        self.assertEqual(self.dialog._chrome._group_tabs[_CORE].tabText(0), "Bot")
-        self.assertEqual(
-            self.dialog._chrome._category_items[_CORE][0].text(), "Bot 设置"
-        )
+        self.assertEqual(self.dialog._chrome._group_tabs[_OTHER].tabText(0), "帮助")
+        self.assertEqual(self.dialog._chrome._category_items[_OTHER][0].text(), "帮助")
 
     def test_mark_layouts_keep_warning_left_and_dirty_right(self) -> None:
         section = self.schema[0].section
@@ -632,17 +621,17 @@ class SettingsDialogMarksTest(unittest.TestCase):
 
 
 class SettingsSourceValidationTest(unittest.IsolatedAsyncioTestCase):
-    """保存与启动复用的来源边界"""
+    """保存与启动共用的来源边界"""
 
     async def test_non_adapter_group_ignores_other_required_group(self) -> None:
         from bot._managers import _settings as mod
 
         schema = deepcopy(_schema())
-        core = schema[1]
-        core.fields = [FieldSchema("name", "名称", "", "", str, required=True)]
+        other = schema[1]
+        other.fields = [FieldSchema("name", "名称", "", "", str, required=True)]
         values = {
             "plugin.AI.model": {"url": "http://a"},
-            "core.bot": {"name": ""},
+            "plugin.help.basic": {"name": ""},
         }
         manager = mod.SettingsManager(lambda: "token")
         with (
@@ -664,7 +653,7 @@ class SettingsSourceValidationTest(unittest.IsolatedAsyncioTestCase):
                 "get_all",
                 return_value={
                     "plugin.AI.model": {"url": "http://a"},
-                    "core.bot": {"debug": False},
+                    "plugin.help.basic": {"mode": "off"},
                 },
             ),
             patch.object(mod, "run_probe_round") as run,

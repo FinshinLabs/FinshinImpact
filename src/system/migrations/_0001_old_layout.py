@@ -1,6 +1,7 @@
 """旧布局整成当前形状
 
 - 顶层 proxy/model/ai/chore/data 搬进来源块，键名与值不改
+- core.data 搬进 plugin.AI.data，新位置已有值为准
 - plugins.toml 的启用集与目录指纹搬进 profile.json 的 plugins 块
 - 新位置已有值为准，旧写法只补缺
 - 旧插件状态文件改名留底，不认识的内容原样保留
@@ -15,13 +16,16 @@ from ..plugin_state import PLUGINS_BLOCK_KEY, StateKeys, save_state
 from ..profile_env import INSTANCE_PROFILE_NAME, read_profile_file
 from ._runner import MigrationInstance
 
+_AI_DATA = ("plugin.AI", "data")
+_CORE_DATA = ("core", "data")
+
 # 旧裸段到新段名的对照表。顺序决定多个旧段争同一键时谁先落定
 _MAPPING: tuple[tuple[str, str, str], ...] = (
     ("proxy", "adapter.tg", "proxy"),
     ("model", "plugin.AI", "model"),
     ("ai", "plugin.AI", "model"),
     ("chore", "plugin.AI", "chore"),
-    ("data", "core", "data"),
+    ("data", *_AI_DATA),
 )
 
 _OLD_SECTIONS = tuple(old for old, _, _ in _MAPPING)
@@ -32,17 +36,19 @@ _BACKUP_SUFFIX = ".bak"
 
 
 def matches(instance: MigrationInstance) -> bool:
-    """两样旧形状任一在场即命中"""
+    """旧配置或旧插件状态任一在场即命中"""
     return (
         _has_bare_sections(instance.document)
+        or _has_core_data(instance.document)
         or (instance.root / _OLD_STATE_NAME).is_file()
     )
 
 
 def apply(instance: MigrationInstance) -> tuple[bool, list[str]]:
-    """按对照表搬段、旧插件状态并进自描述文件，交出「动过」与逐条说明"""
+    """搬旧配置与插件状态，交出「动过」与逐条说明"""
     notes: list[str] = []
-    moved = _move_bare_sections(instance.document, notes)
+    moved = _move_core_data(instance.document, notes)
+    moved = _move_bare_sections(instance.document, notes) or moved
     moved = _move_plugin_state(instance.root, notes) or moved
     return moved, notes
 
@@ -54,11 +60,43 @@ def _has_bare_sections(document: dict[str, Any]) -> bool:
     return any(isinstance(document.get(old), dict) for old in _OLD_SECTIONS)
 
 
+def _has_core_data(document: dict[str, Any]) -> bool:
+    """来源块里留着 core.data"""
+    blocks = document.get("source")
+    if not isinstance(blocks, list):
+        return False
+    return any(
+        isinstance(block, dict)
+        and str(block.get("id", "")) == _CORE_DATA[0]
+        and isinstance(block.get(_CORE_DATA[1]), dict)
+        for block in blocks
+    )
+
+
+def _move_core_data(document: dict[str, Any], notes: list[str]) -> bool:
+    """core.data 搬进 AI 数据段，交出是否动过"""
+    blocks = document.get("source")
+    if not isinstance(blocks, list):
+        return False
+    moved = False
+    for block in tuple(blocks):
+        if not isinstance(block, dict) or str(block.get("id", "")) != _CORE_DATA[0]:
+            continue
+        value = block.get(_CORE_DATA[1])
+        if not isinstance(value, dict):
+            continue
+        _merge_section(document, _AI_DATA[0], _AI_DATA[1], value, "core.data", notes)
+        del block[_CORE_DATA[1]]
+        if set(block) == {"id"}:
+            blocks.remove(block)
+        moved = True
+    return moved
+
+
 def _move_bare_sections(document: dict[str, Any], notes: list[str]) -> bool:
     """按对照表搬段，交出是否动过"""
     if not _has_bare_sections(document):
         return False
-    blocks: list[Any] = document.setdefault("source", [])
     for old, identity, section in _MAPPING:
         if old not in document:
             continue
@@ -66,18 +104,32 @@ def _move_bare_sections(document: dict[str, Any], notes: list[str]) -> bool:
         if not isinstance(value, dict):
             notes.append(f"顶层 {old} 不是表，原样保留")
             continue
-        block: dict[str, Any] | None = _find_block(blocks, identity)
-        if block is None:
-            block = {"id": identity}
-            blocks.append(block)
-        target: dict[str, Any] = block.setdefault(section, {})
-        notes.append(f"搬 [{old}] -> {identity}.{section}")
-        _merge_missing(target, value, f"{identity}.{section}", notes)
+        _merge_section(document, identity, section, value, f"[{old}]", notes)
         del document[old]
     return True
 
 
+def _merge_section(
+    document: dict[str, Any],
+    identity: str,
+    section: str,
+    value: dict[str, Any],
+    origin: str,
+    notes: list[str],
+) -> None:
+    """旧段并进来源块，已有键保留新值"""
+    blocks: list[Any] = document.setdefault("source", [])
+    block: dict[str, Any] | None = _find_block(blocks, identity)
+    if block is None:
+        block = {"id": identity}
+        blocks.append(block)
+    target: dict[str, Any] = block.setdefault(section, {})
+    notes.append(f"搬 {origin} -> {identity}.{section}")
+    _merge_missing(target, value, f"{identity}.{section}", notes)
+
+
 def _find_block(blocks: list[Any], identity: str) -> dict[str, Any] | None:
+    """按身份码找已有来源块"""
     for element in blocks:
         if isinstance(element, dict) and str(element.get("id", "")) == identity:
             return element

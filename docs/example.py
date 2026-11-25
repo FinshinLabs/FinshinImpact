@@ -6,7 +6,7 @@
 
 import asyncio
 
-from utils import get_logger
+from utils.logger import get_logger
 
 logger = get_logger("Example")  # 日志器名自动加 Bot. 前缀
 _MAX_RETRIES = 3  # 网络重试上限

@@ -23,7 +23,7 @@ set_profile("tg.000000")
 from config_plan import adapter_sections, fake_adapter_parts  # noqa: E402
 
 from bot._managers._config_sources import config_sources  # noqa: E402
-from bundled.AI.config import CONFIG_SOURCE  # noqa: E402
+from bundled.AI.config import CONFIG_SOURCE, ai_config  # noqa: E402
 from finshin_sdk.domain.config import (  # noqa: E402
     ConfigPath,
     FieldSpec,
@@ -102,7 +102,7 @@ class TestDottedSectionRoundtrip(unittest.TestCase):
             "[source.proxy.notes]\n"
             'proxy = "自动与仅配置代理两档使用该项"\n'
             "[[source]]\n"
-            'id = "core"\n'
+            'id = "plugin.AI"\n'
             "[source.data]\n"
             "record_keep = 30.0\n"
             "[source.data.notes]\n"
@@ -116,7 +116,7 @@ class TestDottedSectionRoundtrip(unittest.TestCase):
             data,
             {
                 "adapter.tg.proxy": {"proxy": _PROXY_VALUE},
-                "core.data": {"record_keep": 30.0},
+                "plugin.AI.data": {"record_keep": 30.0},
             },
         )
 
@@ -145,8 +145,8 @@ class TestSourceBlockShape(unittest.TestCase):
         path = _temp_file()
         path.write_text(
             "[[source]]\n"
-            'id = "core"\n'
-            'data = "本该写成 [source.data]"\n'
+            'id = "adapter.tg"\n'
+            'proxy = "本该写成 [source.proxy]"\n'
             "[[source]]\n"
             'id = "plugin.AI"\n'
             "[source.model]\n"
@@ -157,8 +157,8 @@ class TestSourceBlockShape(unittest.TestCase):
         with self.assertLogs("Bot.Config", level="ERROR") as logs:
             data = ConfigIO(path).load()
 
-        self.assertEqual(set(data), {"core", "plugin.AI.model"})
-        self.assertEqual(data["core"]["data"], "本该写成 [source.data]")
+        self.assertEqual(set(data), {"adapter.tg", "plugin.AI.model"})
+        self.assertEqual(data["adapter.tg"]["proxy"], "本该写成 [source.proxy]")
         self.assertTrue(any("整块不进配置" in line for line in logs.output))
 
     def test_duplicate_identity_block_refused_and_named(self) -> None:
@@ -166,11 +166,11 @@ class TestSourceBlockShape(unittest.TestCase):
         path = _temp_file()
         path.write_text(
             "[[source]]\n"
-            'id = "core"\n'
+            'id = "plugin.AI"\n'
             "[source.data]\n"
             "record_keep = 12.0\n"
             "[[source]]\n"
-            'id = "core"\n'
+            'id = "plugin.AI"\n'
             "[source.data]\n"
             "record_keep = 99.0\n",
             encoding="utf-8",
@@ -179,7 +179,7 @@ class TestSourceBlockShape(unittest.TestCase):
         with self.assertLogs("Bot.Config", level="ERROR") as logs:
             data = ConfigIO(path).load()
 
-        self.assertEqual(data["core.data"]["record_keep"], 12.0)
+        self.assertEqual(data["plugin.AI.data"]["record_keep"], 12.0)
         named = [line for line in logs.output if "重复" in line]
         self.assertEqual(len(named), 1, logs.output)
         self.assertIn("第 2 块", named[0])
@@ -203,9 +203,15 @@ class TestSourceAssembly(unittest.TestCase):
         data = ConfigIO(path).load()
         self.assertEqual(
             list(data),
-            ["adapter.tg.proxy", "plugin.AI.model", "plugin.AI.chore", "core.data"],
+            [
+                "adapter.tg.proxy",
+                "plugin.AI.model",
+                "plugin.AI.chore",
+                "plugin.AI.data",
+            ],
         )
-        self.assertEqual(data["core.data"]["record_keep"], 30.0)
+        self.assertEqual(data["plugin.AI.data"]["record_keep"], 30.0)
+        self.assertEqual(data["plugin.AI.data"]["waiting"], 0.5)
         self.assertEqual(data["adapter.tg.proxy"]["proxy_mode"], "auto")
         text = path.read_text(encoding="utf-8")
         self.assertIn("[source.chore.notes]", text)
@@ -221,9 +227,37 @@ class TestSourceAssembly(unittest.TestCase):
                 ("adapter.tg", "Telegram"),
                 ("plugin.AI", "AI 设置"),
                 ("plugin.AI", "AI 设置"),
-                ("core", "Bot 设置"),
+                ("plugin.AI", "AI 设置"),
             ],
         )
+
+    def test_record_settings_render_under_ai(self) -> None:
+        """记录与运维挂在 AI 设置下，间隔名称与说明按新文案显示"""
+        with fake_adapter_parts():
+            schema = build_schema(assemble(config_sources()).sections)
+
+        record = next(tab for tab in schema if tab.section == "plugin.AI.data")
+        self.assertEqual(record.group, "plugin.AI")
+        self.assertEqual(record.group_title, "AI 设置")
+        self.assertEqual(record.title, "记录与运维")
+        self.assertEqual(record.fields[0].label, "记录保留（天）")
+        self.assertEqual(record.fields[1].label, "过期检测间隔（小时）")
+        self.assertEqual(
+            record.fields[1].desc,
+            "取值范围 0.1~720，每隔多久检查一次过期记录并清理",
+        )
+
+    def test_ai_reads_record_settings_from_own_source(self) -> None:
+        """AI 按自己声明的数据段取保留天数与检测间隔"""
+        with fake_adapter_parts():
+            plan = assemble(config_sources())
+        manager = _ConfigManager()
+        manager._schema = build_schema(plan.sections)
+        manager.load({"plugin.AI.data": {"record_keep": 2.0, "waiting": 3.0}})
+
+        with patch("bundled.AI.config.config_manager", manager):
+            self.assertEqual(ai_config.keep_seconds, 2 * 24 * 60 * 60)
+            self.assertEqual(ai_config.waiting_time, 3 * 60 * 60)
 
     def test_same_identity_rejects_the_later_source(self) -> None:
         """同一身份码被两份认领时后交的那份整份不进，并点名一句"""
@@ -237,7 +271,8 @@ class TestSourceAssembly(unittest.TestCase):
             ensure_config((first, later))
 
         self.assertEqual(
-            list(ConfigIO(path).load()), ["plugin.AI.model", "plugin.AI.chore"]
+            list(ConfigIO(path).load()),
+            ["plugin.AI.model", "plugin.AI.chore", "plugin.AI.data"],
         )
         named = [line for line in logs.output if "被两份认领" in line]
         self.assertEqual(len(named), 1, logs.output)
@@ -322,7 +357,7 @@ class TestSourceAssembly(unittest.TestCase):
         ):
             ensure_config(config_sources())
 
-        self.assertEqual(list(ConfigIO(path).load()), ["adapter.tg.proxy", "core.data"])
+        self.assertEqual(list(ConfigIO(path).load()), ["adapter.tg.proxy"])
         self.assertTrue(any("AI" in line for line in logs.output))
 
 

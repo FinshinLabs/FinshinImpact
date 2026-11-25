@@ -26,14 +26,13 @@ class SourceKind(StrEnum):
 
     ADAPTER = "adapter"
     PLUGIN = "plugin"
-    CORE = "core"
 
 
 @dataclass(frozen=True, slots=True)
 class ConfigSource:
     """一份来源交出的配置段
 
-    - 身份码为平台码或插件名，本体侧不带
+    - 身份码为平台码或插件名
     - 标题随声明交出，定面板左列那一行
     - 交出顺序即面板页签顺序
     - 检测件照声明原样带进面板
@@ -140,9 +139,9 @@ def current_plan() -> ConfigPlan | None:
 def source_identity(kind: SourceKind, code: str) -> str:
     """来源身份码
 
-    - 本体来源只有类型一段，其余拼上身份码
+    - 来源类型与身份码拼成点分串
     """
-    return str(kind) if kind == SourceKind.CORE else f"{kind}.{code}"
+    return f"{kind}.{code}"
 
 
 def section_name(source: str, section: str) -> str:
