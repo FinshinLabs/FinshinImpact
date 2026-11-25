@@ -12,9 +12,13 @@ from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QTextEdit, QWidget
 
 from skin.theme import FiveStateDialogTheme, ObjectName
+from utils.check import display_note
+from utils.logger import get_logger
 from utils.network import CHECKING, FrameKey, RowStatus
 
 from .._lifecycle import Ticker
+
+_logger = get_logger("GUI.Check")
 
 _CLOCK_MS = 1000  # 倒计时步进：一秒一跳，与探测预算的秒刻度对齐
 _HEIGHT_SCREEN_RATIO = 0.35  # 表格占可用屏幕高度的上限，加上窗头与按钮约占四成多
@@ -29,6 +33,22 @@ def _state_map(cfg: FiveStateDialogTheme) -> dict[str, tuple[str, str]]:
         RowStatus.FAIL: (cfg.fail_mark, cfg.fail_color),
         RowStatus.SKIP: (cfg.skip_mark, cfg.skip_color),
     }
+
+
+def _row_detail(raw: str) -> str:
+    """行上详情
+
+    - 网页正文洗成纯文字，洗过的原文落调试日志
+    """
+    note = display_note(raw)
+    if note != raw:
+        _logger.debug(f"检查窗详情洗成纯文本，原文 {raw}")
+    return note
+
+
+def _detail_html(text: str) -> str:
+    """详情转行内 HTML，换行照原样分行"""
+    return html.escape(text).replace("\n", "<br/>")
 
 
 class RowTable(QTextEdit):
@@ -64,7 +84,9 @@ class RowTable(QTextEdit):
 
         - 按行重置超时预算与计时起点
         """
-        self._rows = {r["id"]: [r["title"], r["status"], r["detail"]] for r in rows}
+        self._rows = {
+            r["id"]: [r["title"], r["status"], _row_detail(r["detail"])] for r in rows
+        }
         self._budgets = {r["id"]: int(r["budget"]) for r in rows if "budget" in r}
         self._elapsed = {
             rid: 0 for rid in self._budgets if self._rows[rid][1] == CHECKING
@@ -86,7 +108,8 @@ class RowTable(QTextEdit):
         if entry is None or entry[1] not in (RowStatus.PENDING, CHECKING):
             return
         entry[1] = frame.get("status", entry[1])
-        entry[2] = frame.get("detail", entry[2])
+        if "detail" in frame:
+            entry[2] = _row_detail(frame["detail"])
         rid = frame["id"]
         if entry[1] == CHECKING and rid in self._budgets:
             self._elapsed.setdefault(rid, 0)
@@ -129,7 +152,7 @@ class RowTable(QTextEdit):
                 )
                 text = f"{text} {tick}" if text else tick
             detail_html = (
-                f"<span style='color: {color};'>{html.escape(text)}</span>"
+                f"<span style='color: {color};'>{_detail_html(text)}</span>"
                 if text
                 else ""
             )
