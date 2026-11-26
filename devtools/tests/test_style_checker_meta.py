@@ -6,7 +6,8 @@
 - 回调形参四条判据各命中一次，业务协程与已合规写法不误报
 - 日志消息串留占位往后传参判硬性，就地拼好与百分号当单位不误报
 - CHANGELOG 载体三类判据各命中一次，合规样张零条目
-- 文档写法两条判据各命中一次，代码区里的分号与链接字面不报
+- 文档写法两条判据各命中一次，代码区里的链接字面不报
+- 分号只放行 docstring 里单个分号的引用形状，md 围栏与行内代码段照报
 - 模块级别名按消费者定私有性，类型构造与被他模块取用的别名不判
 - 豁免清单只罩待核，条目须可解析，本轮装载到的路径没命中才判失效转硬性
 - devtools 树可直连私有模块：不报越界，其引用不把 src 公共名算成对外
@@ -480,6 +481,69 @@ class TestChangelogCarrier(unittest.TestCase):
         """子项行末缺句号即报，止于冒号的纯主题行不误报"""
         hits = self._hits("- 缺句号的子项\n- **主题**：\n")
         self.assertEqual(len([t for t in hits if "子项行末缺句号" in t]), 1, hits)
+
+
+class TestSemicolonScope(unittest.TestCase):
+    """分号的放行形状与 md 全行覆盖"""
+
+    def _doc_hits(self, line: str) -> list[str]:
+        """造一条 docstring 详情行，取本分节条目"""
+        rel = "src/ui/_probe_semi.py"
+        source = (
+            _skeleton(rel)
+            + "def _go() -> None:\n"
+            + '    """定位\n\n    - 说明\n'
+            + f"    {line}\n"
+            + '    """\n'
+        )
+        return _scan([(rel, source)]).get("Docstring", [])
+
+    def _md_hits(self, body: str) -> list[str]:
+        """落一份 md 样张，取本分节条目"""
+        return _scan([("docs/_probe_semi.md", body)]).get("文档写法", [])
+
+    def test_docstring_single_semicolon_literal_passes(self) -> None:
+        """反引号与双引号包住的单个分号当字面量，零条目"""
+        for line in ("- 标记 `;` 表示并列", '- 标记 ";" 表示并列'):
+            with self.subTest(line=line):
+                self.assertEqual(
+                    [text for text in self._doc_hits(line) if "含分号" in text], []
+                )
+
+    def test_docstring_title_literal_passes(self) -> None:
+        """标题行同样放行单分号字面量"""
+        rel = "src/ui/_probe_semi.py"
+        source = (
+            _skeleton(rel)
+            + 'def _go() -> None:\n    """分号 `;` 的写法\n\n    - 说明\n    """\n'
+        )
+        hits = _scan([(rel, source)]).get("Docstring", [])
+        self.assertEqual([text for text in hits if "含分号" in text], [])
+
+    def test_docstring_literal_with_other_text_flagged(self) -> None:
+        """反引号里不止一个分号字面量就照报"""
+        hits = self._doc_hits("- 代码 `a(); b` 表示两句")
+        self.assertTrue([text for text in hits if "含分号" in text], hits)
+
+    def test_docstring_plain_semicolon_flagged(self) -> None:
+        """普通全角分号照报硬性"""
+        hits = self._doc_hits("- 一句话说完；再来一句")
+        self.assertTrue([text for text in hits if "含分号" in text], hits)
+
+    def test_md_fenced_semicolon_flagged(self) -> None:
+        """围栏代码块里的分号照报"""
+        hits = self._md_hits('```powershell\npy -3 -c "a=1; b=2"\n```\n')
+        self.assertTrue([text for text in hits if "含分号" in text], hits)
+
+    def test_md_inline_code_semicolon_flagged(self) -> None:
+        """行内代码段里的分号照报"""
+        hits = self._md_hits("- 行内写 `a=1; b=2` 也照报\n")
+        self.assertTrue([text for text in hits if "含分号" in text], hits)
+
+    def test_md_link_inside_code_not_checked(self) -> None:
+        """相对链接检查维持只看围栏外正文"""
+        hits = self._md_hits("`[文字](no_such_file.md)`\n")
+        self.assertEqual([text for text in hits if "相对链接" in text], [])
 
 
 class TestAliasPrivacy(unittest.TestCase):

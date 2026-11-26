@@ -1,8 +1,7 @@
-"""文档写法分节 md 正文细则
+"""文档写法分节 md 细则
 
-- 正文行含全角或半角分号即报
-- 相对 markdown 链接的目标文件不在场即报
-- 围栏代码块行与行内代码段不算正文
+- 任一行含全角或半角分号即报，围栏代码块与行内代码段不豁免
+- 相对 markdown 链接的目标文件不在场即报，只看围栏外正文
 - CHANGELOG.md 归日志与文案分节细则，本节不读
 """
 
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
 # 一条一个事实，两件事拆成两条，两种分号同判
 _SEMIS: tuple[str, ...] = ("；", ";")
 
-# 反引号行内代码段，括起的是语法原样，不进判据
+# 反引号行内代码段，只在相对链接检查里剥掉
 _INLINE_CODE_RE = re.compile(r"`[^`]*`")
 
 # 围栏行，出现一次切换进出状态
@@ -33,19 +32,18 @@ _NON_FILE_PREFIXES: tuple[str, ...] = ("http://", "https://", "mailto:", "#")
 
 
 def check(files: list[FileData]) -> list[Finding]:
-    """扫描入库 md 正文的分号与相对链接存在性"""
+    """扫描入库 md 的分号与相对链接存在性"""
     findings: list[Finding] = []
     for file in files:
         if file.path.suffix != ".md" or file.path.name == CHANGELOG_NAME:
             continue
-        body = _body_lines(file.lines)
-        findings.extend(_semicolon_findings(file, body))
-        findings.extend(_link_findings(file, body))
+        findings.extend(_semicolon_findings(file, file.lines))
+        findings.extend(_link_findings(file, _body_lines(file.lines)))
     return findings
 
 
 def _body_lines(lines: list[str]) -> list[tuple[int, str]]:
-    """剔去围栏代码块行与行内代码段，行号与正文保持同形"""
+    """剔去围栏代码块行与行内代码段，行号与正文保持同形，供相对链接检查用"""
     out: list[tuple[int, str]] = []
     in_fence = False
     for no, line in enumerate(lines, start=1):
@@ -58,10 +56,10 @@ def _body_lines(lines: list[str]) -> list[tuple[int, str]]:
     return out
 
 
-def _semicolon_findings(file: FileData, body: list[tuple[int, str]]) -> list[Finding]:
-    """正文行出现任一分号即报，消息带行首截断"""
+def _semicolon_findings(file: FileData, lines: list[str]) -> list[Finding]:
+    """全文任一行出现分号即报，消息带行首截断"""
     findings: list[Finding] = []
-    for no, text in body:
+    for no, text in enumerate(lines, start=1):
         if any(semicolon in text for semicolon in _SEMIS):
             shown = text.strip()[:30]
             findings.append(_f(file, no, f"正文行含分号：`{shown}…`"))

@@ -22,6 +22,10 @@ if TYPE_CHECKING:
 # docstring 文本规则
 _PAREN_RE = re.compile(r"[（(）)]")
 _SEMICOLON_RE = re.compile(r"[;；]")
+
+# 成对的单分号字面量，引用语法本身时不进分号判据
+_SEMICOLON_LITERAL_RE = re.compile(r'(?:`[;；]`|"[;；]")')
+
 _EOL_PERIOD_RE = re.compile(r"[。.]\s*$")
 _CN_BREAK_RE = re.compile(r"[，、；;]$")
 
@@ -107,7 +111,7 @@ def _check_title(file: FileData, line: int, title: str) -> list[Finding]:
         findings.append(
             _f(file, line, f"docstring 标题行含冒号解释：`{title}`", hard=False)
         )
-    if _SEMICOLON_RE.search(title):
+    if _live_semicolon(title):
         findings.append(_f(file, line, f"docstring 标题行含分号：`{title}`", hard=True))
     if _EOL_PERIOD_RE.search(title):
         findings.append(_f(file, line, f"docstring 标题行尾句号：`{title}`", hard=True))
@@ -142,7 +146,7 @@ def _check_detail(file: FileData, title_line: int, detail: list[str]) -> list[Fi
             findings.append(
                 _f(file, cur, f"docstring 详情行未以 `-` 起头：{stripped}", hard=True)
             )
-        if _SEMICOLON_RE.search(stripped):
+        if _live_semicolon(stripped):
             findings.append(
                 _f(file, cur, f"docstring 详情行含分号：{stripped}", hard=True)
             )
@@ -162,6 +166,11 @@ def _check_detail(file: FileData, title_line: int, detail: list[str]) -> list[Fi
     if not real:
         findings.clear()
     return findings
+
+
+def _live_semicolon(text: str) -> re.Match[str] | None:
+    """去掉单分号字面量后取剩余分号，剥完不再有则交空"""
+    return _SEMICOLON_RE.search(_SEMICOLON_LITERAL_RE.sub("", text))
 
 
 def _f(file: FileData, line: int, message: str, hard: bool) -> Finding:
