@@ -32,6 +32,7 @@ from finshin_sdk.domain import (  # noqa: E402
     ProbeResult,
     ProbeRow,
 )
+from skin.messages import DialogMessage  # noqa: E402
 from skin.theme import ButtonSize, ButtonStyle, button_object_name  # noqa: E402
 from ui._bridge import gui_bridge  # noqa: E402
 from ui._dialogs import ConfigMode, Round, SettingsDialog  # noqa: E402
@@ -516,7 +517,9 @@ class SettingsDialogMarksTest(unittest.TestCase):
             [button.text() for button in buttons], ["放弃改动", "退出程序"]
         )
 
-        next(button for button in buttons if button.text() == "放弃改动").click()
+        with patch.object(_save.NoticeDialog, "notify") as notify:
+            next(button for button in buttons if button.text() == "放弃改动").click()
+        self.assertEqual(notify.call_args.args[0], DialogMessage.SETUP_DISCARDED)
         self.assertFalse(dialog.is_setup)
         self.assertEqual(dialog._fields.inputs[item].text(), "")
         self.assertEqual(dialog.dirty_groups, [])
