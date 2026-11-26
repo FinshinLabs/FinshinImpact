@@ -26,6 +26,7 @@ class DialogMessage:
     # 用：保存与关闭流程直读的提示
     SETTINGS_SIGNAL_SOURCE_DONE = "单类保存结果"
     SETUP_NO_CHANGE = "这一类没有改动"
+    SETUP_DISCARDED = "已放弃改动，配置已恢复为上次保存的值"
     SETUP_UNSAVED = "还有 {n} 类改了没存：\n{groups}"
     SETUP_EXIT_UNFINISHED = "配置未完成，下次启动会再进向导"
     SETUP_EXIT_UNSAVED = "改动未保存，退出即丢弃"

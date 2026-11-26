@@ -12,6 +12,7 @@ from PySide6.QtGui import QCloseEvent, QFont, QKeyEvent, QShowEvent
 from PySide6.QtWidgets import QWidget
 
 from finshin_sdk.domain import ConnectionPlan
+from skin.messages import DialogMessage
 from skin.qss import build_error_label_qss, build_settings_dialog_qss
 from skin.theme import SETTINGS_DIALOG
 from utils.config import changed_groups, changed_sections, merge_source_config
@@ -23,15 +24,18 @@ from utils.config.models import (
     probe_of,
     tabs_by_group,
 )
+from utils.logger import get_logger
 
 from ..._bridge import gui_bridge
 from ..._primitives import BaseDialog
+from .._notice import NoticeDialog
 from ._change import ChangeConfirmDialog
 from ._chrome import ChromeBuilder
 from ._field import FieldBuilder, refresh_label
 from ._source_button import SourceButtons
 
 _ERROR_FONT = QFont(SETTINGS_DIALOG.error_font_family, SETTINGS_DIALOG.error_font_size)
+_logger = get_logger("GUI.Settings")
 
 
 def _sections_with_errors(schema: AppSchema, field_errors: FieldErrors) -> set[str]:
@@ -233,6 +237,8 @@ class SettingsDialog(BaseDialog):
         self._warning_groups.clear()
         self._field_errors.clear()
         self.switch_to_edit()
+        _logger.debug("用户放弃未保存改动，配置回到盘上值")
+        NoticeDialog.notify(DialogMessage.SETUP_DISCARDED, parent=self)
 
     def get_modified_config(self) -> AppConfigData:
         """从输入控件提取配置字典"""
