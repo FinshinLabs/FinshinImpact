@@ -25,26 +25,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import check_coding_style  # noqa: E402
-import gates  # noqa: E402
 from _style_checks import (  # noqa: E402
     SECTIONS,
     Finding,
     ImportGraph,
     Waiver,
-    apply_waivers,
     load_files,
     load_waivers,
     run_checks,
 )
-from check_coding_style import _judged_dead, _run  # noqa: E402
+from check_coding_style import _filter_findings, _judged_dead  # noqa: E402
 
 _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parent.parent
-
-
-def _gate_targets() -> list[Path]:
-    """按闸门那份目标算覆盖面，本体三棵树加盘上在场的子仓源码目录"""
-    return [_ROOT / rel for rel in gates._source_targets(_ROOT)]
 
 
 def _skeleton(rel: str) -> str:
@@ -310,29 +303,29 @@ class TestCallbackParams(unittest.TestCase):
         hits = _scan([("src/bundled/_probe_cb.py", source)]).get("回调形参", [])
         self.assertTrue(any("handler, event, data" in text for text in hits), hits)
 
-    def test_injected_context_rename(self) -> None:
-        """回调里上下文形参改名即注入不到，判硬性"""
-        source = (
-            _skeleton("src/bundled/_probe_cb.py")
-            + "from aiogram.types import Message\n"
-            + "from services import HandlerContext\n\n\n"
-            + "async def _go(raw: Message, host: HandlerContext) -> None:\n"
-            + '    """定位\n\n    - 说明\n    """\n'
+    def test_callback_param_shapes_flagged(self) -> None:
+        """上下文改名或原始件按平台类型标注都判硬性"""
+        cases = (
+            (
+                "async def _go(raw: Message, host: HandlerContext) -> None:\n",
+                "改名 `ctx`",
+            ),
+            (
+                "async def _go(platform_raw: Message, ctx: HandlerContext) -> None:\n",
+                "注解应写 `object`",
+            ),
         )
-        hits = _scan([("src/bundled/_probe_cb.py", source)]).get("回调形参", [])
-        self.assertTrue(any("改名 `ctx`" in text for text in hits), hits)
-
-    def test_platform_raw_needs_object(self) -> None:
-        """原始件口子按平台类型标注即锁死该平台，判硬性"""
-        source = (
-            _skeleton("src/bundled/_probe_cb.py")
-            + "from aiogram.types import Message\n"
-            + "from services import HandlerContext\n\n\n"
-            + "async def _go(platform_raw: Message, ctx: HandlerContext) -> None:\n"
-            + '    """定位\n\n    - 说明\n    """\n'
-        )
-        hits = _scan([("src/bundled/_probe_cb.py", source)]).get("回调形参", [])
-        self.assertTrue(any("注解应写 `object`" in text for text in hits), hits)
+        for signature, want in cases:
+            with self.subTest(signature=signature):
+                source = (
+                    _skeleton("src/bundled/_probe_cb.py")
+                    + "from aiogram.types import Message\n"
+                    + "from services import HandlerContext\n\n\n"
+                    + signature
+                    + '    """定位\n\n    - 说明\n    """\n'
+                )
+                hits = _scan([("src/bundled/_probe_cb.py", source)]).get("回调形参", [])
+                self.assertTrue(any(want in text for text in hits), hits)
 
     def test_platform_raw_ctx_rename(self) -> None:
         """首位收 object 也算回调，上下文改名照样查得到"""
@@ -445,21 +438,26 @@ class TestChangelogCarrier(unittest.TestCase):
         """合规样张零条目"""
         self.assertEqual(self._hits(self._COMPLIANT), [])
 
-    def test_fullwidth_semicolon_flagged(self) -> None:
-        """行含全角分号即报"""
-        hits = self._hits("- 一句话说完；再来一句。\n")
-        self.assertEqual(len([t for t in hits if "全角分号" in t]), 1, hits)
-
-    def test_version_heading_shapes(self) -> None:
-        """版本号坏形状、缺日期后缀与 Unreleased 多余内容三条都按形状不符报出"""
-        hits = self._hits(
-            "## [1.0] - 2026-11-18\n"
-            "\n"
-            "## [1.2.3] 2026-11-18\n"
-            "\n"
-            "## [Unreleased] - 2026-11-18\n"
+    def test_bad_shapes_flagged(self) -> None:
+        """全角分号、版本段坏形状、裸 dev 串与缺句号子项都报出"""
+        cases = (
+            ("- 一句话说完；再来一句。\n", "全角分号", 1),
+            (
+                "## [1.0] - 2026-11-18\n"
+                "\n"
+                "## [1.2.3] 2026-11-18\n"
+                "\n"
+                "## [Unreleased] - 2026-11-18\n",
+                "版本段标题形状不符",
+                3,
+            ),
+            ("## [1.0.1.dev0] - 2026-11-18\n", "版本段标题形状不符", 1),
+            ("- 缺句号的子项\n- **主题**：\n", "子项行末缺句号", 1),
         )
-        self.assertEqual(len([t for t in hits if "版本段标题形状不符" in t]), 3, hits)
+        for body, marker, want in cases:
+            with self.subTest(body=body):
+                hits = self._hits(body)
+                self.assertEqual(len([t for t in hits if marker in t]), want, hits)
 
     def test_prerelease_heading_accepted(self) -> None:
         """alpha、beta 与 rc 各带 dev 实录后缀的段标题都放行"""
@@ -471,16 +469,6 @@ class TestChangelogCarrier(unittest.TestCase):
             "## [1.0.0-rc.1] - 2026-11-17\n"
         )
         self.assertEqual(hits, [])
-
-    def test_dev_suffix_needs_stage(self) -> None:
-        """实录段只在预发布阶段之后放行，裸 dev 串报出"""
-        hits = self._hits("## [1.0.1.dev0] - 2026-11-18\n")
-        self.assertEqual(len([t for t in hits if "版本段标题形状不符" in t]), 1, hits)
-
-    def test_bullet_period(self) -> None:
-        """子项行末缺句号即报，止于冒号的纯主题行不误报"""
-        hits = self._hits("- 缺句号的子项\n- **主题**：\n")
-        self.assertEqual(len([t for t in hits if "子项行末缺句号" in t]), 1, hits)
 
 
 class TestSemicolonScope(unittest.TestCase):
@@ -520,25 +508,22 @@ class TestSemicolonScope(unittest.TestCase):
         hits = _scan([(rel, source)]).get("Docstring", [])
         self.assertEqual([text for text in hits if "含分号" in text], [])
 
-    def test_docstring_literal_with_other_text_flagged(self) -> None:
-        """反引号里不止一个分号字面量就照报"""
-        hits = self._doc_hits("- 代码 `a(); b` 表示两句")
-        self.assertTrue([text for text in hits if "含分号" in text], hits)
+    def test_docstring_semicolon_flagged(self) -> None:
+        """反引号里不止一个字面量或普通分号都照报"""
+        for line in ("- 代码 `a(); b` 表示两句", "- 一句话说完；再来一句"):
+            with self.subTest(line=line):
+                hits = self._doc_hits(line)
+                self.assertTrue([text for text in hits if "含分号" in text], hits)
 
-    def test_docstring_plain_semicolon_flagged(self) -> None:
-        """普通全角分号照报硬性"""
-        hits = self._doc_hits("- 一句话说完；再来一句")
-        self.assertTrue([text for text in hits if "含分号" in text], hits)
-
-    def test_md_fenced_semicolon_flagged(self) -> None:
-        """围栏代码块里的分号照报"""
-        hits = self._md_hits('```powershell\npy -3 -c "a=1; b=2"\n```\n')
-        self.assertTrue([text for text in hits if "含分号" in text], hits)
-
-    def test_md_inline_code_semicolon_flagged(self) -> None:
-        """行内代码段里的分号照报"""
-        hits = self._md_hits("- 行内写 `a=1; b=2` 也照报\n")
-        self.assertTrue([text for text in hits if "含分号" in text], hits)
+    def test_md_semicolon_flagged(self) -> None:
+        """围栏代码块与行内代码段里的分号都照报"""
+        for body in (
+            '```powershell\npython -c "a=1; b=2"\n```\n',
+            "- 行内写 `a=1; b=2` 也照报\n",
+        ):
+            with self.subTest(body=body):
+                hits = self._md_hits(body)
+                self.assertTrue([text for text in hits if "含分号" in text], hits)
 
     def test_md_link_inside_code_not_checked(self) -> None:
         """相对链接检查维持只看围栏外正文"""
@@ -664,45 +649,34 @@ class TestFacadeOutlets(unittest.TestCase):
         )
         self.assertTrue(any("转发公开符号 `StrEnum`" in text for text in found), found)
 
-    def test_public_module_forwarding_flagged(self) -> None:
-        """包外经门面取公开子模块符号报硬性"""
+    def test_public_module_forwarding_rule(self) -> None:
+        """包外经门面取公开子模块符号报硬性，直连公开子模块不报"""
         facade = "src/ui/__init__.py"
-        found = self._naming(
-            [
-                (facade, _skeleton(facade) + "from .thing import Thing\n"),
-                (
-                    "src/ui/thing.py",
-                    _skeleton("src/ui/thing.py") + "class Thing:\n" + _CLASS_DOC,
-                ),
-                (
-                    "src/core/use.py",
-                    _skeleton("src/core/use.py")
-                    + "from ui import Thing\n\n_USE = Thing\n",
-                ),
-            ]
-        )
-        self.assertTrue(
-            any("门面代发公开子模块符号 `Thing`" in text for text in found), found
-        )
-
-    def test_public_module_direct_import_passes(self) -> None:
-        """包外直连公开子模块不报转发"""
-        facade = "src/ui/__init__.py"
-        found = self._naming(
-            [
-                (facade, _skeleton(facade) + "from .thing import Thing\n"),
-                (
-                    "src/ui/thing.py",
-                    _skeleton("src/ui/thing.py") + "class Thing:\n" + _CLASS_DOC,
-                ),
-                (
-                    "src/core/use.py",
-                    _skeleton("src/core/use.py")
-                    + "from ui.thing import Thing\n\n_USE = Thing\n",
-                ),
-            ]
-        )
-        self.assertFalse(any("门面代发公开子模块符号" in text for text in found), found)
+        for use_line, flagged in (
+            ("from ui import Thing\n\n_USE = Thing\n", True),
+            ("from ui.thing import Thing\n\n_USE = Thing\n", False),
+        ):
+            with self.subTest(flagged=flagged):
+                found = self._naming(
+                    [
+                        (facade, _skeleton(facade) + "from .thing import Thing\n"),
+                        (
+                            "src/ui/thing.py",
+                            _skeleton("src/ui/thing.py")
+                            + "class Thing:\n"
+                            + _CLASS_DOC,
+                        ),
+                        (
+                            "src/core/use.py",
+                            _skeleton("src/core/use.py") + use_line,
+                        ),
+                    ]
+                )
+                self.assertEqual(
+                    any("门面代发公开子模块符号" in text for text in found),
+                    flagged,
+                    found,
+                )
 
     def test_private_module_own_definition_passes(self) -> None:
         """私有模块自己定义的名字被取用不报"""
@@ -816,22 +790,15 @@ class TestWaiverFile(unittest.TestCase):
             with self.subTest(path=waiver.path):
                 self.assertTrue(waiver.reason.strip(), "豁免理由为空")
 
-    def test_no_dead_waiver(self) -> None:
-        """按闸门那份目标扫到后，清单里不许留失效条目"""
-        files = load_files(_ROOT, _gate_targets())
-        findings = run_checks(files, ImportGraph(files))
-        waivers = load_waivers(_HERE.parent / "style_waivers.toml")
-        _, dead = apply_waivers(findings, waivers)
-        judged = _judged_dead(dead, list(SECTIONS), {f.rel for f in files})
-        self.assertEqual(
-            [(w.section, w.path) for w in judged],
-            [],
-            "有豁免条目已不再命中，代码改完要删清单",
-        )
-
     def test_hard_only_keeps_live_waivers(self) -> None:
         """只输出硬性时不许把在用的豁免判成失效"""
-        ordered, _ = _run(_gate_targets(), list(SECTIONS), True)
+        rel = "src/ui/_probe.py"
+        soft = Finding("注释", rel, 9, "注释含分号：`一句话说完；再来一句`", False)
+        waiver = Waiver(section="注释", path=rel, reason="探针", match="分号")
+        ordered, waived = _filter_findings(
+            [soft], (waiver,), list(SECTIONS), hard_only=True, loaded={rel}
+        )
+        self.assertEqual(waived, 1)
         self.assertEqual(
             [f.message for f in ordered if "失效豁免" in f.message],
             [],
@@ -875,14 +842,10 @@ class TestDevtoolsWhiteBox(unittest.TestCase):
     ]
     _TARGETS = ("src", "devtools")
 
-    def test_private_import_from_tool_passes(self) -> None:
-        """工具直连私有模块不报跨包越界"""
+    def test_tool_references_do_not_count(self) -> None:
+        """工具直连私有模块不报越界，只被工具引用的公共名照样提示加下划线"""
         messages = _scan(self._SAMPLE, self._TARGETS).get("命名与门面导出", [])
         self.assertFalse([m for m in messages if "跨包访问私有模块" in m], messages)
-
-    def test_tool_use_does_not_promote(self) -> None:
-        """只被工具引用的公共名照样提示加下划线"""
-        messages = _scan(self._SAMPLE, self._TARGETS).get("命名与门面导出", [])
         self.assertTrue([m for m in messages if "Public" in m], messages)
 
 

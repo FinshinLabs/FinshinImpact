@@ -45,17 +45,34 @@ def _run(
         by_rel.setdefault(f.rel, f)
     graph = ImportGraph(list(by_rel.values()))
     findings = run_checks(files, graph)
+    return _filter_findings(
+        findings,
+        load_waivers(_WAIVER_FILE),
+        sections,
+        hard_only=hard_only,
+        loaded={f.rel for f in files},
+    )
+
+
+def _filter_findings(
+    findings: list[Finding],
+    waivers: tuple[Waiver, ...],
+    sections: list[str],
+    *,
+    hard_only: bool,
+    loaded: set[str],
+) -> tuple[list[Finding], int]:
+    """按分节过滤、匹配豁免、判失效并按节序排列"""
     findings = [f for f in findings if f.section in sections]
 
     # 豁免只罩待核，须拿全量算命中，先滤硬性会把在用的条目全判失效
-    waivers = load_waivers(_WAIVER_FILE)
     kept, dead = apply_waivers(findings, waivers)
     waived = len(findings) - len(kept)
     if hard_only:
         kept = [f for f in kept if f.hard]
 
     # 只在扫到清单覆盖面时才判失效，局部扫描的没命中不作数
-    dead = _judged_dead(dead, sections, {f.rel for f in files})
+    dead = _judged_dead(dead, sections, loaded)
     entries = kept + [_dead_finding(waiver) for waiver in dead]
     ordered = sorted(entries, key=lambda f: (SECTIONS.index(f.section), f.rel, f.line))
     return ordered, waived
