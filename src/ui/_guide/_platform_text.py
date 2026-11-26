@@ -7,11 +7,7 @@
 from collections.abc import Sequence
 
 from services.adapter_catalog import ReleaseRow
-from services.env_setup.platform_rows import (
-    ComponentBucket,
-    ComponentRow,
-    ComponentSource,
-)
+from services.env_setup.platform_rows import ComponentRow, ComponentSource
 from services.env_setup.platform_state import (
     ComponentOrigin,
     VersionLine,
@@ -128,15 +124,12 @@ def row_note(
     """装不了的那句原因
 
     - 能装就交空串
-    - 该装的那版被在场适配器挡住即点名那一版
-    - 目录里没有一版满足即说没有
+    - 该装的那版被接口包要求挡住即点名那一版
     """
-    if target is not None:
-        return release_blocked(rows, row, target)
-    if row.release is None or row.bucket != ComponentBucket.UPGRADABLE:
+    if target is None:
         return ""
 
-    return PlatformMessage.SDK_RANGE_NONE
+    return release_blocked(rows, row, target)
 
 
 def action_text(row: ComponentRow) -> str:

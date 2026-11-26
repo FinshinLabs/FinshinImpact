@@ -96,7 +96,7 @@ def present_platforms() -> frozenset[str]:
 def _rows(catalog: Catalog | None) -> tuple[ComponentRow, ...]:
     """按本机在场件与目录行排出组件行
 
-    - 接口包在最前
+    - 接口包在最前，只报读数
     """
     installed = _installed_by_platform()
     requires = _declared_requires()
@@ -177,20 +177,26 @@ def _row(
         installed=installed,
         requires=requires,
         release=release,
-        bucket=_bucket_of(source, installed, release),
+        bucket=_bucket_of(platform, source, installed, release),
     )
 
 
 def _bucket_of(
-    source: ComponentSource, installed: str, release: ReleaseRow | None
+    platform: str,
+    source: ComponentSource,
+    installed: str,
+    release: ReleaseRow | None,
 ) -> ComponentBucket:
     """一行组件归到哪一档
 
+    - 接口包那行固定归本机已有，只报读数
     - 目录里没有这一只即只有本机有
     - 环境里没那只包即归网络可装，源码仓挂着也一样要先装
     - 源码仓挂着且包已装进环境即归本机已有，再装一次换不掉源码仓那份声明
     - 本机版本号读不懂即归本机已有，宁可不动也不按猜测装新版
     """
+    if not platform:
+        return ComponentBucket.LOCAL
     if release is None:
         return ComponentBucket.LOCAL
     if not installed:

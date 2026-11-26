@@ -1,8 +1,8 @@
-"""随包接口件补装判定的单元测试
+"""接口件补装判定的单元测试
 
-- 本机已装高于随包那版即不进装单，同版本照装，随包件不压新版
-- 免装指纹只记核心依赖，随包件装成功就被删
-- 装成功即从包根删掉随包目录，目录不在场也不报错
+- 本机已装高于待装那版即不进装单，同版本照装，接口件不压新版
+- 接口包在免装指纹里记发行件名、版本与指纹
+- 装成功即从包根删掉接口件目录，目录不在场也不报错
 """
 
 import sys
@@ -46,10 +46,10 @@ class TestAlreadyEnough(unittest.TestCase):
 
 
 class TestInstallPlan(unittest.TestCase):
-    """装单与免装指纹"""
+    """装单"""
 
     def _root(self, stage: Path, installed: str = "") -> Path:
-        """造一棵带随包件的包根，需要时补一个已装标记"""
+        """造一棵带接口件的包根，需要时补一个已装标记"""
         seed = stage / mod.PackLayout.SDK_WHEEL_DIR
         seed.mkdir(parents=True)
         (seed / _WHEEL).write_bytes(b"one")
@@ -60,46 +60,59 @@ class TestInstallPlan(unittest.TestCase):
         return stage
 
     def test_newer_installed_keeps_the_wheel_out(self) -> None:
-        """本机已装更高版本，装单里不留随包件"""
+        """本机已装更高版本，装单里不留接口件"""
         with TemporaryDirectory() as raw:
             root = self._root(Path(raw), installed="0.2.0")
             with patch.object(mod, "dependencies", lambda _root: []):
-                deps, _ = mod._install_plan(root)
+                deps = mod._install_plan(root)
             self.assertEqual([item for item in deps if item.endswith(".whl")], [])
 
     def test_same_version_installed_puts_the_wheel_in(self) -> None:
-        """本机同版本，装单里照样带随包件"""
+        """本机同版本，装单里照样带接口件"""
         with TemporaryDirectory() as raw:
             root = self._root(Path(raw), installed="0.1.0")
             with patch.object(mod, "dependencies", lambda _root: []):
-                deps, _ = mod._install_plan(root)
+                deps = mod._install_plan(root)
             self.assertTrue([item for item in deps if item.endswith(".whl")])
 
     def test_absent_installed_puts_the_wheel_in(self) -> None:
-        """本机没装，装单里按路径带上随包件"""
+        """本机没装，装单里按路径带上接口件"""
         with TemporaryDirectory() as raw:
             root = self._root(Path(raw))
             with patch.object(mod, "dependencies", lambda _root: []):
-                deps, _ = mod._install_plan(root)
+                deps = mod._install_plan(root)
             self.assertTrue([item for item in deps if item.endswith(".whl")])
 
-    def test_mark_carries_core_only(self) -> None:
-        """免装指纹只记核心依赖，随包件不进指纹"""
-        with TemporaryDirectory() as raw:
-            root = self._root(Path(raw))
-            with patch.object(mod, "dependencies", lambda _root: ["pillow==12.1.1"]):
-                _, stamped = mod._install_plan(root)
-            self.assertEqual(stamped, ["pillow==12.1.1"])
-
     def test_no_seed_means_core_only(self) -> None:
-        """随包件已被删掉，装单里只剩核心依赖"""
+        """接口件已被删掉，装单里只剩核心依赖"""
         with TemporaryDirectory() as raw:
             root = Path(raw) / "pack"
             root.mkdir()
             with patch.object(mod, "dependencies", lambda _root: ["pillow==12.1.1"]):
-                deps, stamped = mod._install_plan(root)
+                deps = mod._install_plan(root)
             self.assertEqual(deps, ["pillow==12.1.1"])
-            self.assertEqual(stamped, ["pillow==12.1.1"])
+
+
+class TestSdkStamp(unittest.TestCase):
+    """接口包在免装指纹里的那一行"""
+
+    def test_line_carries_name_version_and_digest(self) -> None:
+        """发行件名、版本与指纹都在同一行"""
+        self.assertEqual(mod._sdk_line("0.2.0", "abc"), "finshin-sdk==0.2.0#abc")
+
+    def test_digest_read_back(self) -> None:
+        """同版本那一行的指纹读得回来"""
+        lines = ["pillow==12.1.1", "finshin-sdk==0.2.0#abc"]
+        self.assertEqual(mod._installed_sdk_digest(lines, "0.2.0"), "abc")
+
+    def test_other_version_not_adopted(self) -> None:
+        """别的版本那一行不算已装"""
+        lines = ["finshin-sdk==0.1.0#abc"]
+        self.assertEqual(mod._installed_sdk_digest(lines, "0.2.0"), "")
+
+    def test_missing_line_is_empty(self) -> None:
+        """没有接口包那一行即交出空串"""
+        self.assertEqual(mod._installed_sdk_digest([], "0.2.0"), "")
 
 
 class TestDropSeeds(unittest.TestCase):

@@ -1,6 +1,7 @@
 """启动器与构建侧取数通道
 
 - 通道清单给到忽略环境代理的干净直连
+- 镜像地址按前缀拼出，官方直链排在末尾兜底
 - 取 JSON、取字节、探长度三种交出内容或空值，落盘下载一种交出末次异常
 - 每条通道按同一节奏最多发三次，含首发
 """
@@ -34,6 +35,11 @@ def _clean_opener() -> Opener:
 def openers() -> list[Opener]:
     """排出干净直连的取数通道清单"""
     return [_clean_opener()]
+
+
+def mirror_sources(url: str, mirrors: Sequence[str]) -> list[str]:
+    """把官方地址配成镜像在前、官方直链兜底的序列"""
+    return [f"{mirror}{url}" for mirror in mirrors] + [url]
 
 
 def fetch_json(

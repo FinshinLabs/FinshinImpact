@@ -1,7 +1,7 @@
 """打包共享规格
 
 - 产物身份名、发布地址与 Windows 协议值的常量表
-- 版本页、发布说明与依赖清单的读取入口
+- 版本页、发布说明、接口包附件指纹与依赖清单的读取入口
 """
 
 import hashlib
@@ -31,6 +31,7 @@ HDR_AUTHORIZATION = "Authorization"  # 令牌请求头名
 # 在线地址的家，启动器与构建脚本只在这一处写
 _ACCOUNT = "FinshinLabs"
 _MAIN_REPO = "FinshinImpact"
+_SDK_REPO = "FinshinSDK"
 _PAGES_HOST = f"https://{_ACCOUNT}.github.io"
 API_HOST = "https://api.github.com"
 DOWNLOAD_HOST = "https://github.com"
@@ -65,7 +66,14 @@ class PackLayout:
 # 版本信息网页
 _PAGES_PYPROJECT_URL = f"{_PAGES_HOST}/{_MAIN_REPO}/{PackLayout.DECLARATION}"
 _RELEASE_API_URL = API_HOST + f"/repos/{_ACCOUNT}/{_MAIN_REPO}/releases/tags/v{{ver}}"
+_SDK_RELEASE_API_URL = (
+    API_HOST + f"/repos/{_ACCOUNT}/{_SDK_REPO}/releases/tags/v{{ver}}"
+)
 _API_USER_AGENT = "Python-Script"  # GitHub API 认 UA，缺头即拒
+
+# 附件自报指纹的取法，算法名与十六进制值以冒号分隔
+_DIGEST_SCHEME = "sha256"
+_DIGEST_SEP = ":"
 
 # 发布包直链所在行的标记
 _DOWNLOAD_MARK = "releases/download/"
@@ -74,6 +82,13 @@ _DOWNLOAD_MARK = "releases/download/"
 RELEASE_ZIP_URL = (
     DOWNLOAD_HOST
     + f"/{_ACCOUNT}/{_MAIN_REPO}/releases/download/v{{ver}}/{APP_NAME}-v{{ver}}.zip"
+)
+
+# 接口包发行件名与直链，版本由配置表钉死
+_SDK_WHEEL_NAME = "finshin_sdk-{ver}-py3-none-any.whl"
+SDK_RELEASE_URL = (
+    DOWNLOAD_HOST
+    + f"/{_ACCOUNT}/{_SDK_REPO}/releases/download/v{{ver}}/{_SDK_WHEEL_NAME}"
 )
 
 
@@ -173,6 +188,7 @@ def require_setting(root: Path, key: str) -> Any:
 
 
 _SETTING_MIRRORS = "github-mirrors"
+_SETTING_SDK_VERSION = "sdk-version"
 
 
 def release_mirrors(root: Path = ROOT) -> tuple[str, ...]:
@@ -183,12 +199,50 @@ def release_mirrors(root: Path = ROOT) -> tuple[str, ...]:
     return tuple(require_setting(root, _SETTING_MIRRORS))
 
 
-# 本体侧那三件在 system/digest.py，打包边界两侧各留一份
-_LINES_JOIN = "\n"
+def sdk_version(root: Path = ROOT) -> str:
+    """取接口包钉死的版本
+
+    - 版本只在配置表里维护，代码不写第二份
+    """
+    return str(require_setting(root, _SETTING_SDK_VERSION))
+
+
+def sdk_wheel_name(version: str) -> str:
+    """接口包指定版本的发行件文件名"""
+    return _SDK_WHEEL_NAME.format(ver=version)
+
+
+def remote_sdk_digest(version: str) -> str:
+    """读取接口包指定版本的附件指纹，失败返回空串
+
+    - 指纹取 release 附件自报的 digest，算法名不是 sha256 即不算
+    """
+    data = net_channel.fetch_json(
+        _SDK_RELEASE_API_URL.format(ver=version),
+        net_channel.openers(),
+        {HDR_USER_AGENT: _API_USER_AGENT},
+        _TIMEOUT_RELEASE,
+    )
+    assets = data.get("assets") if isinstance(data, dict) else None
+    if not isinstance(assets, list):
+        return ""
+
+    wanted = sdk_wheel_name(version)
+    for asset in assets:
+        if not isinstance(asset, dict) or asset.get("name") != wanted:
+            continue
+        scheme, sep, value = str(asset.get("digest") or "").partition(_DIGEST_SEP)
+        if sep and scheme == _DIGEST_SCHEME:
+            return value.lower()
+
+    return ""
 
 
 def file_digest(path: Path) -> str:
-    """算文件字节指纹，读不出交出空串"""
+    """算文件字节指纹，读不出交出空串
+
+    - 打包边界内不引本体模块，同名件在 system/digest.py
+    """
     try:
         return bytes_digest(path.read_bytes())
     except OSError:
@@ -198,8 +252,3 @@ def file_digest(path: Path) -> str:
 def bytes_digest(payload: bytes) -> str:
     """算一段字节的指纹"""
     return hashlib.sha256(payload).hexdigest()
-
-
-def lines_digest(items: list[str]) -> str:
-    """算行清单的指纹，行序参与取值"""
-    return bytes_digest(_LINES_JOIN.join(items).encode("utf-8"))

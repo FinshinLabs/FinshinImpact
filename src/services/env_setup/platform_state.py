@@ -12,7 +12,7 @@ from enum import StrEnum
 
 from skin.messages import PlatformMessage
 from system.distributions import SDK_DISTRIBUTION, installed_version
-from system.versions import is_upgrade, over_ceiling, requires_met
+from system.versions import over_ceiling, requires_met
 
 from ..adapter_catalog import ReleaseRow
 from .platform_rows import ComponentBucket, ComponentRow, ComponentSource
@@ -104,73 +104,36 @@ def update_targets(rows: Sequence[ComponentRow]) -> list[ReleaseRow]:
 def update_target(rows: Sequence[ComponentRow], row: ComponentRow) -> ReleaseRow | None:
     """这一行该装的那一版
 
-    - 没得更动交出 None
+    - 接口包那行只报读数，交出 None
     - 适配器那行取目录最新一版
-    - 接口包那行取满足在场每只适配器要求里最新的一版，本机没装过时不比本机
     """
-    if row.release is None:
+    if not row.platform:
         return None
-    if row.platform:
-        return row.release
 
-    for item in row.release.versions:
-        newer = not row.installed or is_upgrade(row.installed, item.version) is True
-        if newer and _sdk_in_range(rows, item.version):
-            return item
-
-    return None
+    return row.release
 
 
 def release_blocked(
     rows: Sequence[ComponentRow], row: ComponentRow, release: ReleaseRow
 ) -> str:
-    """这一版的挡装理由
+    """适配器这一版的挡装理由
 
     - 能装交出空串
-    - 适配器那行按本机接口包落在不在这一版声明的要求之内判
-    - 接口包那行按这一版满不满足在场每只适配器声明的要求判
+    - 按本机接口包落在不在这一版声明的要求之内判
     """
-    if row.platform:
-        return _install_blocked(rows, row, release)
-    if _sdk_in_range(rows, release.version):
-        return ""
-
-    return PlatformMessage.SDK_RANGE_GAP
-
-
-def _declared_ranges(rows: Sequence[ComponentRow]) -> tuple[str, ...]:
-    """在场适配器各自声明的接口包要求
-
-    - 没装进环境的不算在场
-    """
-    return tuple(
-        row.requires for row in rows if row.platform and row.installed and row.requires
-    )
-
-
-def _sdk_in_range(rows: Sequence[ComponentRow], version: str) -> bool:
-    """这一版接口包是否落在在场每只适配器声明的要求之内
-
-    - 要求串或版本串读不懂算不满足
-    """
-    return all(
-        requires_met(version, requires) is True for requires in _declared_ranges(rows)
-    )
+    return _install_blocked(rows, row, release)
 
 
 def _install_blocked(
     rows: Sequence[ComponentRow], row: ComponentRow, release: ReleaseRow
 ) -> str:
-    """这只组件这一版的挡装下一步
+    """这只适配器这一版的挡装下一步
 
     - 能装交出空串
-    - 适配器要接口包已在本机，且落在要装那一版声明的要求之内
+    - 要接口包已在本机，且落在要装那一版声明的要求之内
     - 那一版没写要求即按本机已装适配器的声明判
-    - 接口包自己不受这条限制
     - 版本串读不懂算没到位
     """
-    if not row.platform:
-        return ""
     sdk = next((item for item in rows if not item.platform), None)
     if sdk is None or not sdk.installed:
         return PlatformMessage.NEED_SDK_INSTALL
@@ -275,9 +238,9 @@ def deps_text(row: ComponentRow) -> str:
     """接口包要求那一行的正文
 
     - 说法按本机接口包版本定
-    - 接口包那行没有要求可报，本机没在场的行也一样
+    - 本机没在场的行没有要求可报
     """
-    if not row.platform or row.source == ComponentSource.NONE:
+    if row.source == ComponentSource.NONE:
         return ""
     if not row.requires:
         return PlatformMessage.REQUIRES_NONE

@@ -114,7 +114,7 @@ def _apply_update(root: Path, version: str) -> bool:
         shutil.rmtree(stage, ignore_errors=True)
         stage.mkdir(parents=True)
         zip_url = RELEASE_ZIP_URL.format(ver=version)
-        urls = [m + zip_url for m in release_mirrors()]
+        urls = net_channel.mirror_sources(zip_url, release_mirrors())
         _fetch_zip(urls, stage / PackLayout.STAGE_ZIP)
         unpack_all(stage / PackLayout.STAGE_ZIP, stage)
 

@@ -1,6 +1,7 @@
 """平台组件面板的组件块
 
-- 一只组件一块，块内按来源、来路、版本、接口包要求与动作逐行摆
+- 适配器一块，块内按来源、来路、版本、接口包要求与动作逐行摆
+- 接口包一块只出名字与版本读数
 - 历史版本与本机安装包各展开一层，展开哪一层记在本块身上
 - 动作栏只摆做得到的动作，置灰那颗旁边跟一句下一步
 """
@@ -64,6 +65,7 @@ class _BlockMode(StrEnum):
 class ComponentBlock(QFrame):
     """一只组件一块
 
+    - 接口包那块只出名字与版本读数，没有动作可点
     - 装卸跑完面板整片重灌，块跟着重建即收起
     """
 
@@ -89,12 +91,19 @@ class ComponentBlock(QFrame):
     def _rebuild(self) -> None:
         """按当前展开层重摆块内的行
 
+        - 接口包那块摆完名字与版本读数即收
         - 来路那一行只在本机有得取的内容时出，点名取的是哪一版
         """
         clear_layout(self._lines)
         head = QLabel(name_text(self._row), parent=self)
         head.setObjectName(ObjectName.PLATFORM_NAME)
         self._lines.addWidget(head)
+        if not self._row.platform:
+            self._add_text(
+                f"{PlatformMessage.LABEL_VERSION}：{version_text(self._row)}"
+            )
+            return
+
         self._add_text(f"{PlatformMessage.LABEL_SOURCE}：{source_text(self._row)}")
         version = self._target.version if self._target is not None else ""
         origin = origin_text(source_origin(self._rows, self._row), version)

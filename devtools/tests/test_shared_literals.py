@@ -23,11 +23,11 @@ set_profile("tg.000000")
 import gen_catalog  # noqa: E402
 import gen_release  # noqa: E402
 import instancelock as launch_instancelock  # noqa: E402
-import pack_seed  # noqa: E402
+import net_channel  # noqa: E402
 import pack_spec  # noqa: E402
 
 from services import adapter_catalog as catalog_mod  # noqa: E402
-from services.env_setup import platform_rows, toolchain, wheel_fetch  # noqa: E402
+from services.env_setup import toolchain, wheel_fetch  # noqa: E402
 from system import (  # noqa: E402
     app_identity,
     distributions,
@@ -84,13 +84,6 @@ class TestCatalogShape(unittest.TestCase):
 class TestSameValuePairs(unittest.TestCase):
     """注释点名同值的串逐条比对"""
 
-    def test_sdk_tree_dir_matches_build(self) -> None:
-        """接口包源码目录本体读的那份与构建侧打 wheel 的那份同处"""
-        self.assertEqual(
-            Path(platform_rows._SDK_TREE_DIR),
-            pack_seed._SDK_SOURCE.relative_to(pack_seed.ROOT),
-        )
-
     def test_bootstrap_mutex_matches_launcher(self) -> None:
         """引导锁名本体与启动器同串，不同名即两个进程各探各的锁"""
         self.assertEqual(
@@ -144,6 +137,21 @@ class TestEndpoints(unittest.TestCase):
         """镜像名单只有配置表一个出处"""
         self.assertEqual(
             tuple(toolchain.GITHUB_MIRRORS), tuple(pack_spec.release_mirrors())
+        )
+
+    def test_sdk_release_url_is_built_from_constants(self) -> None:
+        """接口包地址由常量拼出，官方直链排在镜像序列末尾"""
+        version = pack_spec.sdk_version()
+        wheel = f"finshin_sdk-{version}-py3-none-any.whl"
+        official = (
+            "https://github.com/FinshinLabs/FinshinSDK/releases/download/"
+            f"v{version}/{wheel}"
+        )
+        self.assertEqual(pack_spec.SDK_RELEASE_URL.format(ver=version), official)
+        mirrors = pack_spec.release_mirrors()
+        self.assertEqual(
+            net_channel.mirror_sources(official, mirrors),
+            [*(mirror + official for mirror in mirrors), official],
         )
 
 

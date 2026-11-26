@@ -3,7 +3,8 @@
 - 行的拼装、归属档与装挡判定同一条链路，两份模块一起过
 - 版本串读不懂、在线不比本机新、源码仓挂着且已装包都算本机已有
 - 该装的那批只收本机没有与在线更新的两档
-- 接口包没到位或高出上限时适配器那颗不给装，接口包那行自己不受此限
+- 接口包那行只报读数，固定归本机已有且没有该装的一版
+- 接口包没到位或高出上限时适配器那颗不给装
 - 适配器那颗按要装那一版声明的要求挡，那一版没写要求即回落已装声明
 - 在场平台只看已装包，源码仓挂着没装的不算
 - 版本清单逐版报本机来路，盘上的件逐份报在不在清单里
@@ -103,11 +104,6 @@ def _rows(sdk: str, adapter: str) -> tuple[rows_mod.ComponentRow, ...]:
 def _adapter_row(rows: tuple[rows_mod.ComponentRow, ...]) -> rows_mod.ComponentRow:
     """读数里 Telegram 那一行"""
     return next(row for row in rows if row.platform == str(Platform.TELEGRAM))
-
-
-def _sdk_row(rows: tuple[rows_mod.ComponentRow, ...]) -> rows_mod.ComponentRow:
-    """读数里接口包那一行"""
-    return next(row for row in rows if not row.platform)
 
 
 _WHEEL_BODY = b"wheel body"
@@ -296,28 +292,22 @@ class TestUpdateTarget(unittest.TestCase):
 
         return [sdk, adapter]
 
-    def test_newest_over_ceiling_is_skipped(self) -> None:
-        """最新一版高出在场适配器的上限即退到满足要求的那一版"""
-        rows = self._rows("0.1.0", "0.2.0", "0.1.5")
-        target = mod.update_target(rows, rows[0])
-        if target is None:
-            self.fail("满足要求的 0.1.5 没被交出来")
+    def test_sdk_row_is_local_without_target(self) -> None:
+        """接口包那行只报读数，归本机已有且没有该装的一版"""
+        sdk_release = _release_row("0.2.1", _SHA, _SDK)
+        catalog = Catalog(sdk=sdk_release, adapters={}, rejects=())
+        with (
+            patch.object(rows_mod, "installed_adapters", lambda: ()),
+            patch.object(rows_mod, "tree_distributions", lambda: {}),
+            patch.object(rows_mod, "load_adapter_manifests", lambda: {}),
+            patch.object(rows_mod, "installed_version", lambda name: "0.2.0"),
+            patch.object(rows_mod, "project_value", lambda key, path: ""),
+        ):
+            rows = rows_mod.component_rows(catalog)
 
-        self.assertEqual(target.version, "0.1.5")
-
-    def test_no_version_in_range(self) -> None:
-        """没有一版落在在场适配器要求之内即不交版本"""
-        rows = self._rows("0.1.0", "0.3.0", "0.2.5")
-        self.assertIsNone(mod.update_target(rows, rows[0]))
-
-    def test_absent_adapters_do_not_constrain(self) -> None:
-        """环境里没在场适配器即照取最新一版"""
-        sdk = _component("", _SDK, "0.1.0", "", "0.2.0")
-        target = mod.update_target([sdk], sdk)
-        if target is None:
-            self.fail("没有在场适配器时该交最新一版")
-
-        self.assertEqual(target.version, "0.2.0")
+        sdk = rows[0]
+        self.assertEqual(sdk.bucket, rows_mod.ComponentBucket.LOCAL)
+        self.assertIsNone(mod.update_target(rows, sdk))
 
     def test_adapter_row_takes_latest(self) -> None:
         """适配器那行仍取目录最新一版"""
@@ -327,31 +317,6 @@ class TestUpdateTarget(unittest.TestCase):
             self.fail("适配器那行没交出版本")
 
         self.assertEqual(target.version, "0.1.1")
-
-    def test_batch_skips_out_of_range_sdk(self) -> None:
-        """一键更新那批不带推不出要求的接口包"""
-        targets = mod.update_targets(self._rows("0.1.0", "0.3.0", "0.2.5"))
-        self.assertEqual([item.distribution for item in targets], [_ADAPTER])
-
-    def test_batch_takes_in_range_version(self) -> None:
-        """一键更新那批取满足要求的那一版接口包"""
-        targets = mod.update_targets(self._rows("0.1.0", "0.2.0", "0.1.5"))
-        self.assertEqual([item.version for item in targets], ["0.1.5", "0.1.1"])
-
-    def test_out_of_range_version_names_the_gap(self) -> None:
-        """超界的接口包那一版点名它不在区间内"""
-        rows = self._rows("0.1.0", "0.2.0", "0.1.5")
-        self.assertEqual(
-            mod.release_blocked(rows, rows[0], _release_row("0.2.0", _SHA, _SDK)),
-            "这一版接口包超出已装适配器的要求",
-        )
-
-    def test_in_range_version_is_free(self) -> None:
-        """落在区间内的接口包那一版不挡"""
-        rows = self._rows("0.1.0", "0.2.0", "0.1.5")
-        self.assertEqual(
-            mod.release_blocked(rows, rows[0], _release_row("0.1.5", _SHA, _SDK)), ""
-        )
 
 
 class TestLocalWheels(unittest.TestCase):
@@ -440,22 +405,6 @@ class TestLocalWheels(unittest.TestCase):
                 mod.WheelOrigin.UNKNOWN,
             ],
         )
-
-    def test_out_of_range_recorded_wheel_is_blocked(self) -> None:
-        """本机记过但超出在场适配器要求的接口包那一版照样挡"""
-        sdk = replace(_component("", _SDK, "0.1.0", "", "2.0.0"), release=None)
-        adapter = _component(
-            str(Platform.TELEGRAM), _ADAPTER, "0.1.0", ">=1.0.0,<2.0.0", "0.1.1"
-        )
-        _wheel_on(self._root, "2.0.0", _SDK)
-        wheel_fetch._record_digest(
-            self._root, _wheel_name("2.0.0", _SDK), self._recorded
-        )
-        lines = self._wheels([sdk, adapter], sdk)
-
-        self.assertEqual([line.version for line in lines], ["2.0.0"])
-        self.assertEqual(lines[0].origin, mod.WheelOrigin.RECORDED)
-        self.assertEqual(lines[0].blocked, "这一版接口包超出已装适配器的要求")
 
 
 class TestBucket(unittest.TestCase):
@@ -604,40 +553,6 @@ class TestOrigin(unittest.TestCase):
         row = self._row(rows_mod.ComponentSource.INSTALLED, with_release=False)
         self.assertEqual(self._origin(row), mod.ComponentOrigin.NONE)
 
-    def test_origin_follows_the_targeted_version(self) -> None:
-        """接口包该装的是满足在场要求那一版，来路按那一版报"""
-        stem = _SDK.replace("-", "_")
-        (self._root / f"{stem}-0.1.5-py3-none-any.whl").write_bytes(b"old sdk")
-        newest = ReleaseRow(
-            distribution=_SDK,
-            version="0.2.0",
-            url=f"https://example.invalid/{stem}-0.2.0-py3-none-any.whl",
-            sha256="3" * 64,
-        )
-        older = ReleaseRow(
-            distribution=_SDK,
-            version="0.1.5",
-            url=f"https://example.invalid/{stem}-0.1.5-py3-none-any.whl",
-            sha256=hashlib.sha256(b"old sdk").hexdigest(),
-        )
-        sdk = replace(newest, versions=(newest, older))
-        sdk = rows_mod.ComponentRow(
-            platform="",
-            distribution=_SDK,
-            source=rows_mod.ComponentSource.INSTALLED,
-            installed="0.1.0",
-            requires="",
-            release=sdk,
-            bucket=rows_mod.ComponentBucket.UPGRADABLE,
-        )
-        adapter = _component(
-            str(Platform.TELEGRAM), _ADAPTER, "0.1.0", ">=0.1.0,<0.2.0", "0.1.1"
-        )
-        with patch.object(mod, "WHEELS_DIR", self._root):
-            origin = mod.source_origin([sdk, adapter], sdk)
-
-        self.assertEqual(origin, mod.ComponentOrigin.WHEEL)
-
     def test_absent_without_catalog_row(self) -> None:
         """本机什么都没有即没有可取的内容"""
         row = self._row(rows_mod.ComponentSource.NONE, with_release=False)
@@ -706,19 +621,14 @@ class TestInstallBlocked(unittest.TestCase):
             mod._install_blocked(rows, _adapter_row(rows), self._TARGET), ""
         )
 
-    def test_sdk_row_is_never_blocked(self) -> None:
-        """接口包那一行不受这条限制，它自己就是出路"""
-        rows = _rows("", "")
-        self.assertEqual(mod._install_blocked(rows, _sdk_row(rows), self._TARGET), "")
-
     def test_sdk_below_range_blocks(self) -> None:
-        """接口包在场但够不到适配器要求的下限，那句换成先更新接口包"""
+        """接口包在场但够不到适配器要求的下限，那句指向更新程序"""
         requires = {str(Platform.TELEGRAM): ">=9.9.9"}
         with patch.object(rows_mod, "_declared_requires", lambda: requires):
             rows = _rows("0.1.0", "0.1.0")
         self.assertEqual(
             mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
-            "先更新接口包",
+            "先更新程序",
         )
 
     def test_sdk_over_ceiling_blocks(self) -> None:

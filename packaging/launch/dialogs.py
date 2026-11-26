@@ -6,6 +6,7 @@
 import ctypes
 import sys
 from enum import StrEnum
+from typing import NoReturn
 
 from pack_spec import APP_NAME
 
@@ -60,7 +61,7 @@ def ask_yes_no_cancel(text: str) -> Answer:
     return _ANSWER_BY_ID.get(answer, Answer.CANCEL)
 
 
-def fail_exit(text: str) -> None:
+def fail_exit(text: str) -> NoReturn:
     """错误弹窗并退出"""
     ctypes.windll.user32.MessageBoxW(0, text, APP_NAME, _MB_ICON_ERROR)
     sys.exit(1)

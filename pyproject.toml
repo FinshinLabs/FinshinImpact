@@ -37,4 +37,5 @@ github-mirrors = [
     "https://gh-proxy.com/",
     "https://ghproxy.net/",
 ]
+sdk-version = "0.2.0"
 playwright-cdn = "https://cdn.npmmirror.com/binaries/playwright"

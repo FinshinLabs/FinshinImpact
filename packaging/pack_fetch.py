@@ -28,7 +28,7 @@ _UV_URL_SUFFIX = (
     f"astral-sh/uv/releases/download/{_UV_VERSION}/uv-x86_64-pc-windows-msvc.zip"
 )
 _UV_OFFICIAL_URL = f"{DOWNLOAD_HOST}/{_UV_URL_SUFFIX}"
-_UV_URLS = tuple(f"{mirror}{_UV_OFFICIAL_URL}" for mirror in release_mirrors())
+_UV_URLS = tuple(net_channel.mirror_sources(_UV_OFFICIAL_URL, release_mirrors()))
 _UV_CACHE_NAME = f"uv-{_UV_VERSION}.zip"
 
 # 官方发布页校验值，升 _UV_VERSION 必须同步换值
@@ -56,7 +56,7 @@ def _download(url: str, target: Path) -> None:
     net_channel.download_to(url, net_channel.openers(), target, _DOWNLOAD_TIMEOUT)
 
 
-def _download_verified(urls: list[str], target: Path, sha256: str = "") -> None:
+def download_verified(urls: list[str], target: Path, sha256: str = "") -> None:
     """构建原料多源下载
 
     - zip 验条目，带哈希的再比对 sha256，任一不过即该源失败换下一源
@@ -90,5 +90,5 @@ def _fetch_to_cache(urls: list[str], name: str, *, sha256: str = "") -> Path:
     if cached.exists():
         print(f"命中缓存 {name}")
         return cached
-    _download_verified(urls, cached, sha256)
+    download_verified(urls, cached, sha256)
     return cached

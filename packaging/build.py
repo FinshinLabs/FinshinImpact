@@ -13,19 +13,24 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+import net_channel
 import pack_fetch
 import pack_release
-import pack_seed
 import unpack
 from pack_spec import (
     APP_NAME,
     DIST,
     EXE_NAME,
     ROOT,
+    SDK_RELEASE_URL,
     STAGE,
     PackLayout,
     bytes_digest,
     local_version,
+    release_mirrors,
+    remote_sdk_digest,
+    sdk_version,
+    sdk_wheel_name,
 )
 
 _PACKAGING_DIR = "packaging"
@@ -185,8 +190,30 @@ def _refuse_leftovers(stage: Path) -> None:
         raise RuntimeError("发布物里有版本控制条目：" + "、".join(offenders))
 
 
+def _check_sdk_pin() -> None:
+    """核接口包钉死的版本能取到且与 GitHub 指纹一致
+
+    - 走镜像取一次附件，核 release 自报的 sha256，不符即中止并点名版本
+    """
+    version = sdk_version(ROOT)
+    digest = remote_sdk_digest(version)
+    if not digest:
+        raise SystemExit(f"取不到接口包 v{version} 的附件指纹，检查 GitHub release")
+    name = sdk_wheel_name(version)
+    urls = net_channel.mirror_sources(
+        SDK_RELEASE_URL.format(ver=version), release_mirrors()
+    )
+    print(f"核验接口包 v{version}…")
+    with tempfile.TemporaryDirectory(prefix="finshin-sdk-") as tmp:
+        try:
+            pack_fetch.download_verified(urls, Path(tmp) / name, digest)
+        except RuntimeError as e:
+            raise SystemExit(f"接口包 v{version} 核验失败：{e}") from e
+
+
 def _assemble(launcher_dir: Path) -> Path:
     """组装发布目录并压缩为 zip"""
+    _check_sdk_pin()
     version = local_version(ROOT)
     if STAGE.exists():
         shutil.rmtree(STAGE)
@@ -208,7 +235,6 @@ def _assemble(launcher_dir: Path) -> Path:
     (STAGE / PackLayout.MAIN_SCRIPT).write_text(_MAIN_PY, encoding="utf-8")
     _refuse_leftovers(STAGE)
     _write_runtime_seed(launcher_dir)
-    pack_seed.seed_sdk_wheel()
     _precompile_stage()
     zip_name = DIST / f"{APP_NAME}-v{version}.zip"
     if zip_name.exists():
