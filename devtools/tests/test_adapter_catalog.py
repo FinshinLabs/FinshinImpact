@@ -5,6 +5,7 @@
 - 下载直链按独立整串收下，换 host 与换分发名互不影响
 - 整份读不出与接口包段缺失各出一条说明，不牵动其余行
 - 行内版本清单逐条验形态，坏条目只丢那一条
+- 接口包区间是可选键，缺了即空串，不进必填校验
 - 老读法只看行级五键，多嵌那段不进判定
 """
 
@@ -36,8 +37,9 @@ _TG_OLD_URL = (
 )
 _SHA_OLD = "2" * 64
 
-_ORDER = ("platform", "distribution", "version", "url", "sha256")
-_VERSION_ORDER = ("version", "url", "sha256")
+_ORDER = ("platform", "distribution", "version", "url", "sha256", "sdk_requires")
+_VERSION_ORDER = ("version", "url", "sha256", "sdk_requires")
+_SDK_REQUIRES = ">=0.1.0,<0.2.0"
 
 _SDK_FIELDS = {
     "distribution": "finshin-sdk",
@@ -51,6 +53,7 @@ _TG_FIELDS = {
     "version": "9.9.9",
     "url": _TG_URL,
     "sha256": _SHA_TG,
+    "sdk_requires": _SDK_REQUIRES,
 }
 
 
@@ -124,6 +127,27 @@ class TestCatalogParse(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(catalog.sdk.distribution, "finshin-sdk")
         self.assertEqual(catalog.sdk.sha256, _SHA_SDK)
         self.assertEqual(catalog.adapters[Platform.TELEGRAM].url, _TG_URL)
+
+    async def test_sdk_requires_read(self) -> None:
+        """适配器行读到接口包区间，接口包段没写这一键即空串"""
+        catalog, _ = await self._read(_full_text())
+        if catalog.sdk is None or not catalog.adapters:
+            self.fail(f"完整目录被拒收：{catalog.rejects}")
+
+        self.assertEqual(
+            catalog.adapters[Platform.TELEGRAM].sdk_requires, _SDK_REQUIRES
+        )
+        self.assertEqual(catalog.sdk.sdk_requires, "")
+
+    async def test_missing_sdk_requires_is_empty(self) -> None:
+        """这一键写成空串也照收，读出空串"""
+        catalog, _ = await self._read(
+            _sdk_text() + _adapter_text(dict(_TG_FIELDS, sdk_requires=""))
+        )
+        if catalog.adapters.get(Platform.TELEGRAM) is None:
+            self.fail(f"空值被当成缺字段拒收：{catalog.rejects}")
+
+        self.assertEqual(catalog.adapters[Platform.TELEGRAM].sdk_requires, "")
 
     async def test_url_independent_of_distribution(self) -> None:
         """直链换 host 照收，不由分发名拼出"""
@@ -253,6 +277,13 @@ class TestVersionList(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(versions[1].url, _TG_OLD_URL)
         self.assertEqual(versions[1].sha256, _SHA_OLD)
+
+    async def test_older_versions_carry_sdk_requires(self) -> None:
+        """旧版条目各读各的接口包区间，没写的即空串"""
+        catalog = await self._read(_listed_text(_older(sdk_requires=">=0.0.9,<0.1.0")))
+        versions = catalog.adapters[Platform.TELEGRAM].versions
+        self.assertEqual(versions[0].sdk_requires, _SDK_REQUIRES)
+        self.assertEqual(versions[1].sdk_requires, ">=0.0.9,<0.1.0")
 
     async def test_bad_entry_dropped_row_kept(self) -> None:
         """清单里的坏条目只丢那一条，行照进表也不报拒收"""

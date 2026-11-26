@@ -36,6 +36,7 @@ class _RowKey(StrEnum):
     VERSION = "version"
     URL = "url"
     SHA256 = "sha256"
+    SDK_REQUIRES = "sdk_requires"
     VERSIONS = "versions"
 
 
@@ -51,6 +52,7 @@ class ReleaseRow:
 
     - url 是目录行给出的整条直链
     - sha256 归一成小写十六进制串
+    - sdk_requires 是可选键，缺了即空串
     - versions 是可装版本清单，最新一版在最前且自身不带清单
     """
 
@@ -58,6 +60,7 @@ class ReleaseRow:
     version: str
     url: str
     sha256: str
+    sdk_requires: str = ""
     versions: tuple["ReleaseRow", ...] = ()
 
 
@@ -120,6 +123,7 @@ def _build_row(values: dict[str, Any]) -> ReleaseRow:
         version=_text_of(values, _RowKey.VERSION),
         url=_text_of(values, _RowKey.URL),
         sha256=_text_of(values, _RowKey.SHA256).lower(),
+        sdk_requires=_text_of(values, _RowKey.SDK_REQUIRES),
     )
 
     return replace(newest, versions=(newest, *_older_rows(values, newest)))
@@ -159,6 +163,7 @@ def _version_row(item: Any, distribution: str) -> ReleaseRow | None:
         version=_text_of(item, _RowKey.VERSION),
         url=_text_of(item, _RowKey.URL),
         sha256=_text_of(item, _RowKey.SHA256).lower(),
+        sdk_requires=_text_of(item, _RowKey.SDK_REQUIRES),
     )
 
 

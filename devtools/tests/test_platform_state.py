@@ -4,6 +4,7 @@
 - 版本串读不懂、在线不比本机新、源码仓挂着且已装包都算本机已有
 - 该装的那批只收本机没有与在线更新的两档
 - 接口包没到位或高出上限时适配器那颗不给装，接口包那行自己不受此限
+- 适配器那颗按要装那一版声明的要求挡，那一版没写要求即回落已装声明
 - 在场平台只看已装包，源码仓挂着没装的不算
 - 版本清单逐版报本机来路，盘上的件逐份报在不在清单里
 - 来源按源码仓在不在场与包装没装进环境分四档，来路按内容从哪儿取到分三档
@@ -183,6 +184,25 @@ def _component(
     )
 
 
+def _target_row(
+    platform: str, distribution: str, sdk_requires: str
+) -> rows_mod.ComponentRow:
+    """一行可更新的适配器，目录最新版自带接口包要求"""
+    newest = replace(
+        _release_row("0.1.1", _SHA, distribution), sdk_requires=sdk_requires
+    )
+
+    return rows_mod.ComponentRow(
+        platform=platform,
+        distribution=distribution,
+        source=rows_mod.ComponentSource.INSTALLED,
+        installed="0.1.0",
+        requires="",
+        release=newest,
+        bucket=rows_mod.ComponentBucket.UPGRADABLE,
+    )
+
+
 class TestOlderVersions(unittest.TestCase):
     """版本清单里除最新一版外的每一版"""
 
@@ -244,6 +264,22 @@ class TestOlderVersions(unittest.TestCase):
         row = replace(row, release=None)
         with patch.object(mod, "WHEELS_DIR", self._root):
             self.assertEqual(mod.older_versions([row], row), ())
+
+    def test_blocked_follows_each_release(self) -> None:
+        """逐版按各自声明的接口包要求判挡装"""
+        sdk = _component("", _SDK, "0.2.0", "", "0.2.0")
+        newest = replace(_release_row("0.3.0", _SHA), sdk_requires="<0.2.0")
+        met = replace(_release_row("0.2.0", self._cached), sdk_requires=">=0.2.0")
+        over = replace(_release_row("0.1.0", _SHA), sdk_requires="<0.2.0")
+        row = replace(
+            self._row("0.1.0"), release=replace(newest, versions=(newest, met, over))
+        )
+        with patch.object(mod, "WHEELS_DIR", self._root):
+            lines = mod.older_versions([sdk, row], row)
+
+        self.assertEqual(
+            [line.blocked for line in lines], ["", "接口包太新，适配器等新版"]
+        )
 
 
 class TestUpdateTarget(unittest.TestCase):
@@ -625,7 +661,9 @@ class TestUpdateTargets(unittest.TestCase):
 
     def test_upgradable_row_included(self) -> None:
         """可更新的行进差集，交的是目录行自带的直链与指纹"""
-        targets = mod.update_targets([_tg_row("0.1.0", "0.1.1")])
+        sdk = _component("", _SDK, "0.1.0", "", "0.1.0")
+        adapter = _component(str(Platform.TELEGRAM), _ADAPTER, "0.1.0", "", "0.1.1")
+        targets = mod.update_targets([sdk, adapter])
         self.assertEqual([release.version for release in targets], ["0.1.1"])
         self.assertEqual([release.distribution for release in targets], [_ADAPTER])
 
@@ -633,27 +671,45 @@ class TestUpdateTargets(unittest.TestCase):
         """本机没装过的不进一键，装哪个平台由逐行的按钮定"""
         self.assertEqual(mod.update_targets([_tg_row("", "0.1.0")]), [])
 
+    def test_blocked_target_excluded(self) -> None:
+        """目标版被挡的那行不进一键，别的行照收"""
+        sdk = _component("", _SDK, "0.2.0", "", "0.2.0")
+        rows = [
+            sdk,
+            _target_row(str(Platform.TELEGRAM), _ADAPTER, "<0.2.0"),
+            _target_row("qq", "finshin-adapter-qq", ">=0.2.0"),
+        ]
+
+        self.assertEqual(
+            [item.distribution for item in mod.update_targets(rows)],
+            ["finshin-adapter-qq"],
+        )
+
 
 class TestInstallBlocked(unittest.TestCase):
     """接口包不在要求的区间内时适配器那颗不给装，并交出那句下一步"""
+
+    _TARGET = _release_row("0.1.1", _SHA)
 
     def test_absent_sdk_blocks_the_adapter(self) -> None:
         """本机没装接口包即挡住，那句是先装接口包"""
         rows = _rows("", "")
         self.assertEqual(
-            mod._install_blocked(rows, _adapter_row(rows)),
+            mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
             "先装接口包",
         )
 
     def test_installed_sdk_frees_the_adapter(self) -> None:
         """接口包在场即放行"""
         rows = _rows("0.1.0", "")
-        self.assertEqual(mod._install_blocked(rows, _adapter_row(rows)), "")
+        self.assertEqual(
+            mod._install_blocked(rows, _adapter_row(rows), self._TARGET), ""
+        )
 
     def test_sdk_row_is_never_blocked(self) -> None:
         """接口包那一行不受这条限制，它自己就是出路"""
         rows = _rows("", "")
-        self.assertEqual(mod._install_blocked(rows, _sdk_row(rows)), "")
+        self.assertEqual(mod._install_blocked(rows, _sdk_row(rows), self._TARGET), "")
 
     def test_sdk_below_range_blocks(self) -> None:
         """接口包在场但够不到适配器要求的下限，那句换成先更新接口包"""
@@ -661,7 +717,7 @@ class TestInstallBlocked(unittest.TestCase):
         with patch.object(rows_mod, "_declared_requires", lambda: requires):
             rows = _rows("0.1.0", "0.1.0")
         self.assertEqual(
-            mod._install_blocked(rows, _adapter_row(rows)),
+            mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
             "先更新接口包",
         )
 
@@ -671,7 +727,7 @@ class TestInstallBlocked(unittest.TestCase):
         with patch.object(rows_mod, "_declared_requires", lambda: requires):
             rows = _rows("0.1.0", "0.1.0")
         self.assertEqual(
-            mod._install_blocked(rows, _adapter_row(rows)),
+            mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
             "接口包太新，适配器等新版",
         )
 
@@ -680,7 +736,22 @@ class TestInstallBlocked(unittest.TestCase):
         requires = {str(Platform.TELEGRAM): ">=0.1.0,<0.2.0"}
         with patch.object(rows_mod, "_declared_requires", lambda: requires):
             rows = _rows("0.1.5", "0.1.0")
-        self.assertEqual(mod._install_blocked(rows, _adapter_row(rows)), "")
+        self.assertEqual(
+            mod._install_blocked(rows, _adapter_row(rows), self._TARGET), ""
+        )
+
+    def test_target_version_requirement_wins(self) -> None:
+        """要装那一版自带要求即按它判，同一行按已装声明判本来放行"""
+        requires = {str(Platform.TELEGRAM): ">=0.1.0,<0.2.0"}
+        with patch.object(rows_mod, "_declared_requires", lambda: requires):
+            rows = _rows("0.1.0", "0.1.0")
+        row = _adapter_row(rows)
+        target = replace(self._TARGET, sdk_requires="<0.0.1")
+
+        self.assertEqual(
+            mod.release_blocked(rows, row, target), "接口包太新，适配器等新版"
+        )
+        self.assertEqual(mod.release_blocked(rows, row, self._TARGET), "")
 
     def test_requires_line_keeps_both_bounds(self) -> None:
         """要求那一行把上下限原样带出来"""

@@ -12,6 +12,7 @@ from typing import Any
 from gen_release import (
     KEY_DISTRIBUTION,
     KEY_PLATFORM,
+    KEY_SDK_REQUIRES,
     KEY_SHA256,
     KEY_URL,
     KEY_VERSION,
@@ -28,7 +29,7 @@ _SECTION_SDK = "sdk"
 _SECTION_ADAPTER = "adapter"
 
 _SDK_ORDER = (KEY_DISTRIBUTION, KEY_VERSION, KEY_URL, KEY_SHA256)
-_ADAPTER_ORDER = (KEY_PLATFORM, *_SDK_ORDER)
+_ADAPTER_ORDER = (KEY_PLATFORM, *_SDK_ORDER, KEY_SDK_REQUIRES)
 
 
 def _lines(row: dict[str, Any], order: tuple[str, ...]) -> list[str]:

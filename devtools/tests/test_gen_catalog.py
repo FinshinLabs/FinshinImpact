@@ -3,6 +3,7 @@
 - 归属判定只看默认分支声明里的分发名，仓名不参与
 - 最新一版的平台码、版本与直链取自该版声明与 release 附件自报的值
 - 旧版本的版本号取 wheel 文件名，缺件的只丢那一版
+- 适配器各版带自己声明的接口包区间，读不出即少这一个键
 - 陌生仓与没发版的仓跳过，发过版却缺件的当场报错
 - 目录文本的段名与键位与本体读侧同值
 """
@@ -25,22 +26,36 @@ _TG_REPO = "FinshinLabs/FinshinAdapterTG"
 _OTHER_REPO = "FinshinLabs/hello-world"
 _XX_REPO = "FinshinLabs/FinshinAdapterXX"
 _SHA = "1" * 64
+_SDK_REQUIRES = ">=0.1.0,<0.2.0"
+_SDK_PIN = f"finshin-sdk{_SDK_REQUIRES}"
 _SDK_URL = f"https://example.invalid/{_SDK_REPO}/releases/download/v9.9.9/finshin_sdk-9.9.9-py3-none-any.whl"
 _TG_URL = f"https://example.invalid/{_TG_REPO}/releases/download/v9.9.9/finshin_adapter_tg-9.9.9-py3-none-any.whl"
 
 
-def _decl(distribution: str, platform: str = "") -> dict[str, Any]:
+def _decl(
+    distribution: str,
+    platform: str = "",
+    dependencies: tuple[str, ...] = (),
+) -> dict[str, Any]:
     """把一份声明编成 contents 接口回的结构"""
     lines = [
         "[project]",
         f'name = "{distribution}"',
         'version = "9.9.9"',
     ]
+    if dependencies:
+        pins = ", ".join(f'"{pin}"' for pin in dependencies)
+        lines.append(f"dependencies = [{pins}]")
     if platform:
         lines += ["", "[tool.finshin-adapter]", f'platform = "{platform}"']
     blob = base64.b64encode("\n".join(lines).encode("utf-8")).decode("ascii")
 
     return {"content": blob}
+
+
+def _decl_at(repo: str, ref: str) -> str:
+    """某仓某个 tag 检出点声明的假响应键"""
+    return f"{repo}/contents/{gen_release._DECL_FILE}?ref={ref}"
 
 
 def _asset(distribution: str, version: str, url: str, digest: str) -> dict[str, Any]:
@@ -90,7 +105,10 @@ def _repo(full_name: str) -> dict[str, Any]:
 
 
 class CatalogStub:
-    """按 URL 分发假响应的取件替身"""
+    """按 URL 分发假响应的取件替身
+
+    - 表里最长的命中键生效，带 ref 的键据此把默认分支与各 tag 分开
+    """
 
     def __init__(self, repos: list[dict[str, Any]], table: dict[str, Any]) -> None:
         """装入仓清单与按 URL 取用的假响应"""
@@ -100,9 +118,9 @@ class CatalogStub:
 
     def __call__(self, url: str) -> Any:
         self.asked.append(url)
-        for needle, answer in self.table.items():
-            if needle in url:
-                return answer
+        hits = [needle for needle in self.table if needle in url]
+        if hits:
+            return self.table[max(hits, key=len)]
         if "users/FinshinLabs/repos" in url:
             return self.repos
         return None
@@ -135,7 +153,7 @@ class TestGenCatalog(unittest.TestCase):
 
         return {
             f"{_SDK_REPO}/contents": _decl("finshin-sdk"),
-            f"{_TG_REPO}/contents": _decl("finshin-adapter-tg", "tg"),
+            f"{_TG_REPO}/contents": _decl("finshin-adapter-tg", "tg", (_SDK_PIN,)),
             f"{_SDK_REPO}/releases/latest": _release("finshin-sdk", _SDK_URL),
             f"{_SDK_REPO}/releases?": [_release("finshin-sdk", _SDK_URL)],
             f"{_TG_REPO}/releases/latest": tg_release,
@@ -156,6 +174,48 @@ class TestGenCatalog(unittest.TestCase):
         self.assertIn(f'sha256 = "{_SHA}"', text)
         self.assertIn('platform = "tg"', text)
         self.assertIn('version = "9.9.9"', text)
+
+    def test_latest_row_carries_sdk_requires(self) -> None:
+        """最新一版的行与版本条目都带接口包区间，接口包段不写"""
+        text = self._build(self._both(), self._two())
+
+        sdk_part, _, adapter_part = text.partition("[[adapter]]")
+        self.assertNotIn("sdk_requires", sdk_part)
+        self.assertIn(f'sdk_requires = "{_SDK_REQUIRES}"', adapter_part)
+        self.assertEqual(text.count(f'sdk_requires = "{_SDK_REQUIRES}"'), 2)
+
+    def test_older_rows_carry_their_own_sdk_requires(self) -> None:
+        """旧版逐版回读各自 tag 的声明，各写各的区间"""
+        listed = [
+            _release("finshin-adapter-tg", _TG_URL),
+            _older("finshin-adapter-tg", "8.8.8"),
+            _older("finshin-adapter-tg", "7.7.7"),
+        ]
+        table = self._both(listed)
+        table[_decl_at(_TG_REPO, "v8.8.8")] = _decl(
+            "finshin-adapter-tg", "tg", ("finshin-sdk>=0.0.9,<0.1.0",)
+        )
+        table[_decl_at(_TG_REPO, "v7.7.7")] = _decl(
+            "finshin-adapter-tg", "tg", ("finshin-sdk>=0.0.5,<0.0.9",)
+        )
+        text = self._build(table, self._two())
+
+        self.assertEqual(text.count('sdk_requires = ">=0.0.9,<0.1.0"'), 1)
+        self.assertEqual(text.count('sdk_requires = ">=0.0.5,<0.0.9"'), 1)
+
+    def test_older_tag_without_declaration_keeps_version(self) -> None:
+        """老 tag 的声明读不出即少一个键，这一版照进目录也不报错"""
+        listed = [
+            _release("finshin-adapter-tg", _TG_URL),
+            _older("finshin-adapter-tg", "0.1.0"),
+        ]
+        table = self._both(listed)
+        table[_decl_at(_TG_REPO, "v0.1.0")] = None
+        text = self._build(table, self._two())
+
+        self.assertEqual(text.count("[[adapter.versions]]"), 2)
+        self.assertIn('version = "0.1.0"', text)
+        self.assertEqual(text.count(f'sdk_requires = "{_SDK_REQUIRES}"'), 2)
 
     def test_version_list_keeps_latest_first(self) -> None:
         """一只发行件的行内带版本清单，最新那一版在最前"""

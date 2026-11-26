@@ -31,19 +31,22 @@ KEY_VERSION = "version"
 KEY_URL = "url"
 KEY_SHA256 = "sha256"
 KEY_VERSIONS = "versions"
+KEY_SDK_REQUIRES = "sdk_requires"
 
-# 一条版本条目的键序
-VERSION_KEYS = (KEY_VERSION, KEY_URL, KEY_SHA256)
+# 一条版本条目的键序，sdk_requires 可选，只对适配器写
+VERSION_KEYS = (KEY_VERSION, KEY_URL, KEY_SHA256, KEY_SDK_REQUIRES)
 
 # 声明里的项目段与键名，与各仓那份 pyproject 同值
 _DECL_PROJECT = "project"
 _DECL_TOOL = "tool"
 _DECL_NAME = "name"
+_DECL_DEPENDENCIES = "dependencies"
 _DECL_FILE = pack_spec.PackLayout.DECLARATION
 _DECL_ADAPTER_TABLE = "finshin-adapter"
 
 _WHEEL_SUFFIX = ".whl"
 _DIGEST_SEP = ":"
+_MARKER_SEP = ";"
 
 
 def owner() -> str:
@@ -130,6 +133,30 @@ def _platform_of(data: dict[str, Any] | None) -> str:
     return code if isinstance(code, str) else ""
 
 
+def _sdk_requires(data: dict[str, Any] | None) -> str:
+    """取声明里对接口包的版本要求，没写即交空串
+
+    - 只认以接口包分发名开头的那一条，包名之后剩下的约束串原样交出
+    - 附加功能名与 `;` 之后的环境条件不算版本要求
+    """
+    project = (data or {}).get(_DECL_PROJECT)
+    pins = project.get(_DECL_DEPENDENCIES) if isinstance(project, dict) else None
+    if not isinstance(pins, list):
+        return ""
+
+    for pin in pins:
+        text = str(pin).strip()
+        if not text.startswith(SDK_DISTRIBUTION):
+            continue
+        spec = text[len(SDK_DISTRIBUTION) :].strip()
+        if spec.startswith("["):
+            _, _, spec = spec.partition("]")
+            spec = spec.strip()
+        return spec.partition(_MARKER_SEP)[0].strip()
+
+    return ""
+
+
 def _wheel_of(release: dict[str, Any], distribution: str) -> tuple[str, str, str]:
     """取 release 里属于这只分发名的 wheel 文件名、直链与指纹
 
@@ -160,17 +187,20 @@ def _versions(
 ) -> list[dict[str, Any]]:
     """排出一只发行件的可装版本清单，最新那一版在最前
 
-    - 旧版的版本号取 wheel 文件名，不回读那一版的声明
+    - 旧版的版本号取 wheel 文件名，接口包版本要求回读那一版的声明
     - 旧版缺直链、指纹或文件名读不出版本号的只丢那一版
+    - 旧版声明读不出或没写要求即少这一个键，不丢这一版
     """
-    listed: list[dict[str, Any]] = [{key: newest[key] for key in VERSION_KEYS}]
+    listed: list[dict[str, Any]] = [
+        {key: newest[key] for key in VERSION_KEYS if key in newest}
+    ]
     seen = {str(newest[KEY_VERSION])}
     for release in _releases(name):
         if len(listed) >= _VERSIONS_MAX:
             break
         if str(release.get("tag_name") or "") == newest_tag:
             continue
-        older = _older_row(distribution, release)
+        older = _older_row(name, distribution, release)
         if older is None or older[KEY_VERSION] in seen:
             continue
         seen.add(str(older[KEY_VERSION]))
@@ -179,14 +209,26 @@ def _versions(
     return listed
 
 
-def _older_row(distribution: str, release: dict[str, Any]) -> dict[str, Any] | None:
-    """一版旧件的可装条目，文件名读不出版本号即不交出"""
+def _older_row(
+    name: str, distribution: str, release: dict[str, Any]
+) -> dict[str, Any] | None:
+    """一版旧件的可装条目，文件名读不出版本号即不交出
+
+    - 适配器回读这一版的声明取接口包版本要求，读不出就少这一个键
+    """
     asset, url, sha256 = _wheel_of(release, distribution)
     version = _version_in_name(asset)
     if not version:
         return None
 
-    return {KEY_VERSION: version, KEY_URL: url, KEY_SHA256: sha256}
+    row = {KEY_VERSION: version, KEY_URL: url, KEY_SHA256: sha256}
+    tag = str(release.get("tag_name") or "")
+    if distribution != SDK_DISTRIBUTION and tag:
+        requires = _sdk_requires(_declaration(name, tag))
+        if requires:
+            row[KEY_SDK_REQUIRES] = requires
+
+    return row
 
 
 def release_row(name: str, ref: str) -> tuple[dict[str, Any] | None, str]:
@@ -229,6 +271,9 @@ def release_row(name: str, ref: str) -> tuple[dict[str, Any] | None, str]:
         if not code:
             raise RuntimeError(f"{name}：{tag} 的声明里没写平台码")
         row[KEY_PLATFORM] = code
+        requires = _sdk_requires(data)
+        if requires:
+            row[KEY_SDK_REQUIRES] = requires
 
     row[KEY_VERSIONS] = _versions(name, distribution, tag, row)
 

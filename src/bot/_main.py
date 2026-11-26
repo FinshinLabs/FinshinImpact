@@ -16,6 +16,7 @@ from exceptions import (
     AdapterError,
     AdapterMissingError,
     AdapterNotInstalledError,
+    AdapterOutOfDateError,
     describe_error,
 )
 from skin.messages import CheckMessage, MiscMessage
@@ -126,7 +127,7 @@ class Main:
     def _report_adapter_failure(self, exc: AdapterError) -> int:
         """适配器取件失败上报
 
-        - 缺件那类另开平台组件面板
+        - 缺件、没进环境与版本不符三类另开平台组件面板
         """
         detail = describe_error(exc)
         self.logger.send_error(f"程序启动异常：{detail}", exc)
@@ -134,8 +135,11 @@ class Main:
         # 取件排在 GUI 之前，这句只能自己弹窗，主窗的兜底还没挂上
         self._pop_failure(detail)
 
-        # 缺件与没装进环境的出路都在面板里，版本不合与被拒装还得人工换件
-        if isinstance(exc, (AdapterMissingError, AdapterNotInstalledError)):
+        # 缺件、没进环境与版本不符的出路都在面板里，被拒装还得人工换件
+        if isinstance(
+            exc,
+            (AdapterMissingError, AdapterNotInstalledError, AdapterOutOfDateError),
+        ):
             open_platform_dialog()
         return 1
 

@@ -463,11 +463,11 @@ class TestAdapterHost(unittest.TestCase):
                 settings_mod._channel_probe()
 
     def test_startup_refusal_pops_the_notice(self) -> None:
-        """启动取件被拒时那句人话上屏
+        """启动取件被拒时那句人话上屏，关掉后开面板
 
         - 取件排在主窗之前，主窗的兜底还没挂上
         - 先收提示卡，再弹报错窗
-        - 版本不合只弹窗，不开面板
+        - 版本不合的出路在面板里，弹窗关掉即开
         """
         popped: list[str] = []
         events: list[str] = []
@@ -495,9 +495,13 @@ class TestAdapterHost(unittest.TestCase):
             self.assertEqual(main.main(), 1)
 
         self.assertEqual(
-            popped, ["tg 平台的适配器要接口包 >=9.9.9，本机接口包是 0.1.0"]
+            popped,
+            [
+                "tg 平台的适配器要接口包 >=9.9.9，本机接口包是 0.1.0\n"
+                "在平台组件面板装与接口包匹配的适配器版本，装完重新打开本程序"
+            ],
         )
-        self.assertEqual(events, ["dismiss", "popup"])
+        self.assertEqual(events, ["dismiss", "popup", "panel"])
 
     def test_missing_adapter_opens_the_panel(self) -> None:
         """缺件那条报错窗关掉即开面板

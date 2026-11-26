@@ -1,7 +1,7 @@
 """平台组件的装与挡
 
-- 一键更新的那批只收在线比本机新的行，接口包那行先算在场适配器的要求
-- 适配器要接口包已在本机，且落在它声明的版本要求之内
+- 一键更新的那批只收在线比本机新、且目标版挡装判据放行的行
+- 适配器要接口包已在本机，且落在要装那一版声明的要求之内
 - 接口包要求那一行的说法按本机接口包版本定
 - 可装的旧版逐版报来路，盘上的件逐份报核没核到指纹
 """
@@ -88,14 +88,14 @@ def update_targets(rows: Sequence[ComponentRow]) -> list[ReleaseRow]:
 
     - 只收在线比本机新的
     - 本机没装过的不进这一批
-    - 接口包推不出在场适配器要求的那批不进这一批
+    - 目标版挡装判据不放行的不进这一批
     """
     targets: list[ReleaseRow] = []
     for row in rows:
         if row.bucket != ComponentBucket.UPGRADABLE:
             continue
         target = update_target(rows, row)
-        if target is not None:
+        if target is not None and not release_blocked(rows, row, target):
             targets.append(target)
 
     return targets
@@ -127,11 +127,11 @@ def release_blocked(
     """这一版的挡装理由
 
     - 能装交出空串
-    - 适配器那行按本机接口包落在不在它声明的要求之内判
+    - 适配器那行按本机接口包落在不在这一版声明的要求之内判
     - 接口包那行按这一版满不满足在场每只适配器声明的要求判
     """
     if row.platform:
-        return _install_blocked(rows, row)
+        return _install_blocked(rows, row, release)
     if _sdk_in_range(rows, release.version):
         return ""
 
@@ -158,11 +158,14 @@ def _sdk_in_range(rows: Sequence[ComponentRow], version: str) -> bool:
     )
 
 
-def _install_blocked(rows: Sequence[ComponentRow], row: ComponentRow) -> str:
-    """这只组件的挡装下一步
+def _install_blocked(
+    rows: Sequence[ComponentRow], row: ComponentRow, release: ReleaseRow
+) -> str:
+    """这只组件这一版的挡装下一步
 
     - 能装交出空串
-    - 适配器要接口包已在本机，且落在它声明的版本要求之内
+    - 适配器要接口包已在本机，且落在要装那一版声明的要求之内
+    - 那一版没写要求即按本机已装适配器的声明判
     - 接口包自己不受这条限制
     - 版本串读不懂算没到位
     """
@@ -171,9 +174,10 @@ def _install_blocked(rows: Sequence[ComponentRow], row: ComponentRow) -> str:
     sdk = next((item for item in rows if not item.platform), None)
     if sdk is None or not sdk.installed:
         return PlatformMessage.NEED_SDK_INSTALL
-    if requires_met(sdk.installed, row.requires):
+    requires = release.sdk_requires or row.requires
+    if requires_met(sdk.installed, requires):
         return ""
-    if over_ceiling(sdk.installed, row.requires):
+    if over_ceiling(sdk.installed, requires):
         return PlatformMessage.SDK_TOO_NEW
 
     return PlatformMessage.NEED_SDK_UPDATE

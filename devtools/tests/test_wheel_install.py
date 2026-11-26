@@ -95,6 +95,44 @@ class TestInstallReleases(unittest.TestCase):
         self.assertIn(_TG_NAME, notes[1])
         self.assertIn("装不进运行环境", notes[0])
 
+    def test_failed_item_is_not_read_back(self) -> None:
+        """逐只也全失败的件只报装不进，不再读本机版本"""
+        with (
+            patch.object(mod, "dev_mode", lambda: False),
+            patch.object(mod, "with_index_retry", self._retry(1)),
+            patch.object(mod, "installed_version", lambda name: "0.0.9"),
+        ):
+            notes = mod.install_releases(_files(), None)
+
+        self.assertEqual(len(notes), 2)
+        self.assertTrue(all("装不进运行环境" in note for note in notes))
+        self.assertFalse(any("装完读到" in note for note in notes))
+
+    def test_only_installed_item_is_read_back(self) -> None:
+        """整批失败后第一只补救成功，只复核这一只"""
+        reads: list[str] = []
+
+        def record_read(name: str) -> str:
+            reads.append(name)
+            return "0.1.0"
+
+        codes = iter([1, 0, 1])
+
+        def fake(args: list[str], on_line: object = None) -> int:
+            self.calls.append(list(args))
+            return next(codes)
+
+        with (
+            patch.object(mod, "dev_mode", lambda: False),
+            patch.object(mod, "with_index_retry", fake),
+            patch.object(mod, "installed_version", record_read),
+        ):
+            notes = mod.install_releases(_files(), None)
+
+        self.assertEqual(reads, [_SDK_NAME])
+        self.assertEqual(len(notes), 1)
+        self.assertIn(_TG_NAME, notes[0])
+
     def test_dev_mode_only_prints_command(self) -> None:
         """开发模式只交等效手动命令，不跑子进程"""
         lines: list[str] = []

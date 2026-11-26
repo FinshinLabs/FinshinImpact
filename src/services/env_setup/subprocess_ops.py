@@ -28,6 +28,9 @@ _INSTALL_LOG = RUNTIME_DIR / "plugin-ops.log"
 # 调试级噪音行前缀，除这些外子进程输出一律直通进度窗
 _NOISE_PREFIXES = ("DEBUG", "TRACE")
 
+# uv 依赖无解首行，后续缩进行是续述，不上屏也不影响换源
+_NO_SOLUTION = "error: No solution found"
+
 # 子进程静默多久刷一次等待秒数（秒）
 _HEARTBEAT_INTERVAL = 1
 
@@ -76,15 +79,27 @@ def with_index_retry(args: list[str], on_line: ProgressCallback | None) -> int:
     """按换源序列执行 pip 命令直至成功
 
     - 返回最后一次的退出码，全源落空即非零
+    - 依赖无解与镜像源无关，判定后不再换源
     """
+    unresolved = [False]
+
+    def _watch(line: str) -> None:
+        if line == PluginMessage.RESOLVE_FAIL:
+            unresolved[0] = True
+        emit(on_line, line)
+
+    watcher = _watch if on_line is not None else None
     code = 1
     for i, index in enumerate(UV_INDEX_URLS):
         if i:
             emit(on_line, PluginMessage.INDEX_RETRY.format(try_count=i, url=index))
             emit(on_line, PluginMessage.INDEX_RETRY_NOTE)
-        code = run_uv_once(args, index, on_line)
+        unresolved[0] = False
+        code = run_uv_once(args, index, watcher)
         if code == 0:
             return 0
+        if unresolved[0]:
+            return code
     return code
 
 
@@ -172,6 +187,7 @@ def run_process(
     - 静默无窗执行，输出只进进度窗
     - stdout/stderr 合流，编码异常替换不中断
     - 持续无输出由心跳补等待行，任务结束即停
+    - 依赖无解整段英文不上屏，收尾换成一句可操作提示
     - 非零退出时取末条失败行生成简短摘要
     """
     process = popen_hidden(argv, env)
@@ -179,11 +195,21 @@ def run_process(
     beat = _Heartbeat(on_line) if on_line is not None else None
     if beat is not None:
         beat.start()
+    no_solution = False
+    skipping = False
     stream = process.stdout
     if stream is not None:
         for line in stream:
             stripped = line.rstrip()
             raw.append(stripped)
+            if stripped.startswith(_NO_SOLUTION):
+                no_solution = True
+                skipping = True
+                continue
+            if skipping:
+                if not stripped or line[:1].isspace():
+                    continue
+                skipping = False
             if stripped and not _is_noise(stripped):
                 if beat is not None:
                     beat.touch()
@@ -192,9 +218,14 @@ def run_process(
     _join_heartbeat(beat)
     log_ops(raw)
     if code != 0 and on_line is not None:
-        last_err = next((ln for ln in reversed(raw) if ln and not _is_noise(ln)), "")
-        reason = last_err[:80] if last_err else PluginMessage.PROC_FAIL_FALLBACK
-        emit(on_line, PluginMessage.PROC_FAIL.format(reason=reason))
+        if no_solution:
+            emit(on_line, PluginMessage.RESOLVE_FAIL)
+        else:
+            last_err = next(
+                (ln for ln in reversed(raw) if ln and not _is_noise(ln)), ""
+            )
+            reason = last_err[:80] if last_err else PluginMessage.PROC_FAIL_FALLBACK
+            emit(on_line, PluginMessage.PROC_FAIL.format(reason=reason))
     return code
 
 

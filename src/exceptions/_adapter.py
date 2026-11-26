@@ -58,7 +58,8 @@ ADAPTER_MAP = {
         "{platform} 平台的适配器没装进环境：找不到 {module}\n装完请重新打开本程序"
     ),
     AdapterOutOfDateError: (
-        "{platform} 平台的适配器要接口包 {requires}，本机接口包是 {sdk}"
+        "{platform} 平台的适配器要接口包 {requires}，本机接口包是 {sdk}\n"
+        "在平台组件面板装与接口包匹配的适配器版本，装完重新打开本程序"
     ),
     AdapterImportError: "{platform} 平台的适配器不许引本体内部或界面库（{target}，{where}）",
 }

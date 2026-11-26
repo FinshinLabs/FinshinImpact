@@ -3,7 +3,7 @@
 - 一条命令带全部 wheel 与 --find-links，本地包互相喂依赖
 - 逐只点名重装
 - 整批失败转逐只重试，收集装不进的发行件
-- 装完按本机读到的版本复核，对不上即点名，不报成功
+- 只复核装上的件：按本机读到的版本对不上即点名，不报成功
 """
 
 from collections.abc import Sequence
@@ -55,7 +55,7 @@ def install_releases(
     - 交出装不进的说明行
     - 一条命令带全部件，本地包互相喂依赖，逐只点名重装
     - 整批失败转逐只重试，逐只点名
-    - 装完按本机读到的版本复核，对不上即点名
+    - 只复核装上的件：按本机读到的版本对不上即点名
     - 开发模式只交等效手动命令
     """
     if not files:
@@ -74,17 +74,21 @@ def install_releases(
 
     base = _install_flags(files)
     failed: list[str] = []
+    uninstalled: set[str] = set()
     if with_index_retry([*base, *paths], on_line) != 0:
         for item in files:
             if (
                 with_index_retry([*_install_flags([item]), str(item.path)], on_line)
                 != 0
             ):
+                uninstalled.add(item.distribution)
                 failed.append(
                     CatalogMessage.INSTALL_FAILED.format(name=item.distribution)
                 )
 
     for item in files:
+        if item.distribution in uninstalled:
+            continue
         found = installed_version(item.distribution)
         if found != item.version:
             failed.append(

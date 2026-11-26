@@ -72,6 +72,9 @@ class PluginMessage:
     PROC_FAIL = "执行未成功：{reason}"
     PROC_FAIL_FALLBACK = "原因详见运行日志插件装卸记录"
 
+    # 用：services.env_setup.subprocess_ops 依赖解析无解时替代原报错整段，换源也解决不了
+    RESOLVE_FAIL = "要装的版本和本机已装的件互相矛盾，换源也装不上\n先卸掉冲突的旧件，或改选与本机相容的版本"
+
     # 用：ui._guide._progress 任务异常中止行
     TASK_FAIL = "任务异常中止，详情见运行日志"
 

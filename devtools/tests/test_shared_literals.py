@@ -60,6 +60,7 @@ class TestCatalogShape(unittest.TestCase):
                 gen_release.KEY_VERSION,
                 gen_release.KEY_URL,
                 gen_release.KEY_SHA256,
+                gen_release.KEY_SDK_REQUIRES,
                 gen_release.KEY_VERSIONS,
             },
         )
