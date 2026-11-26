@@ -19,25 +19,3 @@ from ._restart import close_restart_wait, finish_restart_wait, show_restart_wait
 from ._settings import ChangeConfirmDialog, ConfigMode, SettingsDialog
 from ._shutdown import ShutdownDialog
 from ._wait import WaitDialog
-
-__all__ = [
-    # 通用弹窗
-    "NoticeDialog",
-    "PersonaSyncDialog",
-    "ReleaseNotesDialog",
-    "WaitDialog",
-    "ShutdownDialog",
-    # 业务弹窗
-    "SettingsDialog",
-    "ConfigMode",
-    "ChangeConfirmDialog",
-    "PersonaResolveDialog",
-    "CheckDialog",
-    "Round",
-    "current_check_window",
-    "open_check_window",
-    "close_restart_wait",
-    "finish_restart_wait",
-    "show_restart_wait",
-    "LinkDialog",
-]

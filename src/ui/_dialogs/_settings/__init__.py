@@ -32,14 +32,6 @@ from ._chrome import ChromeBuilder
 from ._field import FieldBuilder, refresh_label
 from ._source_button import SourceButtons
 
-__all__ = [
-    # 工作模式
-    "ConfigMode",
-    # 弹窗
-    "SettingsDialog",
-    "ChangeConfirmDialog",
-]
-
 _ERROR_FONT = QFont(SETTINGS_DIALOG.error_font_family, SETTINGS_DIALOG.error_font_size)
 
 

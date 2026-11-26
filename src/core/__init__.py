@@ -10,12 +10,3 @@ from ._repository import (
     SessionRepository,
     TaskRepository,
 )
-
-__all__ = [
-    # 仓储
-    "PrincipalRepository",
-    "SessionRepository",
-    "TaskRepository",
-    "MediaRepository",
-    "GrantRepository",
-]

@@ -8,8 +8,8 @@ import asyncio
 
 from skin.messages import MiscMessage
 from ui import gui_bridge
-from utils import get_logger
 from utils.config import ProbeRecord, SourceSaveRequest
+from utils.logger import get_logger
 
 from ..error_guard import error_guard
 from ._apply import ConfigApplier, get_token_func

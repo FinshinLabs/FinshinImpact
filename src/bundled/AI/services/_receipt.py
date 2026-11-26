@@ -12,7 +12,7 @@ from finshin_sdk import CapabilityCall
 from finshin_sdk.domain import ChatRole
 from finshin_sdk.domain.ids import ContainerCode
 from finshin_sdk.dto import PrincipalDTO, TaskDTO
-from utils import get_logger
+from utils.logger import get_logger
 from utils.paths import DB_FILE
 
 from ..config import ai_config

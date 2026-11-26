@@ -33,39 +33,6 @@ from .sources import (
     use_plan,
 )
 
-__all__ = [
-    # 装配与生命周期
-    "ensure_config",
-    "ConfigSource",
-    "SourceKind",
-    "section_name",
-    "source_identity",
-    "source_values",
-    # 数据读写
-    "get_schema",
-    "load_config",
-    "save_config",
-    "merge_source_config",
-    "changed_groups",
-    "SourceSaveRequest",
-    "ProbeRecord",
-    # 数据比对
-    "compare_configs",
-    # 类型校验
-    "validate_types",
-    # 本体配置项与主人解析
-    "CoreKeys",
-    "CoreSections",
-    "core_item",
-    "OWNER_TAG",
-    "owner_field",
-    "owner_item",
-    # 数据结构
-    "AppConfigData",
-    "AppSchema",
-    "FieldErrors",
-]
-
 
 def _io() -> ConfigIO:
     """取得配置读写器

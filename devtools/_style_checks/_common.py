@@ -109,26 +109,6 @@ def has_cjk(text: str) -> bool:
     return bool(_CJK_RE.search(text))
 
 
-def all_names(file: FileData) -> set[str]:
-    """__all__ 中列出的符号"""
-    for node in file.tree.body:
-        # 先排除非赋值语句，窄化才能延续到取 node.value 处
-        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
-            continue
-        names: list[ast.expr] = (
-            list(node.targets) if isinstance(node, ast.Assign) else [node.target]
-        )
-        if any(isinstance(t, ast.Name) and t.id == "__all__" for t in names):
-            value = node.value
-            if isinstance(value, (ast.List, ast.Tuple, ast.Set)):
-                return {
-                    e.value
-                    for e in value.elts
-                    if isinstance(e, ast.Constant) and isinstance(e.value, str)
-                }
-    return set()
-
-
 def load_files(root: Path, targets: list[Path]) -> list[FileData]:
     """装载扫描目标下的 py 文件、仓库根 CHANGELOG 与入库 md"""
     files: list[FileData] = []

@@ -1,6 +1,5 @@
 """视图层门面
 
-- 按属性惰性解析，取用哪个符号才 import 哪个子包
 - 代发控件构造、生命周期件、信号桥、各类弹窗、引导期窗体与主窗装配
 """
 
@@ -43,56 +42,6 @@ _SYMBOL_MODULES = {
     "SettingsController": "._windows",
     "ShutdownController": "._windows",
 }
-
-__all__ = [
-    # 信号桥
-    "gui_bridge",
-    # 应用实例与事件泵
-    "ensure_app",
-    "pump_events",
-    # 弹窗基类
-    "BaseDialog",
-    # 控件
-    "TickedCheckBox",
-    "ThemedList",
-    # 按钮
-    "make_button",
-    "make_combo",
-    # 通用弹窗
-    "NoticeDialog",
-    "WaitDialog",
-    "ShutdownDialog",
-    # 业务弹窗
-    "CheckDialog",
-    "Round",
-    "current_check_window",
-    "open_check_window",
-    "LinkDialog",
-    "SettingsDialog",
-    "ConfigMode",
-    "ChangeConfirmDialog",
-    # 计时泵
-    "Ticker",
-    # 引导期窗体
-    "pick_profile",
-    "show_launch_wait",
-    "show_popup",
-    "open_panel",
-    "open_platform_dialog",
-    "MODE_AUTO",
-    "settle_runtime",
-    # 主窗装配入口
-    "create_gui",
-    # 主窗与观察器
-    "BotGUI",
-    "LinkWatcher",
-    # 控制器装配入口
-    "build_controllers",
-    # 控制器类型
-    "BaseController",
-    "SettingsController",
-    "ShutdownController",
-]
 
 if TYPE_CHECKING:
     from ._bridge import gui_bridge

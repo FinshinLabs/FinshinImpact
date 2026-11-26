@@ -1,12 +1,12 @@
 """网络栈门面
 
-- 按属性惰性解析，取用哪个符号才 import 哪个子模块
-- 代发 HTTP 客户端、GitHub 取数通道、链路状态、系统代理与探测协议键符号
-- 底层实现分列子模块，与平台无关的校验编排在检查门面
+- 代发 HTTP 客户端、GitHub 取数通道、链路状态、系统代理、探测协议键与进度行状态符号
 """
 
 import importlib
 from typing import TYPE_CHECKING
+
+from finshin_sdk.domain import RowStatus
 
 _SYMBOL_MODULES = {
     "BaseClient": "._client",
@@ -17,31 +17,10 @@ _SYMBOL_MODULES = {
     "CHECKING": "._probe",
     "FrameKey": "._probe",
     "RowId": "._probe",
-    "RowStatus": "._probe",
     "opening_rows": "._probe",
     "probe_skeleton": "._probe",
     "verify_skeleton": "._probe",
 }
-
-__all__ = [
-    # HTTP 客户端
-    "BaseClient",
-    "GitClient",
-    # 链路状态
-    "LinkStatus",
-    "link_report",
-    # 系统代理
-    "detect_system_proxy",
-    # 行状态与协议键
-    "CHECKING",
-    "FrameKey",
-    "RowId",
-    "RowStatus",
-    # 整表铺送
-    "opening_rows",
-    "probe_skeleton",
-    "verify_skeleton",
-]
 
 if TYPE_CHECKING:
     from ._client import BaseClient
@@ -51,7 +30,6 @@ if TYPE_CHECKING:
         CHECKING,
         FrameKey,
         RowId,
-        RowStatus,
         opening_rows,
         probe_skeleton,
         verify_skeleton,

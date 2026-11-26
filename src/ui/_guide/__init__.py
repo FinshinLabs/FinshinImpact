@@ -9,16 +9,3 @@ from ._picker import pick_profile
 from ._platform import open_platform_dialog
 from ._popup import show_popup
 from ._startup import settle_runtime
-
-__all__ = [
-    # 选实例与启动提示
-    "pick_profile",
-    "show_launch_wait",
-    "show_popup",
-    # 插件面板与启动结算
-    "open_panel",
-    "MODE_AUTO",
-    "settle_runtime",
-    # 平台组件面板
-    "open_platform_dialog",
-]

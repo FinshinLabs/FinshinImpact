@@ -12,8 +12,9 @@ from bot.error_guard import error_guard
 from finshin_sdk import HandlerContext
 from finshin_sdk.domain import CommandRole, PluginMark
 from finshin_sdk.dto import PrincipalDTO
-from utils import config_manager, get_logger
+from utils import config_manager
 from utils.config import owner_item
+from utils.logger import get_logger
 
 from .grants import is_admin
 from .messages import BotMessage

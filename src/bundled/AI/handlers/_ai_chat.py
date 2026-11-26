@@ -6,7 +6,7 @@
 
 from finshin_sdk import HandlerContext
 from finshin_sdk.domain import ChatScope, CommandRole, MessageRoute
-from utils import get_logger
+from utils.logger import get_logger
 
 from ..._shared.access import role_of
 from ..._shared.messages import BotMessage

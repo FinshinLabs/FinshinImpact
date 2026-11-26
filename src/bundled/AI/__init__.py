@@ -50,9 +50,3 @@ class AIPlugin(BasePlugin):
     def source_declaration(self) -> SourceDeclaration:
         """来源声明与配置字段表"""
         return CONFIG_SOURCE
-
-
-__all__ = [
-    # 插件契约
-    "AIPlugin",
-]

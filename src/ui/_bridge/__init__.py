@@ -4,8 +4,3 @@
 """
 
 from ._mediator import gui_bridge
-
-__all__ = [
-    # 单例桥梁
-    "gui_bridge",
-]

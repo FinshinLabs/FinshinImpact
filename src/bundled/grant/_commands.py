@@ -12,7 +12,7 @@ from enum import StrEnum
 from finshin_sdk import HandlerContext
 from finshin_sdk.domain import ChatScope, CommandRole, MessageRoute, StepInput
 from finshin_sdk.domain.ids import PrincipalKey, UserId
-from utils import get_logger
+from utils.logger import get_logger
 
 from .._shared.access import require_role
 from .._shared.filters import CommandMatch

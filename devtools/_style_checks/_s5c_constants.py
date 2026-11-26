@@ -1,6 +1,6 @@
 """模块级常量命名检查
 
-- 无人导入且未进 __all__ 的大写常量应加 `_` 前缀
+- 无人导入的大写常量应加 `_` 前缀
 - 模块级私有变量应加 `_` 前缀或收进命名空间类
 - getattr 动态消费名视同消费者
 - 大写与小写蛇形两档样式由本档认领，驼峰别名归 _s5_naming
@@ -12,7 +12,7 @@ import ast
 import re
 from typing import TYPE_CHECKING
 
-from ._common import Finding, ImportGraph, all_names
+from ._common import Finding, ImportGraph
 
 if TYPE_CHECKING:
     from ._common import FileData
@@ -51,7 +51,6 @@ def check_constants(
     imported_names: set[str] = set()
     for symbols in usage.values():
         imported_names |= {s for s in symbols if s}
-    exported = all_names(file)
     for node in file.tree.body:
         targets: list[ast.expr] = []
         if isinstance(node, ast.Assign):
@@ -62,7 +61,7 @@ def check_constants(
             if not isinstance(t, ast.Name):
                 continue
             name = t.id
-            if name.startswith("__") or name == "__all__":
+            if name.startswith("__"):
                 continue
             value = (
                 node.value if isinstance(node, (ast.Assign, ast.AnnAssign)) else None
@@ -72,7 +71,6 @@ def check_constants(
             if _UPPER_CONST_RE.match(name):
                 if (
                     name not in imported_names
-                    and name not in exported
                     and name not in dynamic
                     and not name.startswith("_")
                 ):
@@ -80,7 +78,7 @@ def check_constants(
                         _f(
                             file,
                             node.lineno,
-                            f"模块级常量 `{name}` 无人导入且未进 __all__，应加 `_` 前缀",
+                            f"模块级常量 `{name}` 无人导入，应加 `_` 前缀",
                             hard=False,
                         ),
                     )
@@ -88,7 +86,6 @@ def check_constants(
                 if (
                     not name.startswith("_")
                     and name not in imported_names
-                    and name not in exported
                     and name not in dynamic
                 ):
                     findings.append(

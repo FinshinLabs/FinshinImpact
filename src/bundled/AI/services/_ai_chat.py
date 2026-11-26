@@ -9,7 +9,7 @@ from finshin_sdk import HandlerContext
 from finshin_sdk.domain import QueuedAction
 from finshin_sdk.exceptions import MessageVanishedError
 from services.tasks import TaskItem, get_task_service
-from utils import get_logger
+from utils.logger import get_logger
 
 from ..utils import make_session_key
 from .worker import worker_loop

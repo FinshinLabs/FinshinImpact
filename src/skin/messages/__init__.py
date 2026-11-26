@@ -1,7 +1,6 @@
 """文案中心
 
-- 用户可见文案按域拆小文件，每条标注使用位置
-- 每个域打包为一个 XXXMessage 类
+- 代发各域文案类
 """
 
 from ._catalog import CatalogMessage
@@ -14,20 +13,3 @@ from ._picker import PickerMessage
 from ._platform import PlatformMessage
 from ._plugin import PluginMessage
 from ._version import VersionMessage
-
-__all__ = [
-    # 引导期选窗
-    "PickerMessage",
-    "PluginMessage",
-    # 主窗与专属弹窗
-    "MiscMessage",
-    "DialogMessage",
-    "ConfigMessage",
-    "PlatformMessage",
-    # 网络检查与更新
-    "CheckMessage",
-    "VersionMessage",
-    "CatalogMessage",
-    # 引擎与链路
-    "EngineMessage",
-]

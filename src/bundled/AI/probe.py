@@ -2,7 +2,7 @@
 
 - 检测一次发一次最小对话请求
 - 失败把状态码与原始正文写进详情，能排除地址和密钥时再指认模型
-- 排除不了就整表标红，结论行不再报具体项数
+- 排除不了就整表标红，结论行只给整表结论
 """
 
 import json
@@ -25,7 +25,7 @@ from finshin_sdk.domain import (
     ProbeResult,
     ProbeRow,
 )
-from utils import get_logger
+from utils.logger import get_logger
 
 from .config import SOURCE, PluginKeys, PluginSections
 from .core import AIClient

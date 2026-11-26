@@ -23,7 +23,7 @@ from skin.theme import (
     ObjectName,
     WindowTheme,
 )
-from utils import get_logger
+from utils.logger import get_logger
 
 from .._dialogs import (
     NoticeDialog,

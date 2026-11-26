@@ -12,17 +12,3 @@ from ._controllers import (
 )
 from ._link_watcher import LinkWatcher
 from ._main_window import BotGUI
-
-__all__ = [
-    # 主窗装配入口
-    "create_gui",
-    # 主窗与观察器
-    "BotGUI",
-    "LinkWatcher",
-    # 控制器装配入口
-    "build_controllers",
-    # 控制器类型
-    "BaseController",
-    "SettingsController",
-    "ShutdownController",
-]

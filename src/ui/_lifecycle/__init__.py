@@ -5,11 +5,3 @@
 
 from ._app import ensure_app, pump_events
 from ._ticker import Ticker
-
-__all__ = [
-    # 应用实例与事件泵
-    "ensure_app",
-    "pump_events",
-    # 计时泵
-    "Ticker",
-]

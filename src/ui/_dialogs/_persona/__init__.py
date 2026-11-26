@@ -6,11 +6,3 @@
 from ._panel import PersonaPreviewRow
 from ._resolve import PersonaResolveDialog
 from ._sync import PersonaSyncDialog
-
-__all__ = [
-    # 面板入口行
-    "PersonaPreviewRow",
-    # 正文弹窗
-    "PersonaResolveDialog",
-    "PersonaSyncDialog",
-]

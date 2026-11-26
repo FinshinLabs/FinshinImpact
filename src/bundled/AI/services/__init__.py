@@ -6,14 +6,3 @@
 from ._ai_chat import chat_task_handler, handle_ai_chat
 from ._cleanup import cleanup_loop, wake_cleanup
 from ._receipt import report_lost_tasks
-
-__all__ = [
-    # AI 对话处理
-    "chat_task_handler",
-    "handle_ai_chat",
-    # 核心调度与监控
-    "cleanup_loop",
-    "wake_cleanup",
-    # 停机交代
-    "report_lost_tasks",
-]

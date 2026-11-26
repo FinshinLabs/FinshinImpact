@@ -13,7 +13,7 @@ from finshin_sdk import HandlerContext
 from finshin_sdk.domain.ids import SessionKey
 from finshin_sdk.dto import InboundEventDTO
 from finshin_sdk.exceptions import DomainError, MessageVanishedError
-from utils import get_logger
+from utils.logger import get_logger
 
 from ..._shared.messages import BotMessage
 from ..config import ai_config

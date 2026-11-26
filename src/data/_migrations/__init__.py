@@ -9,12 +9,3 @@ from ._runner import (
     purge_dead_tasks,
     run_migrations,
 )
-
-__all__ = [
-    # 版本对照
-    "SUPPORTED_SCHEMA",
-    "check_schema_compatible",
-    # 迁移执行
-    "run_migrations",
-    "purge_dead_tasks",
-]

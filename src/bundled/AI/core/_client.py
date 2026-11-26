@@ -12,7 +12,7 @@ from typing import Any
 
 from exceptions import HTTPStatusError
 from system.atomic_write import write_text_atomic
-from utils import get_logger
+from utils.logger import get_logger
 from utils.network import BaseClient
 from utils.paths import PROFILE_DIR
 

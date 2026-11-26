@@ -34,9 +34,9 @@ from ui import (
     open_platform_dialog,
     show_popup,
 )
-from utils import get_logger
 from utils.check import bind_diagnose
 from utils.lifecycle import shutdown_all
+from utils.logger import get_logger
 from utils.paths import PLATFORM
 
 from ._adapter_host import parts_for

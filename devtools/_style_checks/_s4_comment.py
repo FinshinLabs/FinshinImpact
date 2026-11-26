@@ -2,7 +2,7 @@
 
 - 函数与类定义前的前置注释一律判违规，归属不清
 - 整行注释紧贴所描述代码，中间不空行
-- 整行注释上方空一行（多行注释非首行、块首之后、docstring 之后、__all__ 内部豁免）
+- 整行注释上方空一行（多行注释非首行、块首之后、docstring 之后豁免）
 - 两行整行注释之间不许空行分隔，禁悬空标题
 - 注释行禁分号、禁逗号顿号劈行
 """
@@ -69,19 +69,6 @@ def _check_leading(file: FileData) -> list[Finding]:
     return findings
 
 
-def _all_range(file: FileData) -> tuple[int, int] | None:
-    """__all__ 赋值的行区间"""
-    for node in file.tree.body:
-        names: list[ast.expr] = []
-        if isinstance(node, ast.Assign):
-            names = list(node.targets)
-        elif isinstance(node, ast.AnnAssign):
-            names = [node.target]
-        if any(isinstance(t, ast.Name) and t.id == "__all__" for t in names):
-            return node.lineno, node.end_lineno or node.lineno
-    return None
-
-
 def _docstring_ranges(file: FileData) -> set[int]:
     """所有 docstring 的结束行号集合"""
     ends: set[int] = set()
@@ -109,17 +96,14 @@ def _check_spacing(file: FileData) -> list[Finding]:
     """整行注释与描述代码之间的空行规则"""
     findings: list[Finding] = []
     doc_ends = _docstring_ranges(file)
-    all_rng = _all_range(file)
     comment_lines = sorted(file.comments)
     comment_set = set(comment_lines)
     for line in comment_lines:
         prev = line - 1
         block_first = prev not in comment_set
         if block_first:
-            in_all = all_rng and all_rng[0] <= prev <= all_rng[1]
             exempt = (
                 prev in doc_ends
-                or in_all
                 or (prev >= 1 and _BLOCK_END_RE.search(file.lines[prev - 1]))
                 or not file.lines[prev - 1].strip()
             )

@@ -79,7 +79,7 @@ python devtools\check_coding_style.py --section 注释
 - [拆分粒度](coding-style.md#拆分粒度)：`_s2_split.py`
 - [Docstring](coding-style.md#docstring)：`_s3_docstring.py`
 - [注释](coding-style.md#注释)：`_s4_comment.py`
-- [命名与门面导出](coding-style.md#命名与门面导出)：`_s5_naming.py`、`_s5b_naming_style.py`、`_s5c_constants.py`、`_s5d_access.py`
+- [命名与门面导出](coding-style.md#命名与门面导出)：`_s5_naming.py`、`_s5b_naming_style.py`、`_s5c_constants.py`、`_s5d_access.py`、`_s5f_facade_exports.py`
 - [魔法数字与字符串](coding-style.md#魔法数字与字符串)：`_s6_magic.py`、`_s6b_protocol_strings.py`、`_s6c_link_home.py`
 - [枚举](coding-style.md#枚举)：`_s5e_enum.py`
 - [日志与文案](coding-style.md#日志与文案)：`_s7_text.py`、`_s7b_changelog.py`
@@ -113,6 +113,14 @@ python devtools\check_coding_style.py --section 注释
 - 右侧是 `TypeVar`／`NewType`／`ParamSpec`／`TypeAliasType` 调用的不判。
 - 标识类型集中定义处按设计公开。
 - 模块级小写蛇形赋值走 `_s5c_constants` 的另一条判据（加 `_` 前缀或收进命名空间类），不看消费者。
+
+## 门面出口查什么
+
+判据见 [门面导出](coding-style.md#门面导出)。
+
+- 私有模块的模块级 `from` 导入表与消费方取用名求交集，命中报硬性，消费方应改从来源模块直连（`_s5_naming`）。
+- 惰性门面的 `_SYMBOL_MODULES` 指向公开模块报硬性，消费方应直连该模块（`_s5f_facade_exports`）。
+- 门面声明 `__all__` 报硬性，导入即出口（`_s5f_facade_exports`）。
 
 ## 回调形参查什么
 

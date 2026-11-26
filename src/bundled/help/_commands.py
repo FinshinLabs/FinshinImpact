@@ -21,7 +21,7 @@ from finshin_sdk.domain import (
     bind_command,
 )
 from finshin_sdk.dto import CommandDTO, OutboundPayloadDTO
-from utils import get_logger
+from utils.logger import get_logger
 
 from .._shared.messages import BotMessage
 from ._services import (

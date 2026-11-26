@@ -19,7 +19,7 @@ set_profile("tg.000000")
 from finshin_sdk import LogLevel, link_down, link_up, log  # noqa: E402
 from finshin_sdk import _link as link_module  # noqa: E402
 from finshin_sdk import _log as log_module  # noqa: E402
-from utils import get_logger  # noqa: E402
+from utils.logger import get_logger  # noqa: E402
 from utils.network import link_report  # noqa: E402
 from utils.network._link import _DOWN_THRESHOLD  # noqa: E402
 

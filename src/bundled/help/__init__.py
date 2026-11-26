@@ -33,9 +33,3 @@ class HelpPlugin(BasePlugin):
     def platform_moments(self) -> tuple[MomentSubscription, ...]:
         """引擎开跑前备图"""
         return (MomentSubscription(PlatformMoment.BEFORE_ENGINE_RUN, _prewarm_menu),)
-
-
-__all__ = [
-    # 插件契约
-    "HelpPlugin",
-]

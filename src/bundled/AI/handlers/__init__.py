@@ -7,8 +7,6 @@ from finshin_sdk.domain import MessageRoute
 
 from . import _ai_chat, _history
 
-__all__ = ["get_routes"]
-
 
 def get_routes() -> tuple[MessageRoute, ...]:
     """按优先级拼出路由清单

@@ -1,6 +1,6 @@
 """控制器门面
 
-- 自动实例化与契约打包
+- 代发控制器装配入口
 """
 
 from collections.abc import Callable
@@ -17,16 +17,6 @@ from ._system import LogsController
 if TYPE_CHECKING:
     from .._main_window import BotGUI
 
-
-__all__ = [
-    # 唯一打包函数
-    "build_controllers",
-    # 类型提示
-    "BaseController",
-    "DiagnoseFlow",
-    "SettingsController",
-    "ShutdownController",
-]
 
 # 只收 GUI 引用的控制器类，统一遍历实例化
 _CONTROLLER_CLASSES = (

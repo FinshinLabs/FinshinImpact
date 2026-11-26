@@ -11,7 +11,7 @@ from typing import NoReturn
 
 from finshin_sdk.domain.ids import SessionKey
 from services.tasks import get_task_service
-from utils import get_logger
+from utils.logger import get_logger
 
 from ..config import ai_config
 from ..core import purge_idle_sessions, purge_pending, purge_sessions

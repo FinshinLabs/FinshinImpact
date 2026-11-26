@@ -11,9 +11,3 @@ class GrantPlugin(BasePlugin):
     def message_routes(self) -> tuple[MessageRoute, ...]:
         """来向消息的路由清单"""
         return ROUTES
-
-
-__all__ = [
-    # 插件契约
-    "GrantPlugin",
-]

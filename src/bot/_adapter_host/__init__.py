@@ -5,10 +5,3 @@
 
 from ._assemble import assemble_platform
 from ._parts import parts_for
-
-__all__ = [
-    # 取件
-    "parts_for",
-    # 装配
-    "assemble_platform",
-]

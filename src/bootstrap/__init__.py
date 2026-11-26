@@ -4,5 +4,3 @@
 """
 
 from ._slot import main
-
-__all__ = ["main"]

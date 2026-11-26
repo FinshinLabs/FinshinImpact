@@ -20,7 +20,7 @@ def _log_shown(title: str, kind: str) -> None:
     """日志文件挂在实例目录下，身份码落定前无处可写"""
     if not get_profile():
         return
-    from utils import get_logger
+    from utils.logger import get_logger
 
     get_logger("GUI.Dialog").debug(f"窗已显示 {title}（{kind}）")
 

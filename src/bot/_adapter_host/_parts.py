@@ -16,8 +16,8 @@ from finshin_sdk import SDK_VERSION, AdapterParts
 from finshin_sdk.domain import PlatformCode
 from services.adapter_manifest import load_adapter_manifests
 from system.versions import requires_met
-from utils import get_logger
 from utils.external_scope import check_external_imports
+from utils.logger import get_logger
 
 _logger = get_logger("Mgr.Adapter")
 

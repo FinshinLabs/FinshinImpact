@@ -22,15 +22,6 @@ _FORMATTER = create_formatter()
 GUI_FORMATTER = create_formatter(marked=True)
 
 
-__all__ = [
-    # 获取日志器
-    "get_logger",
-    # 增强型日志器类
-    "BotLogger",
-    # 仪表盘日志格式（带语义标记）
-    "GUI_FORMATTER",
-]
-
 logging.setLoggerClass(BotLogger)
 
 # 档位转标准库日志级别

@@ -6,7 +6,7 @@
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
-from utils import get_logger
+from utils.logger import get_logger
 
 
 class BaseManager(ABC):

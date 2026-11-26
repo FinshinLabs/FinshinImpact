@@ -1,10 +1,10 @@
 """命名与门面导出分节检查
 
-- 仅被自家包门面导入的子模块应带 `_` 前缀
-- `_` 前缀模块被包外直接导入提示转正
 - 被其他模块导入的符号禁 `_` 前缀，无任何消费者建议加
+- 私有模块不得替公开符号当导入路径，消费方应改从来源模块直连
 - 模块级别名与函数、类同进候选集，样式归属见 _s5c_constants
 - 消费者只算 src 侧调用，devtools 直连内部实现不属业务消费，其引用不给公共名转正
+- 门面出口细则委托 _s5f_facade_exports
 - 模块级常量细则委托 _s5c_constants
 - 命名风格细则委托 _s5b_naming_style
 """
@@ -14,9 +14,10 @@ from __future__ import annotations
 import ast
 from typing import TYPE_CHECKING
 
-from ._common import Finding, ImportGraph, all_names
+from ._common import Finding, ImportGraph
 from ._s5b_naming_style import check_style
 from ._s5c_constants import check_constants, is_type_constructor, owns_style
+from ._s5f_facade_exports import check as check_facade_exports
 
 if TYPE_CHECKING:
     from ._common import FileData
@@ -27,8 +28,9 @@ def check(files: list[FileData], graph: ImportGraph) -> list[Finding]:
     findings: list[Finding] = []
     by_module = {f.module: f for f in files if f.module}
     dynamic = _getattr_names(files)
-    findings.extend(_check_module_prefix(files, graph))
+    findings.extend(check_facade_exports(files, graph))
     findings.extend(_check_symbol_prefix(files, graph, by_module, dynamic))
+    findings.extend(_check_private_reexport(files, graph))
     for file in files:
         if file.parse_error:
             continue
@@ -52,65 +54,6 @@ def _getattr_names(files: list[FileData]) -> set[str]:
             if isinstance(second, ast.Constant) and isinstance(second.value, str):
                 names.add(second.value)
     return names
-
-
-def _outside_consumers(graph: ImportGraph, target: str) -> set[str]:
-    """包外消费者集合，工具侧直连的不计
-
-    - devtools 消费方不计入 src 符号的转正，但 devtools 自家树互用是真消费者
-    """
-    package = target.rpartition(".")[0]
-    target_devtools = target in graph.devtools_modules
-    consumers = graph.consumers.get(target, {})
-    result: set[str] = set()
-    for module in consumers:
-        if module in {target, package}:
-            continue
-        if module.rpartition(".")[0] == package:
-            continue
-        if module in graph.devtools_modules and not target_devtools:
-            continue
-        if _is_ancestor_package(module, package):
-            continue
-        result.add(module)
-    return result
-
-
-def _is_ancestor_package(module: str, package: str) -> bool:
-    """子包模块使用父包内部模块属包内互用"""
-    return bool(package) and module.startswith(f"{package}.")
-
-
-def _check_module_prefix(files: list[FileData], graph: ImportGraph) -> list[Finding]:
-    """子模块文件名的内外前缀规则"""
-    findings: list[Finding] = []
-    for file in files:
-        if file.is_init or not file.module:
-            continue
-        consumers = graph.consumers.get(file.module, {})
-        only_facade = bool(consumers) and set(consumers) == {file.package}
-        if not file.stem.startswith("_") and only_facade:
-            findings.append(
-                _f(
-                    file,
-                    1,
-                    f"子模块 `{file.rel}` 仅被包门面导入，按规范应加 `_` 前缀",
-                    hard=False,
-                ),
-            )
-        if file.stem.startswith("_"):
-            outside = _outside_consumers(graph, file.module)
-            if outside:
-                joined = ", ".join(sorted(outside)[:3])
-                findings.append(
-                    _f(
-                        file,
-                        1,
-                        f"内部模块 `{file.rel}` 被包外直接导入（{joined}），应转正去前缀",
-                        hard=True,
-                    ),
-                )
-    return findings
 
 
 def _check_symbol_prefix(
@@ -139,10 +82,9 @@ def _check_symbol_prefix(
             continue
         defs = _def_defs(file)
         usage = consumed.get(file.module, {})
-        exported = all_names(file)
         entry_names = _main_entry_names(file)
         for name, line in sorted(defs.items(), key=lambda kv: kv[1]):
-            if name.startswith("__") or name == "__all__":
+            if name.startswith("__"):
                 continue
             if name in entry_names:
                 continue
@@ -158,18 +100,68 @@ def _check_symbol_prefix(
                             hard=True,
                         ),
                     )
-            elif not users and name not in exported:
-                if name in dynamic or _has_registration_decorator(file, name):
+            elif not users:
+                if (
+                    name in dynamic
+                    or _has_registration_decorator(file, name)
+                    or _is_plugin_entry(file, name)
+                ):
                     continue
                 findings.append(
                     _f(
                         file,
                         line,
-                        f"符号 `{name}` 无任何消费者且未进 __all__，应加 `_` 前缀",
+                        f"符号 `{name}` 无任何消费者，应加 `_` 前缀",
                         hard=False,
                     ),
                 )
     return findings
+
+
+def _check_private_reexport(files: list[FileData], graph: ImportGraph) -> list[Finding]:
+    """私有模块不得替公开符号当导入路径"""
+    findings: list[Finding] = []
+    for file in files:
+        if file.parse_error or file.is_init or not file.stem.startswith("_"):
+            continue
+        forwarded = _imported_names(file)
+        for consumer, symbols in sorted(graph.consumers.get(file.module, {}).items()):
+            if consumer == file.module:
+                continue
+            for symbol in sorted(symbols & forwarded.keys()):
+                if symbol.startswith("_"):
+                    continue
+                findings.append(
+                    _f(
+                        file,
+                        forwarded[symbol],
+                        f"私有模块转发公开符号 `{symbol}`（{consumer} 经本模块取用），"
+                        "应改从来源模块直连",
+                        hard=True,
+                    ),
+                )
+    return findings
+
+
+def _imported_names(file: FileData) -> dict[str, int]:
+    """模块级 from 导入进来的名字到行号"""
+    return {
+        alias.asname or alias.name: node.lineno
+        for node in file.tree.body
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    }
+
+
+def _is_plugin_entry(file: FileData, name: str) -> bool:
+    """插件入口类由加载器按继承关系在模块里发现，属动态消费方"""
+    bases = [
+        base.id if isinstance(base, ast.Name) else getattr(base, "attr", "")
+        for node in file.tree.body
+        if isinstance(node, ast.ClassDef) and node.name == name
+        for base in node.bases
+    ]
+    return "BasePlugin" in bases
 
 
 def _has_registration_decorator(file: FileData, name: str) -> bool:

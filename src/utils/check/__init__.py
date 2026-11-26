@@ -7,14 +7,3 @@
 from ._advice import failure_note
 from ._diagnose import bind_diagnose, diagnose_flow
 from ._verify import local_row, run_probe_round
-
-__all__ = [
-    # 并行调度核心
-    "run_probe_round",
-    "local_row",
-    # 诊断编排
-    "bind_diagnose",
-    "diagnose_flow",
-    # 结论行短句
-    "failure_note",
-]

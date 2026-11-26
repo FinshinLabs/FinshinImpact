@@ -3,7 +3,6 @@
 - 首行必须是模块 docstring，不写路径注释
 - 模块 docstring 存在且首行为定位
 - 禁止区块标题注释与装饰横线
-- __all__ 只属于非空包门面，且多项成员须按含义分组
 - 主入口 if __name__ 块位于文件末尾
 """
 
@@ -31,16 +30,13 @@ _SECTION_WORDS = (
     "主入口",
 )
 
-# 装饰符号连排达此数即判装饰线，单个减号与下划线属正常书写（`# -1`、`# __all__`）
+# 装饰符号连排达此数即判装饰线，单个减号与下划线属正常书写（`# -1`、`# _MAX_RETRIES`）
 _DECORATION_MIN = 2
 _DECORATION_RE = re.compile(rf"[=\-*~─—_]{{{_DECORATION_MIN},}}(?![\w])")
 
 # 词表项容许的拼接字数，超出即视为说明句而非标题
 _TITLE_SLACK = 4
 _SENTENCE_RE = re.compile(r"[，。：；,.;]")
-
-# __all__ 成员达此数即须按含义分组，单项豁免分组注释
-_GROUP_MIN = 2
 
 
 def check(files: list[FileData]) -> list[Finding]:
@@ -55,7 +51,6 @@ def check(files: list[FileData]) -> list[Finding]:
         findings.extend(_check_first_line(file))
         findings.extend(_check_module_docstring(file))
         findings.extend(_check_section_titles(file))
-        findings.extend(_check_dunder_all(file))
         findings.extend(_check_main_entry(file))
     return findings
 
@@ -132,71 +127,6 @@ def _is_section_title(core: str) -> bool:
         word == core or (word in core and len(core) <= len(word) + _TITLE_SLACK)
         for word in _SECTION_WORDS
     )
-
-
-def _check_dunder_all(file: FileData) -> list[Finding]:
-    """__all__ 归属与分组检查"""
-    node = _all_node(file)
-    line = node.lineno if node else 1
-    if not file.is_init:
-        if node is None:
-            return []
-        return [_f(file, line, "业务模块不应写 __all__，调用方直连导入", hard=True)]
-    if not _has_import(file):
-        if node is None:
-            return []
-        return [_f(file, line, "门面文件无代发符号却写 __all__", hard=False)]
-    if node is None:
-        return [_f(file, 1, "非空门面缺 __all__，代发符号无对外清单", hard=True)]
-    members = _all_members(node)
-    if len(members) < _GROUP_MIN:
-        return []
-
-    # 组名注释只可能落在 __all__ 赋值自身的行区间内
-    span = range(node.lineno, (node.end_lineno or node.lineno) + 1)
-    if any(i in file.comments for i in span):
-        return []
-    return [
-        _f(
-            file,
-            node.lineno,
-            f"__all__ 有 {len(members)} 项却无分组注释，应按含义补 `# 组名`",
-            hard=True,
-        )
-    ]
-
-
-def _has_import(file: FileData) -> bool:
-    """模块顶层是否含导入语句"""
-    return any(
-        isinstance(node, (ast.Import, ast.ImportFrom)) for node in file.tree.body
-    )
-
-
-def _all_node(file: FileData) -> ast.Assign | ast.AnnAssign | None:
-    """模块顶层 __all__ 赋值节点"""
-    for node in file.tree.body:
-        # 先排除非赋值语句，窄化才能延续到 return 处
-        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
-            continue
-        names: list[ast.expr] = (
-            list(node.targets) if isinstance(node, ast.Assign) else [node.target]
-        )
-        if any(isinstance(t, ast.Name) and t.id == "__all__" for t in names):
-            return node
-    return None
-
-
-def _all_members(node: ast.Assign | ast.AnnAssign) -> list[str]:
-    """__all__ 列出的成员名，非字面量容器按零项处理"""
-    value = node.value
-    if not isinstance(value, (ast.List, ast.Tuple, ast.Set)):
-        return []
-    return [
-        e.value
-        for e in value.elts
-        if isinstance(e, ast.Constant) and isinstance(e.value, str)
-    ]
 
 
 def _check_main_entry(file: FileData) -> list[Finding]:

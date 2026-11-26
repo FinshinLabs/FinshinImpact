@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING
 
 from finshin_sdk.domain import BackgroundLoop, MomentRun
 from skin.messages import EngineMessage
-from utils import get_logger, register_lifecycle, unregister_lifecycle
+from utils.lifecycle import register_lifecycle, unregister_lifecycle
+from utils.logger import get_logger
 from utils.network import link_report
 
 if TYPE_CHECKING:

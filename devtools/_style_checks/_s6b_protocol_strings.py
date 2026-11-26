@@ -2,7 +2,7 @@
 
 - 跨文件重复短字面量提示单源收进命名空间类
 - 注解位字符串与 get_logger 域名实参不计入协议串
-- 类命名空间、大写常量、__all__ 导出位不计
+- 类命名空间、大写常量位不计
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 _STR_MIN_LEN = 3
 _STR_MAX_LEN = 40
 
-# 协议串不统计的容器：类命名空间、大写常量、__all__ 导出名
-_SKIP_CONTAINERS = frozenset({"class", "assign-upper", "dunder-all"})
+# 协议串不统计的容器：类命名空间、大写常量
+_SKIP_CONTAINERS = frozenset({"class", "assign-upper"})
 
 # 日志域名入口函数，其实参字符串不计协议串
 _LOGGER_FUNC = "get_logger"
@@ -129,9 +129,6 @@ def _is_logger_call(node: ast.Call) -> bool:
 
 def _parent_container(file: FileData, node: ast.Constant) -> str:
     """字符串字面量所处的定义容器类型"""
-    for item in file.tree.body:
-        if _is_dunder_all(item) and _contains(item, node):
-            return "dunder-all"
     for class_node in ast.walk(file.tree):
         if isinstance(class_node, ast.ClassDef):
             for item in class_node.body:
@@ -157,17 +154,6 @@ def _parent_container(file: FileData, node: ast.Constant) -> str:
             ):
                 return "assign-upper"
     return "inline"
-
-
-def _is_dunder_all(item: ast.stmt) -> bool:
-    """模块级语句是否为 __all__ 赋值"""
-    if isinstance(item, ast.Assign):
-        targets: list[ast.expr] = list(item.targets)
-    elif isinstance(item, ast.AnnAssign):
-        targets = [item.target]
-    else:
-        return False
-    return any(isinstance(t, ast.Name) and t.id == "__all__" for t in targets)
 
 
 def _contains(root: ast.AST, node: ast.Constant) -> bool:

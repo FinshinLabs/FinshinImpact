@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QDialog, QWidget
 
 from skin.messages import CheckMessage
 from system.profile_env import get_profile, read_token
-from utils import get_logger
+from utils.logger import get_logger
 from utils.network import CHECKING, FrameKey, RowId, RowStatus, probe_skeleton
 
 from ..._bridge import gui_bridge

@@ -15,7 +15,7 @@ from system.profile_env import (
     ASSETS_DIR,
     INSTANCE_PROFILE_NAME,
 )
-from utils import get_logger
+from utils.logger import get_logger
 from utils.paths import HELP_IMAGE, PROFILE_DIR
 from utils.plugin import enabled_manifests
 

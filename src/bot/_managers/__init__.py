@@ -4,5 +4,3 @@
 """
 
 from ._manager import BotManager
-
-__all__ = ["BotManager"]

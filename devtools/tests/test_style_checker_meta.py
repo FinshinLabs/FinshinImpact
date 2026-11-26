@@ -9,6 +9,7 @@
 - 文档写法两条判据各命中一次，代码区里的链接字面不报
 - 分号只放行 docstring 里单个分号的引用形状，md 围栏与行内代码段照报
 - 模块级别名按消费者定私有性，类型构造与被他模块取用的别名不判
+- 门面出口三类硬性各命中一次：私有模块转发公开符号、惰性表指向公开模块、声明 `__all__`
 - 豁免清单只罩待核，条目须可解析，本轮装载到的路径没命中才判失效转硬性
 - devtools 树可直连私有模块：不报越界，其引用不把 src 公共名算成对外
 - 扫描目标路径写错即报错退出
@@ -151,8 +152,7 @@ _SAMPLES: dict[str, tuple[tuple[str, str], ...]] = {
         (
             "src/skin/messages/__init__.py",
             _skeleton("src/skin/messages/__init__.py")
-            + "from ._extra import ExtraMessage\nfrom ._other import OtherMessage\n\n"
-            + '__all__ = [\n    # 域类\n    "ExtraMessage",\n    "OtherMessage",\n]\n',
+            + "from ._extra import ExtraMessage\nfrom ._other import OtherMessage\n",
         ),
         _message_enum("src/skin/messages/_other.py", "OtherMessage", "START", "启动"),
         _message_enum("src/skin/messages/_extra.py", "ExtraMessage", "GO", "启动"),
@@ -591,6 +591,93 @@ class TestAliasPrivacy(unittest.TestCase):
         rel = "src/ui/_probe_styled.py"
         found = self._naming([(rel, _skeleton(rel) + "WIDGET_SET = 1\n")])
         self.assertEqual(len([text for text in found if "WIDGET_SET" in text]), 1)
+
+
+class TestFacadeOutlets(unittest.TestCase):
+    """门面出口三类硬性"""
+
+    _LAZY = (
+        "import importlib\n\n"
+        "_SYMBOL_MODULES = {\n"
+        '    "Thing": ".thing",\n'
+        "}\n\n\n"
+        "def __getattr__(name: str) -> object:\n"
+        '    """按名取子模块符号"""\n'
+        "    module = importlib.import_module(_SYMBOL_MODULES[name], __name__)\n"
+        "    return getattr(module, name)\n"
+    )
+
+    def _naming(self, samples: list[tuple[str, str]]) -> list[str]:
+        """取命名分节的条目文本"""
+        return _scan(samples).get("命名与门面导出", [])
+
+    def test_lazy_public_target_flagged(self) -> None:
+        """惰性表指向公开模块报硬性"""
+        facade = "src/ui/__init__.py"
+        found = self._naming(
+            [
+                (facade, _skeleton(facade) + self._LAZY),
+                (
+                    "src/ui/thing.py",
+                    _skeleton("src/ui/thing.py") + "class Thing:\n" + _CLASS_DOC,
+                ),
+            ]
+        )
+        self.assertTrue(any("指向公开模块" in text for text in found), found)
+
+    def test_lazy_private_target_passes(self) -> None:
+        """惰性表指向私有模块不报"""
+        facade = "src/ui/__init__.py"
+        found = self._naming(
+            [
+                (
+                    facade,
+                    _skeleton(facade) + self._LAZY.replace('".thing"', '"._thing"'),
+                ),
+                (
+                    "src/ui/_thing.py",
+                    _skeleton("src/ui/_thing.py") + "class Thing:\n" + _CLASS_DOC,
+                ),
+            ]
+        )
+        self.assertFalse(any("指向公开模块" in text for text in found), found)
+
+    def test_all_declared_flagged(self) -> None:
+        """门面声明 `__all__` 报硬性"""
+        facade = "src/ui/__init__.py"
+        found = self._naming([(facade, _skeleton(facade) + "__all__ = []\n")])
+        self.assertTrue(any("不再声明 `__all__`" in text for text in found), found)
+
+    def test_private_module_forwarding_flagged(self) -> None:
+        """私有模块替公开符号当导入路径报硬性"""
+        provider = "src/ui/_forward.py"
+        user = "src/ui/use.py"
+        found = self._naming(
+            [
+                (provider, _skeleton(provider) + "from enum import StrEnum\n"),
+                (
+                    user,
+                    _skeleton(user)
+                    + "from ui._forward import StrEnum\n\n_USE = StrEnum\n",
+                ),
+            ]
+        )
+        self.assertTrue(any("转发公开符号 `StrEnum`" in text for text in found), found)
+
+    def test_private_module_own_definition_passes(self) -> None:
+        """私有模块自己定义的名字被取用不报"""
+        provider = "src/ui/_own.py"
+        user = "src/ui/use.py"
+        found = self._naming(
+            [
+                (provider, _skeleton(provider) + "class Holder:\n" + _CLASS_DOC),
+                (
+                    user,
+                    _skeleton(user) + "from ui._own import Holder\n\n_USE = Holder\n",
+                ),
+            ]
+        )
+        self.assertFalse(any("转发公开符号" in text for text in found), found)
 
 
 class TestPackageDeclaration(unittest.TestCase):
