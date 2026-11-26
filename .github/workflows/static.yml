@@ -34,18 +34,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Build site content
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['tool']['finshin-impact']['sdk-version'])")
+          python3 -m venv "$RUNNER_TEMP/sdk"
+          "$RUNNER_TEMP/sdk/bin/pip" install --quiet "https://github.com/FinshinLabs/FinshinSDK/releases/download/v${version}/finshin_sdk-${version}-py3-none-any.whl"
           mkdir site
           cp pyproject.toml site/pyproject.toml
-          python3 packaging/gen_catalog.py site/adapters.toml
+          "$RUNNER_TEMP/sdk/bin/python" packaging/gen_catalog.py site/adapters.toml
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           # Copy at deploy time keeps pyproject.toml the single source of the version
           path: 'site'
