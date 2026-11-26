@@ -41,14 +41,15 @@ class TestBindCommand(unittest.TestCase):
     def test_absent_flags_fall_on_defaults(self) -> None:
         self.assertEqual(dict(self._bound().flags), {"-i": False, "-t": 0.0})
 
-    def test_value_flag_converts_to_default_type(self) -> None:
-        self.assertEqual(dict(self._bound("-t", "5").flags)["-t"], 5.0)
+    def test_float_flag_converts_input(self) -> None:
+        for raw, want in (("5", 5.0), ("2.5", 2.5)):
+            with self.subTest(raw=raw):
+                self.assertEqual(dict(self._bound("-t", raw).flags)["-t"], want)
 
-    def test_pure_flag_turns_true_when_present(self) -> None:
-        self.assertEqual(dict(self._bound("-i").flags)["-i"], True)
-
-    def test_help_flag_is_always_accepted(self) -> None:
-        self.assertIs(dict(self._bound("-h").flags)["-h"], True)
+    def test_present_flag_turns_true(self) -> None:
+        for flag in ("-i", "-h"):
+            with self.subTest(flag=flag):
+                self.assertIs(dict(self._bound(flag).flags)[flag], True)
 
     def test_flag_order_follows_manifest(self) -> None:
         self.assertEqual([name for name, _ in self._bound("-i").flags], ["-i", "-t"])

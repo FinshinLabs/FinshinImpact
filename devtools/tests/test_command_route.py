@@ -123,25 +123,16 @@ class TestHelpCommandReject(_VerdictMixin, unittest.IsolatedAsyncioTestCase):
         self.reject = _commands._is_illegal_command
         self.keyword = _commands._is_single_help
 
-    async def test_unknown_name_taken(self) -> None:
-        rejected, _ = await self._verdict("/nope")
-        self.assertTrue(rejected)
-
-    async def test_space_split_is_unknown_name(self) -> None:
-        rejected, _ = await self._verdict("/hel p")
-        self.assertTrue(rejected)
-
-    async def test_gap_after_prefix_is_taken(self) -> None:
-        rejected, _ = await self._verdict("/ help")
-        self.assertTrue(rejected)
+    async def test_unknown_shapes_taken(self) -> None:
+        """认不出的名字、空格拆开、前缀后留空、别人的机器人命令都拦"""
+        for text in ("/nope", "/hel p", "/ help", "/nope@otherbot"):
+            with self.subTest(text=text):
+                rejected, _ = await self._verdict(text)
+                self.assertTrue(rejected)
 
     async def test_menu_command_not_taken(self) -> None:
         rejected, _ = await self._verdict("/help")
         self.assertFalse(rejected)
-
-    async def test_command_for_other_bot_is_taken(self) -> None:
-        rejected, _ = await self._verdict("/nope@otherbot")
-        self.assertTrue(rejected)
 
     async def test_group_chat_leaves_unknown_quiet(self) -> None:
         for text in ("/nope", "/ help", "/nope@otherbot"):
@@ -160,11 +151,6 @@ class TestHelpCommandReject(_VerdictMixin, unittest.IsolatedAsyncioTestCase):
         self.assertFalse(rejected)
         self.assertTrue(listed)
 
-    async def test_mention_is_format_error(self) -> None:
-        rejected, listed = await self._verdict("/history@MYBOT -h")
-        self.assertTrue(rejected)
-        self.assertFalse(listed)
-
     async def test_keyword_hit_with_own_flag(self) -> None:
         rejected, listed = await self._verdict("/history -h")
         self.assertFalse(rejected)
@@ -174,25 +160,20 @@ class TestHelpCommandReject(_VerdictMixin, unittest.IsolatedAsyncioTestCase):
         _, listed = await self._verdict("/history")
         self.assertFalse(listed)
 
-    async def test_unknown_flag_taken_as_stray(self) -> None:
-        rejected, listed = await self._verdict("/history -x")
-        self.assertTrue(rejected)
-        self.assertFalse(listed)
-
-    async def test_positional_arg_taken_as_stray(self) -> None:
-        rejected, listed = await self._verdict("/history 20")
-        self.assertTrue(rejected)
-        self.assertFalse(listed)
-
-    async def test_repeated_flag_taken_as_stray(self) -> None:
-        rejected, listed = await self._verdict("/help -h -h")
-        self.assertTrue(rejected)
-        self.assertFalse(listed)
-
-    async def test_multiple_flags_taken_as_stray(self) -> None:
-        rejected, listed = await self._verdict("/history -a -b")
-        self.assertTrue(rejected)
-        self.assertFalse(listed)
+    async def test_stray_shapes_taken(self) -> None:
+        """带机器人名、未知开关、位置参数、重复或叠加开关都当杂形拦下"""
+        texts = (
+            "/history@MYBOT -h",
+            "/history -x",
+            "/history 20",
+            "/help -h -h",
+            "/history -a -b",
+        )
+        for text in texts:
+            with self.subTest(text=text):
+                rejected, listed = await self._verdict(text)
+                self.assertTrue(rejected)
+                self.assertFalse(listed)
 
 
 class TestArgsAllowedCommand(_VerdictMixin, unittest.IsolatedAsyncioTestCase):
@@ -250,39 +231,29 @@ class TestCommandFlagSpec(_VerdictMixin, unittest.IsolatedAsyncioTestCase):
         self.keyword = _commands._is_single_help
 
     async def test_help_flag_lists(self) -> None:
-        rejected, listed = await self._verdict("/demo -h")
-        self.assertFalse(rejected)
-        self.assertTrue(listed)
+        """带 -h 的几种合法摆法都出单命令帮助"""
+        texts = ("/demo -h", "/demo -h -i", "/demo -i -t 5 -h", "/demo -t 5 -h")
+        for text in texts:
+            with self.subTest(text=text):
+                rejected, listed = await self._verdict(text)
+                self.assertFalse(rejected)
+                self.assertTrue(listed)
 
-    async def test_registered_flag_with_help_lists(self) -> None:
-        rejected, listed = await self._verdict("/demo -h -i")
-        self.assertFalse(rejected)
-        self.assertTrue(listed)
+    async def test_bad_flag_shapes_taken(self) -> None:
+        """没登记的开关、无 -h 却叠两个、同一个开关重复都拦"""
+        for text in ("/demo -h -v", "/demo -i -t", "/demo -i -i"):
+            with self.subTest(text=text):
+                rejected, listed = await self._verdict(text)
+                self.assertTrue(rejected)
+                self.assertFalse(listed)
 
-    async def test_registered_flag_alone_yields_to_command(self) -> None:
-        rejected, listed = await self._verdict("/demo -i")
-        self.assertFalse(rejected)
-        self.assertFalse(listed)
-
-    async def test_unregistered_flag_with_help_taken(self) -> None:
-        rejected, listed = await self._verdict("/demo -h -v")
-        self.assertTrue(rejected)
-        self.assertFalse(listed)
-
-    async def test_two_flags_without_help_taken(self) -> None:
-        rejected, listed = await self._verdict("/demo -i -t")
-        self.assertTrue(rejected)
-        self.assertFalse(listed)
-
-    async def test_repeated_registered_flag_taken(self) -> None:
-        rejected, listed = await self._verdict("/demo -i -i")
-        self.assertTrue(rejected)
-        self.assertFalse(listed)
-
-    async def test_value_flag_with_value_yields_to_command(self) -> None:
-        rejected, listed = await self._verdict("/demo -t 5")
-        self.assertFalse(rejected)
-        self.assertFalse(listed)
+    async def test_well_formed_shapes_yield(self) -> None:
+        """单个开关或带值开关照常放行给命令"""
+        for text in ("/demo -i", "/demo -t 5", "/demo -t 2.5"):
+            with self.subTest(text=text):
+                rejected, listed = await self._verdict(text)
+                self.assertFalse(rejected)
+                self.assertFalse(listed)
 
     async def test_value_flag_without_value_taken(self) -> None:
         for text in ("/demo -t", "/demo -t -h"):
@@ -304,24 +275,9 @@ class TestCommandFlagSpec(_VerdictMixin, unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(rejected)
                 self.assertFalse(listed)
 
-    async def test_several_value_flags_yield(self) -> None:
-        rejected, listed = await self._verdict("/demo -i -t 5 -h")
-        self.assertFalse(rejected)
-        self.assertTrue(listed)
-
     async def test_value_out_of_default_type_taken(self) -> None:
         rejected, _ = await self._verdict("/demo -t 甲")
         self.assertTrue(rejected)
-
-    async def test_decimal_input_yields_to_command(self) -> None:
-        rejected, listed = await self._verdict("/demo -t 2.5")
-        self.assertFalse(rejected)
-        self.assertFalse(listed)
-
-    async def test_value_flag_with_help_lists(self) -> None:
-        rejected, listed = await self._verdict("/demo -t 5 -h")
-        self.assertFalse(rejected)
-        self.assertTrue(listed)
 
     async def test_group_value_flag_without_value_taken(self) -> None:
         rejected, _ = await self._verdict("/demo -t", chat=_GROUP)
@@ -354,17 +310,17 @@ class TestCommandMatchYield(unittest.IsolatedAsyncioTestCase):
         message = _message(chat=_PRIVATE, text=text)
         return await CommandMatch(name)(_ctx(message))
 
-    async def test_head_match_takes(self) -> None:
-        self.assertTrue(await self._hit("history", "/history"))
+    async def test_command_shapes_take(self) -> None:
+        """命令头与带其他开关的命令都算接管"""
+        for text in ("/history", "/history -a"):
+            with self.subTest(text=text):
+                self.assertTrue(await self._hit("history", text))
 
-    async def test_other_flag_takes(self) -> None:
-        self.assertTrue(await self._hit("history", "/history -a"))
-
-    async def test_help_flag_yields(self) -> None:
-        self.assertFalse(await self._hit("history", "/history -h"))
-
-    async def test_other_head_yields(self) -> None:
-        self.assertFalse(await self._hit("history", "/demo"))
+    async def test_help_or_other_head_yields(self) -> None:
+        """-h 让给帮助，别的命令头不归本条"""
+        for text in ("/history -h", "/demo"):
+            with self.subTest(text=text):
+                self.assertFalse(await self._hit("history", text))
 
 
 class TestAiTriggerLadder(unittest.IsolatedAsyncioTestCase):
@@ -379,11 +335,11 @@ class TestAiTriggerLadder(unittest.IsolatedAsyncioTestCase):
     async def _hit(self, message: _Msg) -> bool:
         return await self.predicate(_ctx(message))
 
-    async def test_command_yields(self) -> None:
-        self.assertFalse(await self._hit(_message(text="/help")))
-
-    async def test_format_error_yields(self) -> None:
-        self.assertFalse(await self._hit(_message(text="/ help")))
+    async def test_non_trigger_text_yields(self) -> None:
+        """命令、形态错误与群里闲聊都不归 AI"""
+        for text in ("/help", "/ help", "随便聊聊"):
+            with self.subTest(text=text):
+                self.assertFalse(await self._hit(_message(text=text)))
 
     async def test_mention_triggers_without_keyword(self) -> None:
         message = _message(text="@MyBot 在吗", mentions_bot=True)
@@ -395,9 +351,6 @@ class TestAiTriggerLadder(unittest.IsolatedAsyncioTestCase):
 
     async def test_keyword_is_last_fallback(self) -> None:
         self.assertTrue(await self._hit(_message(text="有个触发词 here")))
-
-    async def test_plain_group_text_ignored(self) -> None:
-        self.assertFalse(await self._hit(_message(text="随便聊聊")))
 
     async def test_private_text_triggers(self) -> None:
         self.assertTrue(await self._hit(_message(chat=_PRIVATE, text="随便聊聊")))

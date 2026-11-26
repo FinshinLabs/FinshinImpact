@@ -68,10 +68,22 @@ def _entry(event: Any) -> str:
 class TestEntry(unittest.TestCase):
     """条目正文段"""
 
-    def test_private_text(self) -> None:
-        """私聊只报体量，容器段不重复发言人"""
-        entry = _entry(_event_of(_message(_PRIVATE, text="你好")))
-        self.assertEqual(entry, "私聊 [三 张|456] [文本 2字]")
+    def test_private_text_and_commands(self) -> None:
+        """私聊只报体量；命令段直接抄正文，多余空白折成单空格"""
+        cases = (
+            (_message(_PRIVATE, text="你好"), "私聊 [三 张|456] [文本 2字]"),
+            (
+                _message(_PRIVATE, text="/grant   12345"),
+                "私聊 [三 张|456] [命令 /grant 12345]",
+            ),
+            (
+                _message(_PRIVATE, text="/grant@bot"),
+                "私聊 [三 张|456] [命令 /grant@bot]",
+            ),
+        )
+        for msg, want in cases:
+            with self.subTest(want=want):
+                self.assertEqual(_entry(_event_of(msg)), want)
 
     def test_group_head_carries_container(self) -> None:
         """群聊行首带容器段与群名"""
@@ -103,36 +115,29 @@ class TestEntry(unittest.TestCase):
         entry = _entry(_album_event(*messages))
         self.assertIn("[图片 3张] [附文 4字]", entry)
 
-    def test_caption_reports_chars(self) -> None:
-        """单条附文只报字数"""
-        entry = _entry(_event_of(_photo(caption="图集")))
-        self.assertIn("[图片 1张] [附文 2字]", entry)
-
-    def test_command_shows_content(self) -> None:
-        """命令段直接抄正文，多余空白折成单空格"""
-        entry = _entry(_event_of(_message(_PRIVATE, text="/grant   12345")))
-        self.assertEqual(entry, "私聊 [三 张|456] [命令 /grant 12345]")
-
-    def test_bad_command_shape_shows_content(self) -> None:
-        """带 @ 段的非法形态仍按命令段抄正文"""
-        entry = _entry(_event_of(_message(_PRIVATE, text="/grant@bot")))
-        self.assertEqual(entry, "私聊 [三 张|456] [命令 /grant@bot]")
-
-    def test_caption_slash_is_not_command(self) -> None:
-        """图片附文里的斜杠头不升成命令段"""
-        entry = _entry(_event_of(_photo(caption="/help")))
-        self.assertIn("[图片 1张] [附文 5字]", entry)
+    def test_caption_reports_chars_only(self) -> None:
+        """单条附文只报字数，斜杠头不升成命令段"""
+        cases = (("图集", "[图片 1张] [附文 2字]"), ("/help", "[图片 1张] [附文 5字]"))
+        for caption, want in cases:
+            with self.subTest(caption=caption):
+                self.assertIn(want, _entry(_event_of(_photo(caption=caption))))
 
     def test_body_not_copied(self) -> None:
         """正文再长也只报字数，不抄进日志"""
         entry = _entry(_event_of(_message(text="字" * 200)))
         self.assertEqual(entry, "群聊 g100123<测试群> [三 张|456] [文本 200字]")
 
-    def test_reply_shows_sender_and_measure(self) -> None:
-        """引用段给出被引标注帧与体量"""
-        reply = _message(id=3, sender=_OTHER, text="在吗")
-        entry = _entry(_event_of(_message(text="在的", quoted=reply)))
-        self.assertIn("（引用 [四|123]：[文本 2字]）", entry)
+    def test_reply_quotes_sender_and_measure(self) -> None:
+        """引用段给出被引标注帧与体量，手打的方括号按文字计"""
+        cases = (
+            ("在吗", "（引用 [四|123]：[文本 2字]）"),
+            ("[图片]", "（引用 [四|123]：[文本 4字]）"),
+        )
+        for text, want in cases:
+            with self.subTest(text=text):
+                reply = _message(id=3, sender=_OTHER, text=text)
+                entry = _entry(_event_of(_message(text="在的", quoted=reply)))
+                self.assertIn(want, entry)
 
     def test_reply_to_bot_marks_assistant(self) -> None:
         """引用机器人自己的话只写 assistant 位"""
@@ -145,12 +150,6 @@ class TestEntry(unittest.TestCase):
         reply = _photo(id=3, sender=_OTHER)
         entry = _entry(_event_of(_message(text="这张呢", quoted=reply)))
         self.assertIn("（引用 [四|123]：[图片]）", entry)
-
-    def test_bracket_text_is_counted_as_text(self) -> None:
-        """用户手打的 [图片] 按文字计，不当成种类占位"""
-        reply = _message(id=3, sender=_OTHER, text="[图片]")
-        entry = _entry(_event_of(_message(text="哪张", quoted=reply)))
-        self.assertIn("（引用 [四|123]：[文本 4字]）", entry)
 
     def test_anonymous_sender_falls_back(self) -> None:
         """无发言人无群名按 id 占位兜底"""

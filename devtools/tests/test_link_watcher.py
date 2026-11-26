@@ -209,14 +209,15 @@ class TestRoundOpenProbe(unittest.TestCase):
         watcher = self._watcher(None)
         self.assertFalse(watcher._is_round_open())
 
-    def test_visible_check_window_suppresses(self) -> None:
-        watcher = self._watcher(SimpleNamespace(isVisible=lambda: True))
-        self.assertTrue(watcher._is_round_open())
+    def test_check_window_visibility_decides(self) -> None:
+        """可见的检查窗吃抑制，收窗不销毁的常驻实例不吃"""
+        for visible, want in ((True, True), (False, False)):
+            with self.subTest(visible=visible):
+                watcher = self._watcher(
+                    SimpleNamespace(isVisible=lambda _v=visible: _v)
+                )
 
-    def test_retained_hidden_check_window_allows(self) -> None:
-        """收窗不销毁的常驻实例不吃抑制"""
-        watcher = self._watcher(SimpleNamespace(isVisible=lambda: False))
-        self.assertFalse(watcher._is_round_open())
+                self.assertEqual(watcher._is_round_open(), want)
 
 
 if __name__ == "__main__":

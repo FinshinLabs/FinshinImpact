@@ -88,31 +88,34 @@ class TestCatalogShape(unittest.TestCase):
 class TestSameValuePairs(unittest.TestCase):
     """注释点名同值的串逐条比对"""
 
-    def test_bootstrap_mutex_matches_launcher(self) -> None:
-        """引导锁名本体与启动器同串，不同名即两个进程各探各的锁"""
-        self.assertEqual(
-            instance_lock._BOOTSTRAP_MUTEX_NAME,
-            launch_instancelock._BOOTSTRAP_MUTEX_NAME,
+    def test_mirrored_literals_match(self) -> None:
+        """引导锁名、任务栏身份变量、后台窗口标志与翻页保护都两处同值"""
+        pairs = (
+            (
+                "引导锁名",
+                instance_lock._BOOTSTRAP_MUTEX_NAME,
+                launch_instancelock._BOOTSTRAP_MUTEX_NAME,
+            ),
+            (
+                "任务栏身份变量",
+                app_identity._AUMID_ANCHOR_VAR,
+                pack_spec.AUMID_ANCHOR_VAR,
+            ),
+            ("后台窗口标志", proc._CREATE_NO_WINDOW, pack_spec.CREATE_NO_WINDOW),
+            (
+                "翻页保护",
+                release_feed._RELEASE_MAX_PAGES,
+                gen_release._RELEASE_MAX_PAGES,
+            ),
         )
-
-    def test_aumid_anchor_var_matches_packaging(self) -> None:
-        """任务栏身份锚定的环境变量名本体与启动器同串"""
-        self.assertEqual(app_identity._AUMID_ANCHOR_VAR, pack_spec.AUMID_ANCHOR_VAR)
-
-    def test_create_no_window_matches_packaging(self) -> None:
-        """后台命令不弹窗口那个标志两侧同一个数"""
-        self.assertEqual(proc._CREATE_NO_WINDOW, pack_spec.CREATE_NO_WINDOW)
+        for label, here, there in pairs:
+            with self.subTest(label=label):
+                self.assertEqual(here, there)
 
     def test_sdk_distribution_matches_generator(self) -> None:
         """接口包分发名本体与目录生成侧同串"""
         self.assertIs(SDK_DISTRIBUTION, distributions.SDK_DISTRIBUTION)
         self.assertIs(SDK_DISTRIBUTION, gen_release.SDK_DISTRIBUTION)
-
-    def test_release_max_pages_matches_feed(self) -> None:
-        """列 release 的翻页保护两处同一个数，改一处即步调不一"""
-        self.assertEqual(
-            release_feed._RELEASE_MAX_PAGES, gen_release._RELEASE_MAX_PAGES
-        )
 
     def test_persona_placeholder_is_in_the_template(self) -> None:
         """人设模板里写的那个占位符与注入读的那份同串"""
@@ -167,13 +170,16 @@ class TestNaming(unittest.TestCase):
             all(name.startswith(gen_release._ADAPTER_PREFIX) for name in others)
         )
 
-    def test_runtime_dir_name_matches_toolchain(self) -> None:
-        """包内运行目录名启动器与本体同值"""
-        self.assertEqual(toolchain.RUNTIME_DIR.name, pack_spec.PackLayout.RUNTIME_DIR)
-
-    def test_interpreter_names_match_toolchain(self) -> None:
-        """包内解释器名启动器与本体同值"""
-        self.assertEqual(toolchain._PY_EXE.name, pack_spec.PackLayout.PYTHON_EXE)
+    def test_layout_names_match_toolchain_and_build(self) -> None:
+        """包内运行目录名、解释器名与图标文件名各自两侧同值"""
+        pairs = (
+            ("运行目录", toolchain.RUNTIME_DIR.name, pack_spec.PackLayout.RUNTIME_DIR),
+            ("解释器", toolchain._PY_EXE.name, pack_spec.PackLayout.PYTHON_EXE),
+            ("图标", app_identity.APP_ICON_PATH.name, pack_spec.PackLayout.ICON),
+        )
+        for label, here, there in pairs:
+            with self.subTest(label=label):
+                self.assertEqual(here, there)
 
     def test_declaration_name_comes_from_sdk(self) -> None:
         """项目声明文件名各处与接口包同值
@@ -187,10 +193,6 @@ class TestNaming(unittest.TestCase):
         self.assertEqual(PROJECT_MANIFEST_FILE, gen_release.PROJECT_MANIFEST_FILE)
         self.assertEqual(tool_settings._ROOT_DECLARATION.name, PROJECT_MANIFEST_FILE)
         self.assertEqual(tool_settings.DEVTOOLS_DECLARATION.name, PROJECT_MANIFEST_FILE)
-
-    def test_icon_name_matches_build(self) -> None:
-        """图标文件名本体与构建侧同值"""
-        self.assertEqual(app_identity.APP_ICON_PATH.name, pack_spec.PackLayout.ICON)
 
 
 class TestLauncherBuild(unittest.TestCase):

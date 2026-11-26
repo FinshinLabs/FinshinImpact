@@ -94,16 +94,6 @@ class TestRecordMerge(unittest.TestCase):
             body = (root / "tg.u456.md").read_text(encoding="utf8")
             self.assertIn("[张三|456]（引用 [王五|999]：昨天那句）私聊一句", body)
 
-    def test_blank_name_falls_back_to_id(self) -> None:
-        """显示名缺位时标注只剩 id 段"""
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            with patch.object(worker.ai_config, "record_dir", root):
-                _write(_event("333", "", "无名发言", ChatScope.GROUP), "收到")
-
-            body = (root / "tg.g100123.md").read_text(encoding="utf8")
-            self.assertIn("[333]（引用 [王五|999]：昨天那句）无名发言", body)
-
     def test_name_marks_are_stripped(self) -> None:
         """名称里的标记字符洗掉，标记词遮成星号，别的字照留"""
         with tempfile.TemporaryDirectory() as tmp:
@@ -134,15 +124,20 @@ class TestRecordMerge(unittest.TestCase):
             for _, _, expected in cases:
                 self.assertIn(expected, body)
 
-    def test_name_keeps_letters_of_any_script(self) -> None:
-        """任何文字的字母都留下，emoji 与符号照样洗掉"""
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            with patch.object(worker.ai_config, "record_dir", root):
-                _write(_event("111", "Björk 😀 旅人", "一句", ChatScope.GROUP), "收到")
+    def test_name_cleaning_cases(self) -> None:
+        """显示名缺位只剩 id 段，任何文字的字母都留下、emoji 洗掉"""
+        cases = (
+            ("333", "", "[333]"),
+            ("111", "Björk 😀 旅人", "[Björk 旅人|111]"),
+        )
+        for user, name, want in cases:
+            with self.subTest(want=want), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                with patch.object(worker.ai_config, "record_dir", root):
+                    _write(_event(user, name, "一句", ChatScope.GROUP), "收到")
 
-            body = (root / "tg.g100123.md").read_text(encoding="utf8")
-            self.assertIn("[Björk 旅人|111]", body)
+                body = (root / "tg.g100123.md").read_text(encoding="utf8")
+                self.assertIn(want, body)
 
     def test_quote_of_bot_marks_assistant(self) -> None:
         """引用机器人自己的话只写 assistant 位，不带 id"""

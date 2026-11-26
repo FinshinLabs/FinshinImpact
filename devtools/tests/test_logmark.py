@@ -67,17 +67,25 @@ class TestResolveMark(unittest.TestCase):
             self.assertEqual(len(mark), 1, f"标记应单字符: {mark!r}")
             self.assertIn(mark, ALL_MARKS, f"非法标记: {mark!r}")
 
-    def test_result_priority(self) -> None:
-        """结果标记压过领域图标"""
-        self.assertEqual(self._mark(20, "引擎启动成功"), "✅")
-        self.assertEqual(self._mark(40, "配置验证失败"), "❌")
-        self.assertEqual(self._mark(20, "正在执行全局清理..."), "🧹")
-
-    def test_cancel_pause_stop(self) -> None:
-        """取消/中断/停止各有其形"""
-        self.assertEqual(self._mark(20, "用户取消关闭操作"), "🚫")
-        self.assertEqual(self._mark(40, "思考中断"), "⏸")
-        self.assertEqual(self._mark(20, "正在停止引擎..."), "🛑")
+    def test_mark_table(self) -> None:
+        """结果标记压过领域图标，取消/中断/停止各有其形，错误级默认红叉，耗时统一秒表"""
+        cases = (
+            (20, "引擎启动成功", "✅"),
+            (40, "配置验证失败", "❌"),
+            (20, "正在执行全局清理...", "🧹"),
+            (20, "用户取消关闭操作", "🚫"),
+            (40, "思考中断", "⏸"),
+            (20, "正在停止引擎...", "🛑"),
+            (40, "协程执行失败: loop 未运行 [xx]", "❌"),
+            (40, "协程执行失败: 超时 5s [xx]", "❌"),
+            (40, "线程停止失败: xx", "❌"),
+            (20, "主程序就绪耗时 5.6s", "⏱"),
+            (20, "连通校验耗时 3.2s", "⏱"),
+            (20, "通道 直连 探测耗时 0.9s", "⏱"),
+        )
+        for level, msg, want in cases:
+            with self.subTest(msg=msg):
+                self.assertEqual(self._mark(level, msg), want, msg)
 
     def test_warn_words_beat_error_level(self) -> None:
         """软警告词优先于 error 默认红叉"""
@@ -93,12 +101,6 @@ class TestResolveMark(unittest.TestCase):
             self._mark(20, EngineMessage.RECOVERED.format(span="3 分 09 秒", n=12)),
             "✅",
         )
-
-    def test_error_level_default_cross(self) -> None:
-        """错误级未命中词汇默认红叉"""
-        self.assertEqual(self._mark(40, "协程执行失败: loop 未运行 [xx]"), "❌")
-        self.assertEqual(self._mark(40, "协程执行失败: 超时 5s [xx]"), "❌")
-        self.assertEqual(self._mark(40, "线程停止失败: xx"), "❌")
 
     def test_head_only_matching(self) -> None:
         """只看冒号前
@@ -124,19 +126,15 @@ class TestResolveMark(unittest.TestCase):
         for msg, expect in cases.items():
             self.assertEqual(self._mark(20, msg), expect, msg)
 
-    def test_detect_light_bulb(self) -> None:
-        """检测到归提示灯"""
-        self.assertEqual(self._mark(20, "检测到配置有误，弹出配置向导..."), "💡")
-
-    def test_cost_mark(self) -> None:
-        """耗时行统一秒表符号，含配置词也不被抢"""
-        self.assertEqual(self._mark(20, "主程序就绪耗时 5.6s"), "⏱")
-        self.assertEqual(self._mark(20, "连通校验耗时 3.2s"), "⏱")
-        self.assertEqual(self._mark(20, "通道 直连 探测耗时 0.9s"), "⏱")
-
-    def test_default_gear(self) -> None:
-        """都没命中齿轮兜底"""
-        self.assertEqual(self._mark(20, "hello world"), "ℹ")
+    def test_fallback_marks(self) -> None:
+        """检测到归提示灯，都没命中齿轮兜底"""
+        cases = (
+            ("检测到配置有误，弹出配置向导...", "💡"),
+            ("hello world", "ℹ"),
+        )
+        for msg, want in cases:
+            with self.subTest(msg=msg):
+                self.assertEqual(self._mark(20, msg), want)
 
 
 if __name__ == "__main__":

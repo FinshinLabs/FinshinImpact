@@ -103,18 +103,14 @@ class TestMenuEntries(unittest.TestCase):
             second = _services._menu_digest()
         self.assertNotEqual(first, second)
 
-    def test_digest_follows_line_spacing(self) -> None:
-        first = _services._menu_digest()
-        with patch.object(_services._HELP, "line_spacing", 26):
-            second = _services._menu_digest()
-        self.assertNotEqual(first, second)
-
-    def test_digest_follows_encoding(self) -> None:
-        """落盘编码档一变即重画"""
-        first = _services._menu_digest()
-        with patch.object(_services._HELP, "palette_colors", 32):
-            second = _services._menu_digest()
-        self.assertNotEqual(first, second)
+    def test_digest_follows_style_change(self) -> None:
+        """行距或配色档一变即重画"""
+        for attr, value in (("line_spacing", 26), ("palette_colors", 32)):
+            with self.subTest(attr=attr):
+                first = _services._menu_digest()
+                with patch.object(_services._HELP, attr, value):
+                    second = _services._menu_digest()
+                self.assertNotEqual(first, second)
 
 
 class _SpecStubMixin(unittest.TestCase):
@@ -160,26 +156,19 @@ class TestUsageLine(_SpecStubMixin):
         self.assertIn("-h 看用法", text)
         self.assertIn("-i 图片输入", text)
 
-    def test_declared_args_get_own_line(self) -> None:
-        self.assertEqual(
-            _services.resolve_single_help("push"),
-            "推送消息\n可用参数：文件路径\n可用开关：\n-h 看用法",
+    def test_help_text_shapes(self) -> None:
+        """带参数、带值开关与没声明的命令各出对应帮助"""
+        cases = (
+            ("push", "推送消息\n可用参数：文件路径\n可用开关：\n-h 看用法"),
+            ("convert", "格式转换\n可用开关：\n-h 看用法\n-t 1.0 输出速度"),
+            ("history", "显示历史记录"),
         )
-
-    def test_value_flag_shows_default(self) -> None:
-        self.assertEqual(
-            _services.resolve_single_help("convert"),
-            "格式转换\n可用开关：\n-h 看用法\n-t 1.0 输出速度",
-        )
+        for cmd, want in cases:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(_services.resolve_single_help(cmd), want)
 
     def test_undeclared_args_leave_no_line(self) -> None:
         self.assertNotIn("可用参数", _services.resolve_single_help("md"))
-
-    def test_command_without_spec_shows_desc_only(self) -> None:
-        self.assertEqual(
-            _services.resolve_single_help("history"),
-            "显示历史记录",
-        )
 
     def test_unknown_name_is_format_error(self) -> None:
         self.assertEqual(
@@ -191,17 +180,15 @@ class TestUsageLine(_SpecStubMixin):
 class TestUsageHint(_SpecStubMixin):
     """多余输入回执的用法提示"""
 
-    def test_hint_leads_with_command_name(self) -> None:
-        self.assertEqual(
-            _services.resolve_usage_hint("convert"),
-            "/convert 用法错误\n可用开关：\n-h 看用法\n-t 1.0 输出速度",
+    def test_hint_shapes(self) -> None:
+        """提示行首带命令名，参数与开关按声明出"""
+        cases = (
+            ("convert", "/convert 用法错误\n可用开关：\n-h 看用法\n-t 1.0 输出速度"),
+            ("push", "/push 用法错误\n可用参数：文件路径\n可用开关：\n-h 看用法"),
         )
-
-    def test_hint_shows_declared_args(self) -> None:
-        self.assertEqual(
-            _services.resolve_usage_hint("push"),
-            "/push 用法错误\n可用参数：文件路径\n可用开关：\n-h 看用法",
-        )
+        for cmd, want in cases:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(_services.resolve_usage_hint(cmd), want)
 
     def test_hint_without_spec_is_format_error(self) -> None:
         self.assertEqual(

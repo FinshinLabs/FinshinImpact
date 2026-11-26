@@ -230,17 +230,18 @@ class TestVersionEntries(unittest.TestCase):
             [entry.release.version for entry in entries], ["0.3.0", "0.2.0", "0.1.0"]
         )
 
-    def test_installed_version_is_current(self) -> None:
-        """环境里就是这一版即标当前使用"""
-        entries = self._entries(self._row("0.1.0"))
+    def test_state_readings(self) -> None:
+        """环境里那一版标当前使用，指纹对得上算本地，盘上没有即走网络"""
+        cases = (
+            (2, mod.VersionState.CURRENT),
+            (1, mod.VersionState.LOCAL),
+            (0, mod.VersionState.NETWORK),
+        )
+        for index, want in cases:
+            with self.subTest(index=index):
+                entries = self._entries(self._row("0.1.0"))
 
-        self.assertEqual(entries[2].state, mod.VersionState.CURRENT)
-
-    def test_matching_digest_is_local(self) -> None:
-        """盘上那份件指纹对得上目录即算本地有"""
-        entries = self._entries(self._row("0.1.0"))
-
-        self.assertEqual(entries[1].state, mod.VersionState.LOCAL)
+                self.assertEqual(entries[index].state, want)
 
     def test_wrong_digest_falls_to_network(self) -> None:
         """盘上同名那份件指纹对不上即只能走网络"""
@@ -251,12 +252,6 @@ class TestVersionEntries(unittest.TestCase):
         )
 
         self.assertEqual(self._entries(row)[1].state, mod.VersionState.NETWORK)
-
-    def test_absent_version_is_network(self) -> None:
-        """盘上没有这一版即从网络安装"""
-        entries = self._entries(self._row("0.1.0"))
-
-        self.assertEqual(entries[0].state, mod.VersionState.NETWORK)
 
     def test_no_row_lists_nothing(self) -> None:
         """没有目录行即没有清单可列"""
@@ -309,73 +304,50 @@ class TestUpdateTarget(unittest.TestCase):
 class TestBucket(unittest.TestCase):
     """一行组件归到哪一档"""
 
-    def test_newer_online_is_upgradable(self) -> None:
-        """在线比本机新即进可更新"""
-        self.assertEqual(
-            _tg_row("0.1.0", "0.1.1").bucket, rows_mod.ComponentBucket.UPGRADABLE
+    def test_online_only_states(self) -> None:
+        """在线比本机新即进可更新，本机没在场即只在网络"""
+        cases = (
+            (_tg_row("0.1.0", "0.1.1"), rows_mod.ComponentBucket.UPGRADABLE),
+            (_tg_row("", "0.1.0"), rows_mod.ComponentBucket.ONLINE),
         )
+        for row, want in cases:
+            with self.subTest(want=want):
+                self.assertEqual(row.bucket, want)
 
-    def test_same_version_is_local(self) -> None:
-        """版本相等即已到位"""
-        self.assertEqual(
-            _tg_row("0.1.0", "0.1.0").bucket, rows_mod.ComponentBucket.LOCAL
+    def test_same_or_older_online_is_local(self) -> None:
+        """版本相等、在线更旧或本机串读不懂都算已到位，不提示降级"""
+        cases = (("0.1.0", "0.1.0"), ("0.2.0", "0.1.0"), ("最新", "0.1.0"))
+        for local, online in cases:
+            with self.subTest(local=local, online=online):
+                self.assertEqual(
+                    _tg_row(local, online).bucket, rows_mod.ComponentBucket.LOCAL
+                )
+
+    def test_tree_bucket_depends_on_package(self) -> None:
+        """源码仓挂着且已装包即本机已有，没装包即仍算只在网络"""
+        cases = (
+            (("0.1.0", "0.1.1"), rows_mod.ComponentBucket.LOCAL),
+            (("", "0.1.0"), rows_mod.ComponentBucket.ONLINE),
         )
-
-    def test_older_online_is_local(self) -> None:
-        """在线比本机旧即不动，不提示降级"""
-        self.assertEqual(
-            _tg_row("0.2.0", "0.1.0").bucket, rows_mod.ComponentBucket.LOCAL
-        )
-
-    def test_absent_package_is_online(self) -> None:
-        """本机没在场即只在网络"""
-        self.assertEqual(_tg_row("", "0.1.0").bucket, rows_mod.ComponentBucket.ONLINE)
-
-    def test_tree_source_is_local(self) -> None:
-        """源码仓挂着且已装包即本机已有，在线再新也不给装"""
-        self.assertEqual(
-            _tg_row("0.1.0", "0.1.1", tree=True).bucket, rows_mod.ComponentBucket.LOCAL
-        )
-
-    def test_tree_source_without_package_is_online(self) -> None:
-        """源码仓挂着但没装包即仍算只在网络，还要给装"""
-        self.assertEqual(
-            _tg_row("", "0.1.0", tree=True).bucket, rows_mod.ComponentBucket.ONLINE
-        )
-
-    def test_unreadable_version_is_local(self) -> None:
-        """版本串读不懂算本机已有，不拿猜的新版去装"""
-        self.assertEqual(
-            _tg_row("最新", "0.1.0").bucket, rows_mod.ComponentBucket.LOCAL
-        )
+        for (local, online), want in cases:
+            with self.subTest(local=local):
+                self.assertEqual(_tg_row(local, online, tree=True).bucket, want)
 
 
 class TestSourceReading(unittest.TestCase):
     """来源那行的四档读数"""
 
-    def test_tree_with_package(self) -> None:
-        """源码仓挂着且装进了环境即第一档"""
-        self.assertEqual(
-            _tg_row("0.1.0", "0.1.1", tree=True).source,
-            rows_mod.ComponentSource.TREE_INSTALLED,
+    def test_source_matrix(self) -> None:
+        """源码仓与已装包两样都在、只有其一与两样都无各归一档"""
+        cases = (
+            ("0.1.0", True, rows_mod.ComponentSource.TREE_INSTALLED),
+            ("", True, rows_mod.ComponentSource.TREE_ONLY),
+            ("0.1.0", False, rows_mod.ComponentSource.INSTALLED),
+            ("", False, rows_mod.ComponentSource.NONE),
         )
-
-    def test_tree_without_package(self) -> None:
-        """源码仓挂着但环境里没那只包即第二档"""
-        self.assertEqual(
-            _tg_row("", "0.1.0", tree=True).source,
-            rows_mod.ComponentSource.TREE_ONLY,
-        )
-
-    def test_package_only(self) -> None:
-        """只有环境里那只包即第三档"""
-        self.assertEqual(
-            _tg_row("0.1.0", "0.1.1").source, rows_mod.ComponentSource.INSTALLED
-        )
-
-    def test_absent(self) -> None:
-        """两样都没有即第四档"""
-        self.assertEqual(_tg_row("", "0.1.0").source, rows_mod.ComponentSource.NONE)
+        for local, tree, want in cases:
+            with self.subTest(local=local, tree=tree):
+                self.assertEqual(_tg_row(local, "0.1.1", tree=tree).source, want)
 
 
 class TestOrigin(unittest.TestCase):
@@ -447,15 +419,17 @@ class TestOrigin(unittest.TestCase):
             row = self._row(source, with_release=False)
             self.assertEqual(self._origin(row), mod.ComponentOrigin.TREE)
 
-    def test_installed_package_without_catalog_row(self) -> None:
-        """没目录行而只有环境里那只包即没有可取的内容"""
-        row = self._row(rows_mod.ComponentSource.INSTALLED, with_release=False)
-        self.assertEqual(self._origin(row), mod.ComponentOrigin.NONE)
-
-    def test_absent_without_catalog_row(self) -> None:
-        """本机什么都没有即没有可取的内容"""
-        row = self._row(rows_mod.ComponentSource.NONE, with_release=False)
-        self.assertEqual(self._origin(row), mod.ComponentOrigin.NONE)
+    def test_no_catalog_row_without_tree(self) -> None:
+        """没目录行而只有环境里那只包或本机什么都没有都取不到内容"""
+        for source in (
+            rows_mod.ComponentSource.INSTALLED,
+            rows_mod.ComponentSource.NONE,
+        ):
+            with self.subTest(source=source):
+                self.assertEqual(
+                    self._origin(self._row(source, with_release=False)),
+                    mod.ComponentOrigin.NONE,
+                )
 
 
 class TestDistributionName(unittest.TestCase):
@@ -469,9 +443,11 @@ class TestDistributionName(unittest.TestCase):
 class TestUpdateTargets(unittest.TestCase):
     """一键更新的那批目录行"""
 
-    def test_local_row_excluded(self) -> None:
-        """本机已有的行不进差集"""
-        self.assertEqual(mod.update_targets([_tg_row("0.1.0", "0.1.0")]), [])
+    def test_rows_without_target_excluded(self) -> None:
+        """本机已有的行与本机没装过的行都不进差集"""
+        for local in ("0.1.0", ""):
+            with self.subTest(local=local):
+                self.assertEqual(mod.update_targets([_tg_row(local, "0.1.0")]), [])
 
     def test_upgradable_row_included(self) -> None:
         """可更新的行进差集，交的是目录行自带的直链与指纹"""
@@ -480,10 +456,6 @@ class TestUpdateTargets(unittest.TestCase):
         targets = mod.update_targets([sdk, adapter])
         self.assertEqual([release.version for release in targets], ["0.1.1"])
         self.assertEqual([release.distribution for release in targets], [_ADAPTER])
-
-    def test_online_row_excluded(self) -> None:
-        """本机没装过的不进一键，装哪个平台由逐行的按钮定"""
-        self.assertEqual(mod.update_targets([_tg_row("", "0.1.0")]), [])
 
     def test_blocked_target_excluded(self) -> None:
         """目标版被挡的那行不进一键，别的行照收"""
@@ -505,49 +477,35 @@ class TestInstallBlocked(unittest.TestCase):
 
     _TARGET = _release_row("0.1.1", _SHA)
 
-    def test_absent_sdk_blocks_the_adapter(self) -> None:
-        """接口包没装上即挡住，那句让重开补装"""
-        rows = _rows("", "")
-        self.assertEqual(
-            mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
-            "接口包没装上，重开会补装",
-        )
+    def test_sdk_presence_decides_the_adapter(self) -> None:
+        """接口包没装上即挡住，装上即放行"""
+        cases = (("", "接口包没装上，重开会补装"), ("0.1.0", ""))
+        for sdk, want in cases:
+            with self.subTest(sdk=sdk):
+                rows = _rows(sdk, "")
+                self.assertEqual(
+                    mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
+                    want,
+                )
 
-    def test_installed_sdk_frees_the_adapter(self) -> None:
-        """接口包在场即放行"""
-        rows = _rows("0.1.0", "")
-        self.assertEqual(
-            mod._install_blocked(rows, _adapter_row(rows), self._TARGET), ""
+    def test_sdk_range_decides_the_adapter(self) -> None:
+        """接口包低于下限、高出上限都挡，落在区间内即放行"""
+        cases = (
+            (">=9.9.9", "0.1.0", "接口包太旧，新版程序才带"),
+            ("<0.0.1", "0.1.0", "接口包太新，适配器等新版"),
+            (">=0.1.0,<0.2.0", "0.1.5", ""),
         )
-
-    def test_sdk_below_range_blocks(self) -> None:
-        """接口包在场但够不到适配器要求的下限，那句指向新版程序"""
-        requires = {str(PlatformCode("tg")): ">=9.9.9"}
-        with patch.object(rows_mod, "_declared_requires", lambda: requires):
-            rows = _rows("0.1.0", "0.1.0")
-        self.assertEqual(
-            mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
-            "接口包太旧，新版程序才带",
-        )
-
-    def test_sdk_over_ceiling_blocks(self) -> None:
-        """接口包高出适配器写的上限，那句换成接口包太新"""
-        requires = {str(PlatformCode("tg")): "<0.0.1"}
-        with patch.object(rows_mod, "_declared_requires", lambda: requires):
-            rows = _rows("0.1.0", "0.1.0")
-        self.assertEqual(
-            mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
-            "接口包太新，适配器等新版",
-        )
-
-    def test_sdk_in_range_frees(self) -> None:
-        """接口包落在要求的区间之内即放行"""
-        requires = {str(PlatformCode("tg")): ">=0.1.0,<0.2.0"}
-        with patch.object(rows_mod, "_declared_requires", lambda: requires):
-            rows = _rows("0.1.5", "0.1.0")
-        self.assertEqual(
-            mod._install_blocked(rows, _adapter_row(rows), self._TARGET), ""
-        )
+        for spec, sdk, want in cases:
+            with self.subTest(requires=spec):
+                requires = {str(PlatformCode("tg")): spec}
+                with patch.object(
+                    rows_mod, "_declared_requires", lambda _r=requires: _r
+                ):
+                    rows = _rows(sdk, "0.1.0")
+                self.assertEqual(
+                    mod._install_blocked(rows, _adapter_row(rows), self._TARGET),
+                    want,
+                )
 
     def test_target_version_requirement_wins(self) -> None:
         """要装那一版自带要求即按它判，同一行按已装声明判本来放行"""
@@ -562,25 +520,23 @@ class TestInstallBlocked(unittest.TestCase):
         )
         self.assertEqual(mod.release_blocked(rows, row, self._TARGET), "")
 
-    def test_requires_line_keeps_both_bounds(self) -> None:
-        """要求那一行把上下限原样带出来"""
+    def test_requires_line_reports_installed(self) -> None:
+        """要求行把上下限原样带出来，本机未满足或没装上照实说"""
         requires = {str(PlatformCode("tg")): ">=0.1.0,<0.2.0"}
-        with (
-            patch.object(rows_mod, "_declared_requires", lambda: requires),
-            patch.object(mod, "installed_version", lambda name: "0.2.0"),
-        ):
-            text = mod.deps_text(_adapter_row(_rows("0.2.0", "0.1.0")))
-        self.assertEqual(text, ">=0.1.0,<0.2.0，本机接口包 0.2.0 未满足")
-
-    def test_requires_line_without_sdk(self) -> None:
-        """本机没装接口包时要求行照实说没装上"""
-        requires = {str(PlatformCode("tg")): ">=0.1.0,<0.2.0"}
-        with (
-            patch.object(rows_mod, "_declared_requires", lambda: requires),
-            patch.object(mod, "installed_version", lambda name: ""),
-        ):
-            text = mod.deps_text(_adapter_row(_rows("", "0.1.0")))
-        self.assertEqual(text, ">=0.1.0,<0.2.0，接口包没装上")
+        cases = (
+            ("0.2.0", ">=0.1.0,<0.2.0，本机接口包 0.2.0 未满足"),
+            ("", ">=0.1.0,<0.2.0，接口包没装上"),
+        )
+        for sdk, want in cases:
+            with self.subTest(sdk=sdk):
+                with (
+                    patch.object(
+                        rows_mod, "_declared_requires", lambda _r=requires: _r
+                    ),
+                    patch.object(mod, "installed_version", lambda name, _s=sdk: _s),
+                ):
+                    text = mod.deps_text(_adapter_row(_rows(sdk, "0.1.0")))
+                self.assertEqual(text, want)
 
 
 class TestPresentPlatforms(unittest.TestCase):

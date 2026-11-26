@@ -35,15 +35,16 @@ class TestPluginState(unittest.TestCase):
         """造一份自描述文件"""
         self.state.write_text(text, encoding="utf-8")
 
-    def test_missing_file_reads_none(self) -> None:
-        """没有自描述文件即从没保存过选择，读回的不是空集"""
-        self.assertIsNone(load_instance_enabled(self.state, StateKeys.ENABLED))
+    def test_absent_state_reads_none(self) -> None:
+        """文件不在与没有插件块都按从没保存过处理，读回的不是空集"""
+        for text in (None, '{"token": "abc"}'):
+            with self.subTest(text=text):
+                if text is None:
+                    self.state.unlink(missing_ok=True)
+                else:
+                    self._write(text)
 
-    def test_missing_block_reads_none(self) -> None:
-        """文件在但没有插件块，同样按从没保存过处理"""
-        self._write('{"token": "abc"}')
-
-        self.assertIsNone(load_instance_enabled(self.state, StateKeys.ENABLED))
+                self.assertIsNone(load_instance_enabled(self.state, StateKeys.ENABLED))
 
     def test_missing_key_reads_empty_set(self) -> None:
         """块里没启用那一键时读回空集，与没有这一块是两种盘面"""

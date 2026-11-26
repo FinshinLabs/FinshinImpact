@@ -106,11 +106,18 @@ class TestValidateTypes(unittest.TestCase):
         errors = validate_types(_schema(), data)
         self.assertIn(_item(_TEMPERATURE), errors)
 
-    def test_int_accepted_for_float_field(self) -> None:
-        """整数可赋给浮点字段"""
-        # toml 里 1 会被解析为 int，float 字段应兼容
-        data = {_MODEL_SECTION: {"temperature": 1, "api_key": "gpt", "triggers": ["a"]}}
-        self.assertEqual(validate_types(_schema(), data), {})
+    def test_valid_data_empty(self) -> None:
+        """合法数据返回空 dict，整数温度兼容浮点字段"""
+        for temperature in (1, 0.5):
+            with self.subTest(temperature=temperature):
+                data = {
+                    _MODEL_SECTION: {
+                        "temperature": temperature,
+                        "api_key": "gpt",
+                        "triggers": ["a"],
+                    }
+                }
+                self.assertEqual(validate_types(_schema(), data), {})
 
     def test_bool_rejected_for_float_field(self) -> None:
         """布尔值不算浮点"""
@@ -125,13 +132,6 @@ class TestValidateTypes(unittest.TestCase):
             _MODEL_SECTION: {"temperature": 0.5, "api_key": "gpt", "triggers": [1, 2]}
         }
         self.assertIn(_item(_TRIGGERS), validate_types(_schema(), data))
-
-    def test_all_valid_empty(self) -> None:
-        """全部合法返回空 dict"""
-        data = {
-            _MODEL_SECTION: {"temperature": 0.5, "api_key": "gpt", "triggers": ["a"]}
-        }
-        self.assertEqual(validate_types(_schema(), data), {})
 
     def test_missing_optional_keys_pass(self) -> None:
         """非必填键缺失放行

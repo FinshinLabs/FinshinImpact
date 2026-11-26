@@ -213,23 +213,19 @@ DECLARATION = PluginDeclaration(title="样例", summary=default(), assets=(), he
 
         self.assertEqual(declaration.summary, "默认值")
 
-    def test_non_sdk_import_is_refused(self) -> None:
-        self._reject("import os\nDECLARATION = None\n", "只许导入 finshin_sdk")
-
-    def test_top_level_call_is_refused(self) -> None:
-        self._reject("print('跑一下')\n", "顶层只许")
-
-    def test_nested_import_is_refused(self) -> None:
-        self._reject("def load():\n    import os\n", "只许在顶层导入")
-
-    def test_private_name_is_refused(self) -> None:
-        self._reject("_hidden = 1\n", "赋值目标只许普通名字")
-
-    def test_foreign_default_call_is_refused(self) -> None:
-        self._reject("def load(value=open('x')):\n    return value\n", "不许调用 open")
-
-    def test_foreign_decorator_is_refused(self) -> None:
-        self._reject("@staticmethod\ndef load():\n    pass\n", "不许访问 staticmethod")
+    def test_disallowed_code_shapes_are_refused(self) -> None:
+        """非接口包导入、顶层调用、函数内导入、私有名、外部默认值与外部装饰器一律拒收"""
+        cases = (
+            ("import os\nDECLARATION = None\n", "只许导入 finshin_sdk"),
+            ("print('跑一下')\n", "顶层只许"),
+            ("def load():\n    import os\n", "只许在顶层导入"),
+            ("_hidden = 1\n", "赋值目标只许普通名字"),
+            ("def load(value=open('x')):\n    return value\n", "不许调用 open"),
+            ("@staticmethod\ndef load():\n    pass\n", "不许访问 staticmethod"),
+        )
+        for source, expected in cases:
+            with self.subTest(expected=expected):
+                self._reject(source, expected)
 
 
 class TestDeclarationShape(PluginDeclarationCase):

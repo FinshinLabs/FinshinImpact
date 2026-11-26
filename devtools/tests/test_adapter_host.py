@@ -239,32 +239,20 @@ class TestAdapterHost(unittest.TestCase):
         """平台标识认不出的声明不进表"""
         self.assertEqual(self._scan(_manifest(tool='platform = "nope"\n')), {})
 
-    def test_platform_not_in_entry_points_is_dropped(self) -> None:
-        """入口点段没点名本平台的声明不进表
+    def test_bad_entry_point_is_dropped(self) -> None:
+        """入口点段没交代本平台的声明不进表
 
-        - 只写了别的平台那条的算它自己没交代入口
+        - 只写了别的平台那条的
+        - 冒号后不指 parts 的
         """
-        self.assertEqual(
-            self._scan(
-                _manifest(
-                    tool='platform = "tg"\n',
-                    points='qq = "fake_adapter.entry:parts"\n',
+        for points in (
+            'qq = "fake_adapter.entry:parts"\n',
+            'tg = "fake_adapter.entry:run"\n',
+        ):
+            with self.subTest(points=points):
+                self.assertEqual(
+                    self._scan(_manifest(tool='platform = "tg"\n', points=points)), {}
                 )
-            ),
-            {},
-        )
-
-    def test_wrong_entry_attribute_is_dropped(self) -> None:
-        """入口点冒号后不指 parts 的声明不进表"""
-        self.assertEqual(
-            self._scan(
-                _manifest(
-                    tool='platform = "tg"\n',
-                    points='tg = "fake_adapter.entry:run"\n',
-                )
-            ),
-            {},
-        )
 
     def test_declared_deps_are_read(self) -> None:
         """声明依赖的清单按顺序读出依赖表"""
@@ -363,39 +351,26 @@ class TestAdapterHost(unittest.TestCase):
         bare = self._scan(_manifest(tool='platform = "tg"\n'))
         self.assertEqual(bare[PlatformCode("tg")].requires_sdk, "")
 
-    def test_newer_requirement_refuses_before_import(self) -> None:
-        """清单要的接口版本比本机新即拒载，入口模块的导入没发生"""
-        too_new = AdapterManifestDTO(
-            platform=PlatformCode("tg"),
-            deps=(),
-            requires_sdk=">=99.0.0",
-            entry="standalone_tg.entry",
-        )
-        with patch.object(
-            parts_mod, "load_adapter_manifests", lambda: {PlatformCode("tg"): too_new}
-        ):
-            with patch.object(parts_mod, "import_module") as imported:
-                with self.assertRaises(AdapterOutOfDateError) as ctx:
-                    parts_mod.parts_for(PlatformCode("tg"))
-        self.assertEqual(ctx.exception.requires, ">=99.0.0")
-        imported.assert_not_called()
-
-    def test_sdk_over_ceiling_refuses_before_import(self) -> None:
-        """本机接口包高出清单写的上限即拒载，入口模块的导入没发生"""
-        too_old = AdapterManifestDTO(
-            platform=PlatformCode("tg"),
-            deps=(),
-            requires_sdk="<0.0.1",
-            entry="standalone_tg.entry",
-        )
-        with patch.object(
-            parts_mod, "load_adapter_manifests", lambda: {PlatformCode("tg"): too_old}
-        ):
-            with patch.object(parts_mod, "import_module") as imported:
-                with self.assertRaises(AdapterOutOfDateError) as ctx:
-                    parts_mod.parts_for(PlatformCode("tg"))
-        self.assertEqual(ctx.exception.requires, "<0.0.1")
-        imported.assert_not_called()
+    def test_sdk_bound_refuses_before_import(self) -> None:
+        """清单要的接口版本与本机不合即拒载，入口模块的导入没发生"""
+        for requires in (">=99.0.0", "<0.0.1"):
+            with self.subTest(requires=requires):
+                card = AdapterManifestDTO(
+                    platform=PlatformCode("tg"),
+                    deps=(),
+                    requires_sdk=requires,
+                    entry="standalone_tg.entry",
+                )
+                with patch.object(
+                    parts_mod,
+                    "load_adapter_manifests",
+                    lambda _c=card: {PlatformCode("tg"): _c},
+                ):
+                    with patch.object(parts_mod, "import_module") as imported:
+                        with self.assertRaises(AdapterOutOfDateError) as ctx:
+                            parts_mod.parts_for(PlatformCode("tg"))
+                self.assertEqual(ctx.exception.requires, requires)
+                imported.assert_not_called()
 
     def test_absent_package_becomes_not_installed(self) -> None:
         """声明在场而环境里取不到那只包，换成没装进环境那句并点名模块"""

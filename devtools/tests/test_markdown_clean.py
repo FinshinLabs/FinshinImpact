@@ -36,17 +36,16 @@ class TestEmphasis(unittest.TestCase):
             for raw, expected in cases.items():
                 self.assertEqual(strip_model_marks(raw), expected, f"漏洗：{raw}")
 
-    def test_single_asterisk_italic(self) -> None:
-        """紧贴单词的单星号斜体照剥"""
-        self.assertEqual(strip_model_marks("*斜*体"), "斜体")
-
-    def test_spacing_protects_operators(self) -> None:
-        """两侧带空格的星号当乘号用，不许误伤"""
-        self.assertEqual(strip_model_marks("a * b * c"), "a * b * c")
-
-    def test_heading_hash_removed(self) -> None:
-        """行首井号串连同后随空格去掉"""
-        self.assertEqual(strip_model_marks("# 标题\n## 二级"), "标题\n二级")
+    def test_emphasis_edges(self) -> None:
+        """单星号斜体照剥，空格隔开的星号当乘号，行首井号串去掉"""
+        cases = {
+            "*斜*体": "斜体",
+            "a * b * c": "a * b * c",
+            "# 标题\n## 二级": "标题\n二级",
+        }
+        for raw, want in cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(strip_model_marks(raw), want)
 
 
 class TestLinks(unittest.TestCase):

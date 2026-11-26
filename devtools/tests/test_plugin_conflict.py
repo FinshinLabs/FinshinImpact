@@ -63,16 +63,6 @@ class TestClaimPolicy(unittest.TestCase):
         self.assertEqual(allowed, frozenset({"extra"}))
         self.assertEqual(conflicts, {})
 
-    def test_bundled_present_takes_command_from_external(self) -> None:
-        """随包件在场即拿走同名命令，表外件整只不放行并记下被谁拿走"""
-        allowed, conflicts = resolve_claims(
-            [_claim("help", "history"), _claim("extra", "history")],
-            frozenset({"extra"}),
-        )
-
-        self.assertEqual(allowed, frozenset({"help"}))
-        self.assertEqual(conflicts, {"extra": (CommandTaken("history", "help"),)})
-
     def test_two_externals_present_together_void_group(self) -> None:
         """同一命令名两只表外插件同时在场整组作废且不记冲突
 
@@ -86,14 +76,29 @@ class TestClaimPolicy(unittest.TestCase):
         self.assertEqual(allowed, frozenset())
         self.assertEqual(conflicts, {})
 
-    def test_absent_external_marked_conflict(self) -> None:
-        """不在场但命令名已被拿走的照记冲突，面板据此禁掉勾选"""
-        allowed, conflicts = resolve_claims(
-            [_claim("first", "ping"), _claim("later", "ping")], frozenset({"first"})
+    def test_command_taken_from_other_plugin(self) -> None:
+        """随包件或先在场那只拿走同名命令，后来者整只不放行并记冲突"""
+        cases = (
+            (
+                [_claim("help", "history"), _claim("extra", "history")],
+                frozenset({"extra"}),
+                "help",
+                "extra",
+            ),
+            (
+                [_claim("first", "ping"), _claim("later", "ping")],
+                frozenset({"first"}),
+                "first",
+                "later",
+            ),
         )
-
-        self.assertEqual(allowed, frozenset({"first"}))
-        self.assertEqual(conflicts, {"later": (CommandTaken("ping", "first"),)})
+        for claims, present, winner, loser in cases:
+            with self.subTest(winner=winner):
+                allowed, conflicts = resolve_claims(claims, present)
+                self.assertEqual(allowed, frozenset({winner}))
+                self.assertEqual(
+                    conflicts, {loser: (CommandTaken(claims[0].commands[0], winner),)}
+                )
 
     def test_bundled_internal_clash_not_marked(self) -> None:
         """随包表内两只抢同一个命令名属本体自己的账，两只都放行也不记冲突"""

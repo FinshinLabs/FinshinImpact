@@ -28,21 +28,17 @@ class TestAlreadyEnough(unittest.TestCase):
         """本机更高即不装，随包件不压新版"""
         self.assertTrue(mod._already_enough(self.wheel, {"finshin-sdk": "0.2.0"}))
 
-    def test_same_version_needs_install(self) -> None:
-        """同版本照装：重打的件不靠版本号分辨"""
-        self.assertFalse(mod._already_enough(self.wheel, {"finshin-sdk": "0.1.0"}))
-
-    def test_lower_installed_needs_install(self) -> None:
-        """本机更低即照装"""
-        self.assertFalse(mod._already_enough(self.wheel, {"finshin-sdk": "0.0.9"}))
+    def test_not_enough_cases(self) -> None:
+        """同版本、本机更低与版本串读不懂都照装，重打的件不靠版本号分辨"""
+        for version in ("0.1.0", "0.0.9", "最新"):
+            with self.subTest(version=version):
+                self.assertFalse(
+                    mod._already_enough(self.wheel, {"finshin-sdk": version})
+                )
 
     def test_absent_needs_install(self) -> None:
         """本机没这只件即照装"""
         self.assertFalse(mod._already_enough(self.wheel, {}))
-
-    def test_unreadable_installed_needs_install(self) -> None:
-        """本机版本串读不懂即照装，不拿猜的当成够"""
-        self.assertFalse(mod._already_enough(self.wheel, {"finshin-sdk": "最新"}))
 
 
 class TestInstallPlan(unittest.TestCase):

@@ -74,14 +74,16 @@ class TestMenuRoleNote(unittest.TestCase):
         self.assertEqual(specs["md"].role, role)
         return help_list["md"]
 
-    def test_owner_note_appended(self) -> None:
-        self.assertEqual(self._desc(CommandRole.OWNER), "演示命令（仅主人）")
-
-    def test_admin_note_appended(self) -> None:
-        self.assertEqual(self._desc(CommandRole.ADMIN), "演示命令（需授权）")
-
-    def test_member_note_left_out(self) -> None:
-        self.assertEqual(self._desc(CommandRole.MEMBER), "演示命令")
+    def test_role_note_in_desc(self) -> None:
+        """主人与需授权两档各带说明，成员档不写"""
+        cases = (
+            (CommandRole.OWNER, "演示命令（仅主人）"),
+            (CommandRole.ADMIN, "演示命令（需授权）"),
+            (CommandRole.MEMBER, "演示命令"),
+        )
+        for role, want in cases:
+            with self.subTest(role=role):
+                self.assertEqual(self._desc(role), want)
 
 
 class TestRoleCheck(unittest.TestCase):
@@ -99,19 +101,18 @@ class TestRoleCheck(unittest.TestCase):
                 _manifest_of("wipe", CommandRole.OWNER), _routes("wipe", None)
             )
 
-    def test_guard_tier_below_declaration_fails(self) -> None:
-        with self.assertRaises(PluginRoleError):
-            _register._check_roles(
-                _manifest_of("wipe", CommandRole.OWNER),
-                _routes("wipe", CommandRole.ADMIN),
-            )
-
-    def test_member_declaration_with_guard_fails(self) -> None:
-        with self.assertRaises(PluginRoleError):
-            _register._check_roles(
-                _manifest_of("wipe", CommandRole.MEMBER),
-                _routes("wipe", CommandRole.ADMIN),
-            )
+    def test_guard_mismatch_fails(self) -> None:
+        """守卫档低于声明或成员命令带守卫都报错"""
+        cases = (
+            (CommandRole.OWNER, CommandRole.ADMIN),
+            (CommandRole.MEMBER, CommandRole.ADMIN),
+        )
+        for declared, guard in cases:
+            with self.subTest(declared=declared, guard=guard):
+                with self.assertRaises(PluginRoleError):
+                    _register._check_roles(
+                        _manifest_of("wipe", declared), _routes("wipe", guard)
+                    )
 
     def test_undeclared_route_without_guard_passes(self) -> None:
         _register._check_roles(

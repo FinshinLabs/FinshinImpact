@@ -68,11 +68,17 @@ class TestMatchScope(unittest.TestCase):
         self.assertTrue(_matches(manifest, "撞名 1", _SCOPE_ALL))
         self.assertFalse(_matches(manifest, "ping_a", _SCOPE_ALL))
 
-    def test_blank_title_falls_back_to_dir_name(self) -> None:
-        """没填标题时显示名就是目录名"""
-        manifest = _manifest("", (("ping", "回一声"),))
+    def test_blank_title_and_desc_rules(self) -> None:
+        """没填标题时显示名就是目录名，命令说明不参与搜索"""
+        cases = (
+            ("", "ping_a", _SCOPE_NAME, True),
+            ("撞名 1", "回一声", _SCOPE_ALL, False),
+        )
+        for title, query, scope, want in cases:
+            with self.subTest(query=query):
+                manifest = _manifest(title, (("ping", "回一声"),))
 
-        self.assertTrue(_matches(manifest, "ping_a", _SCOPE_NAME))
+                self.assertEqual(_matches(manifest, query, scope), want)
 
     def test_command_hits_with_and_without_slash(self) -> None:
         """命令名带不带斜杠都算命中"""
@@ -90,12 +96,6 @@ class TestMatchScope(unittest.TestCase):
         self.assertFalse(_matches(manifest, "ping", _SCOPE_NAME))
         self.assertTrue(_matches(manifest, "ping", _SCOPE_CMD))
         self.assertFalse(_matches(manifest, "撞名", _SCOPE_CMD))
-
-    def test_command_desc_is_not_a_hit_criterion(self) -> None:
-        """明细里那句说明不参与搜索，命中的只有命令名"""
-        manifest = _manifest("撞名 1", (("ping", "回一声"),))
-
-        self.assertFalse(_matches(manifest, "回一声", _SCOPE_ALL))
 
 
 class TestCommandLines(unittest.TestCase):

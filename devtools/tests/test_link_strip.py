@@ -124,20 +124,16 @@ class TestLinkStrip(unittest.TestCase):
         turns = build_turns(persona="人设正文", history=(), thisinput=text)
         return turns[-1]["content"]
 
-    def test_question_url_becomes_mark(self) -> None:
-        """问句里的网址换成占位标记，前后中文留在原位"""
-        self.assertEqual(
-            self._turn("看看 https://example.com/a?b=1 讲了啥"),
-            "看看 [链接] 讲了啥",
+    def test_question_url_rules(self) -> None:
+        """问句网址换标记，裸主机名不动，全角标点不吃进网址"""
+        cases = (
+            ("看看 https://example.com/a?b=1 讲了啥", "看看 [链接] 讲了啥"),
+            ("去 example.com 看看", "去 example.com 看看"),
+            ("见 www.example.com，就这样", "见 [链接]，就这样"),
         )
-
-    def test_bare_host_stays(self) -> None:
-        """不带协议也不以 www 起头的写法不动"""
-        self.assertEqual(self._turn("去 example.com 看看"), "去 example.com 看看")
-
-    def test_fullwidth_tail_not_eaten(self) -> None:
-        """全角标点与中文不算网址的一部分"""
-        self.assertEqual(self._turn("见 www.example.com，就这样"), "见 [链接]，就这样")
+        for raw, want in cases:
+            with self.subTest(raw=raw):
+                self.assertEqual(self._turn(raw), want)
 
     def test_persona_turn_untouched(self) -> None:
         """人设轮一个字不改"""

@@ -49,15 +49,15 @@ class TestRepoOf(unittest.TestCase):
             mod._Repo("a", "b"),
         )
 
-    def test_other_host_is_rejected(self) -> None:
-        """别的站点的地址读不出仓名"""
-        with self.assertRaises(RemoteVersionError):
-            mod._repo_of("https://example.invalid/a/b/releases/download/v1/x.whl")
-
-    def test_non_release_path_is_rejected(self) -> None:
-        """同一仓下的非 release 路径不算"""
-        with self.assertRaises(RemoteVersionError):
-            mod._repo_of("https://github.com/a/b/archive/v1.zip")
+    def test_bad_release_urls_rejected(self) -> None:
+        """别的站点与同仓非 release 路径都读不出仓名"""
+        for url in (
+            "https://example.invalid/a/b/releases/download/v1/x.whl",
+            "https://github.com/a/b/archive/v1.zip",
+        ):
+            with self.subTest(url=url):
+                with self.assertRaises(RemoteVersionError):
+                    mod._repo_of(url)
 
 
 class TestPagination(unittest.IsolatedAsyncioTestCase):
@@ -96,22 +96,17 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
 class TestNoteBody(unittest.TestCase):
     """正文清洗"""
 
-    def test_download_lines_dropped(self) -> None:
-        """发布包直链所在行不留在正文里"""
-        note = mod._to_note(
-            {
-                "tag_name": "v0.1.0",
-                "body": "正文\nhttps://github.com/a/b/releases/download/v0.1.0/x.whl",
-            }
+    def test_body_cleaning(self) -> None:
+        """发布包直链行不留在正文，其余裸链接补成尖括号"""
+        cases = (
+            ("正文\nhttps://github.com/a/b/releases/download/v0.1.0/x.whl", "正文"),
+            ("见 https://example.com/a", "见 <https://example.com/a>"),
         )
+        for body, want in cases:
+            with self.subTest(want=want):
+                note = mod._to_note({"tag_name": "v0.1.0", "body": body})
 
-        self.assertEqual(note.body, "正文")
-
-    def test_bare_link_is_wrapped(self) -> None:
-        """裸链接补成尖括号，整串可点"""
-        note = mod._to_note({"tag_name": "v0.1.0", "body": "见 https://example.com/a"})
-
-        self.assertEqual(note.body, "见 <https://example.com/a>")
+                self.assertEqual(note.body, want)
 
 
 class TestCache(unittest.IsolatedAsyncioTestCase):

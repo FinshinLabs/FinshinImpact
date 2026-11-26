@@ -97,36 +97,34 @@ class TestSdkGap(unittest.TestCase):
         )
 
     def test_unmet_requirement_blocks(self) -> None:
-        """本机接口包不在件里写的区间内即交出那句，不装"""
-        with patch.object(mod, "installed_version", lambda name: "0.2.0"):
-            note = mod._sdk_gap(self._release(), self._wheel(">=0.1.0,<0.2.0"))
-
-        self.assertEqual(
-            note,
-            f"{_ADAPTER} 0.1.0 要接口包 >=0.1.0,<0.2.0，本机是 0.2.0",
+        """本机接口包不在区间内或缺件都在件里写的区间上被拦住，各交对应那句"""
+        cases = (
+            (
+                "0.2.0",
+                ">=0.1.0,<0.2.0",
+                f"{_ADAPTER} 0.1.0 要接口包 >=0.1.0,<0.2.0，本机是 0.2.0",
+            ),
+            ("", ">=0.1.0", f"{_ADAPTER} 0.1.0 要接口包 >=0.1.0，本机缺接口包"),
         )
+        for installed, requires, want in cases:
+            with self.subTest(installed=installed):
+                with patch.object(
+                    mod, "installed_version", lambda name, _v=installed: _v
+                ):
+                    note = mod._sdk_gap(self._release(), self._wheel(requires))
+
+                self.assertEqual(note, want)
 
     def test_met_requirement_passes(self) -> None:
-        """本机接口包落在区间内即放行"""
-        with patch.object(mod, "installed_version", lambda name: "0.1.5"):
-            self.assertEqual(
-                mod._sdk_gap(self._release(), self._wheel(">=0.1.0,<0.2.0")), ""
-            )
-
-    def test_absent_sdk_blocks(self) -> None:
-        """接口包没装上即拦住，那句只说本机缺件"""
-        with patch.object(mod, "installed_version", lambda name: ""):
-            note = mod._sdk_gap(self._release(), self._wheel(">=0.1.0"))
-
-        self.assertEqual(
-            note,
-            f"{_ADAPTER} 0.1.0 要接口包 >=0.1.0，本机缺接口包",
-        )
-
-    def test_no_requirement_passes(self) -> None:
-        """件里没写接口包要求即放行"""
-        with patch.object(mod, "installed_version", lambda name: "0.2.0"):
-            self.assertEqual(mod._sdk_gap(self._release(), self._wheel("")), "")
+        """本机落在区间内或件里没写要求即放行"""
+        for installed, requires in (("0.1.5", ">=0.1.0,<0.2.0"), ("0.2.0", "")):
+            with self.subTest(requires=requires):
+                with patch.object(
+                    mod, "installed_version", lambda name, _v=installed: _v
+                ):
+                    self.assertEqual(
+                        mod._sdk_gap(self._release(), self._wheel(requires)), ""
+                    )
 
 
 class TestApplyUpdates(unittest.IsolatedAsyncioTestCase):

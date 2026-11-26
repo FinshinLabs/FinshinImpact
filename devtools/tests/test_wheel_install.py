@@ -220,17 +220,11 @@ class TestSdkRequires(unittest.TestCase):
 
         self.assertEqual(mod.sdk_requires(path), ">=0.1.0,<0.2.0")
 
-    def test_no_declaration_is_empty(self) -> None:
-        """没声明接口包即空串"""
-        path = self._wheel("Metadata-Version: 2.1\nName: demo\n")
-
-        self.assertEqual(mod.sdk_requires(path), "")
-
-    def test_broken_wheel_is_empty(self) -> None:
-        """元数据读不出即空串，不拦住装机"""
-        path = self._wheel(None)
-
-        self.assertEqual(mod.sdk_requires(path), "")
+    def test_absent_declaration_is_empty(self) -> None:
+        """没声明接口包或元数据读不出都交出空串，不拦住装机"""
+        for metadata in ("Metadata-Version: 2.1\nName: demo\n", None):
+            with self.subTest(metadata=metadata):
+                self.assertEqual(mod.sdk_requires(self._wheel(metadata)), "")
 
 
 if __name__ == "__main__":

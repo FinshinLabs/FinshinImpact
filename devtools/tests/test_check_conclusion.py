@@ -52,13 +52,11 @@ def _errors(count: int) -> dict[ConfigPath, str]:
 class FailureNoteCase(unittest.TestCase):
     """结论行失败那一句"""
 
-    def test_detail_wins(self) -> None:
-        """有结论句即用它，字段数不参与"""
-        self.assertEqual(failure_note("首轮全部不通", _errors(2)), "首轮全部不通")
-
-    def test_counts_fields(self) -> None:
-        """没有结论句：按标红字段数出句"""
-        self.assertEqual(failure_note("", _errors(2)), "2 项配置异常")
+    def test_detail_wins_or_counts_fields(self) -> None:
+        """有结论句即用它，没有则按标红字段数出句"""
+        for detail, want in (("首轮全部不通", "首轮全部不通"), ("", "2 项配置异常")):
+            with self.subTest(detail=detail):
+                self.assertEqual(failure_note(detail, _errors(2)), want)
 
     def test_falls_back_without_field_errors(self) -> None:
         """结论句与字段错都没有：回落未通过提示"""
@@ -79,28 +77,31 @@ class DisplayNoteCase(unittest.TestCase):
             "HTTP 502\n502 Bad Gateway\nnginx",
         )
 
-    def test_title_not_shown(self) -> None:
-        """head 里的标题不进正文"""
-        raw = (
-            "<html><head><title>Error response</title></head>"
-            "<body><h1>Error response</h1></body></html>"
+    def test_fragmented_head_still_reads_body(self) -> None:
+        """head 里的标题不进正文，缺 </head> 的残页仍抽到正文"""
+        cases = (
+            (
+                "<html><head><title>Error response</title></head>"
+                "<body><h1>Error response</h1></body></html>",
+                "Error response",
+            ),
+            (
+                "<html><head><title>x</title><body><p>502 Bad Gateway</p></body></html>",
+                "502 Bad Gateway",
+            ),
         )
-        self.assertEqual(display_note(raw), "Error response")
-
-    def test_unclosed_head_still_reads_body(self) -> None:
-        """缺 </head> 的残页仍抽到正文"""
-        raw = "<html><head><title>x</title><body><p>502 Bad Gateway</p></body></html>"
-        self.assertEqual(display_note(raw), "502 Bad Gateway")
-
-    def test_prefixed_json_stays(self) -> None:
-        """带状态码前缀的非网页正文原样返回"""
-        raw = 'HTTP 400 {"error": "invalid_api_key"}'
-        self.assertEqual(display_note(raw), raw)
+        for raw, want in cases:
+            with self.subTest(want=want):
+                self.assertEqual(display_note(raw), want)
 
     def test_json_stays(self) -> None:
-        """JSON 错误正文原样返回"""
-        raw = '{"error": "invalid_api_key"}'
-        self.assertEqual(display_note(raw), raw)
+        """JSON 错误正文带不带状态码前缀都原样返回"""
+        for raw in (
+            'HTTP 400 {"error": "invalid_api_key"}',
+            '{"error": "invalid_api_key"}',
+        ):
+            with self.subTest(raw=raw):
+                self.assertEqual(display_note(raw), raw)
 
     def test_sentence_stays(self) -> None:
         """普通短句原样返回"""
