@@ -274,6 +274,7 @@ def main() -> None:
         pack_release.check_release()
         return
 
+    pack_release.refuse_tree_tag_mismatch()
     if args.no_launcher:
         launcher_dir = DIST / "_launcher" / APP_NAME
         if not (launcher_dir / EXE_NAME).exists():

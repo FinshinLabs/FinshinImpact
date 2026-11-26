@@ -47,6 +47,7 @@ python packaging\build.py
 
 ### 构建步骤
 
+- 构建前核两件——工作树干净（`git status --porcelain` 无输出），本地版本 tag 的树与 HEAD 相同。缺 tag 或树不同当场中止，tag 未推不影响构建。
 - 编译启动器，白名单组装并排除 `*.egg-info` 等开发残留，只在临时副本里构建，或仓内构建后清 `build\`、`*.egg-info`、`dist\`，包内 `pyproject.toml` 与仓里那份一字一样。
 - 下载嵌入式 `Python` 与 `uv`，只走镜像，zip 逐条目校验，`uv` 另比对官方 sha256，不过会中止，加速镜像名单只在 `github-mirrors` 键里维护。
 - 用随包嵌入式解释器预编暂存区 `src` 与 `main.py` 的字节码，按内容判断是否复用，用户解压即热，首启不必现场编译。

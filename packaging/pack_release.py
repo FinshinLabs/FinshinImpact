@@ -1,9 +1,11 @@
 """发布状态自检
 
 - 本地版本号、远端 tag、本地包指纹、在线版本页、发布包各源可达逐项检查
+- 本地工作树与版本 tag 的树一致性
 """
 
 import subprocess
+from pathlib import Path
 
 import net_channel
 from pack_spec import (
@@ -54,6 +56,52 @@ def check_release() -> None:
         checks.append((url, _asset_probe(url, local_size)))
     for name, detail in checks:
         print(f"[自检] {name}: {detail}")
+
+
+def refuse_tree_tag_mismatch(root: Path = ROOT) -> None:
+    """构建前核工作树干净且 HEAD 树与版本 tag 的树相同"""
+    version = local_version(root)
+    tag = f"v{version}"
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    if status.returncode:
+        detail = (status.stderr or status.stdout).strip()
+        raise SystemExit(f"git status --porcelain 失败：{detail}")
+    if status.stdout:
+        print(status.stdout, end="")
+        raise SystemExit(1)
+
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD^{tree}"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    if head.returncode:
+        detail = (head.stderr or head.stdout).strip()
+        raise SystemExit(f"读取 HEAD 的树失败：{detail}")
+
+    tagged = subprocess.run(
+        ["git", "rev-parse", f"refs/tags/{tag}^{{tree}}"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    if tagged.returncode:
+        raise SystemExit(f"目标 tag {tag} 不存在，先 fetch 或先打 tag")
+
+    head_tree = head.stdout.strip()
+    tag_tree = tagged.stdout.strip()
+    if head_tree != tag_tree:
+        raise SystemExit(
+            f"版本 {version} 的当前树 {head_tree} 与目标 tag {tag} 的树 {tag_tree} "
+            "不同，产物会含未定稿代码"
+        )
+    print(f"工作树干净，当前 HEAD 树与目标 tag {tag} 的树一致，核对通过")
 
 
 def _asset_probe(url: str, local_size: int) -> str:
