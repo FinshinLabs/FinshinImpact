@@ -18,10 +18,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from system.profile_env import set_profile  # noqa: E402
 
 set_profile("tg.000000")
+
+from db_template import copy_migrated_db  # noqa: E402
 
 from bundled.AI.config import ai_config  # noqa: E402
 from bundled.AI.services import _receipt  # noqa: E402
@@ -30,7 +33,6 @@ from data import (  # noqa: E402
     build_repositories,
     close_all,
     get_connection,
-    run_migrations,
 )
 from finshin_sdk import CapabilityCall  # noqa: E402
 from finshin_sdk.domain import TaskStatus  # noqa: E402
@@ -111,9 +113,8 @@ class TestReportLostTasks(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name)
         self.db = root / "bot.db"
-        (root / "backups").mkdir()
+        await copy_migrated_db(self.db)
         conn = await get_connection(self.db)
-        await run_migrations(conn, self.db, root / "backups")
         self.addAsyncCleanup(close_all)
         self.repos = build_repositories(conn)
 

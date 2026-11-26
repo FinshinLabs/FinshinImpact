@@ -14,12 +14,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from db_template import copy_migrated_db  # noqa: E402
 
 from data import (  # noqa: E402
     build_repositories,
     close_all,
     get_connection,
-    run_migrations,
 )
 from finshin_sdk import HandlerContext  # noqa: E402
 from finshin_sdk.domain import ChatScope, TaskStatus  # noqa: E402
@@ -76,9 +78,8 @@ class TestTaskLedger(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name)
         self.db = root / "bot.db"
-        (root / "backups").mkdir()
+        await copy_migrated_db(self.db)
         conn = await get_connection(self.db)
-        await run_migrations(conn, self.db, root / "backups")
         self.addAsyncCleanup(close_all)
         self.repos = build_repositories(conn)
         self.ledger = TaskLedger(self.db, on_fault=self._fault)

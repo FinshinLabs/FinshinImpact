@@ -11,8 +11,10 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import aiosqlite  # noqa: E402
+from db_template import copy_migrated_db  # noqa: E402
 
 from data import (  # noqa: E402
     SUPPORTED_SCHEMA,
@@ -130,9 +132,11 @@ def _contents(session: SessionDTO) -> list[str]:
 class _RealDb(unittest.IsolatedAsyncioTestCase):
     """每例各开一只临时库
 
-    - 建库即跑迁移，仓储按需装配
+    - 库默认从迁移好的模板拷来，建表只跑一次
     - 收尾先合并 WAL 关连接，再删临时目录
     """
+
+    migrate_self = False
 
     async def asyncSetUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory(prefix="finshin-data-")
@@ -142,13 +146,19 @@ class _RealDb(unittest.IsolatedAsyncioTestCase):
         self.backup_dir.mkdir()
         self.addCleanup(self.tmp.cleanup)
         self.addAsyncCleanup(close_all)
-        self.conn = await get_connection(self.db)
-        await run_migrations(self.conn, self.db, self.backup_dir)
+        if self.migrate_self:
+            self.conn = await get_connection(self.db)
+            await run_migrations(self.conn, self.db, self.backup_dir)
+        else:
+            await copy_migrated_db(self.db)
+            self.conn = await get_connection(self.db)
         self.repos = build_repositories(self.conn)
 
 
 class TestSchema(_RealDb):
     """建表、版本行与连接参数"""
+
+    migrate_self = True
 
     async def test_tables_and_pragmas(self) -> None:
         """表与索引齐、版本落一行、WAL 与外键已开"""
