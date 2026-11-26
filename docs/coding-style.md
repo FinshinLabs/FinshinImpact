@@ -111,6 +111,7 @@ md 的分号与相对链接判据见 [行尾与分号](writing-style.md#行尾�
 - 单一或极少数消费者的符号不进门面，子模块转正（去 `_` 前缀），由调用方 `from package.module import symbol` 直连。
 - 一个名字只留一条出口，门面不重复代发别处已能取到的名字。
 - 门面不声明 `__all__`，模块内导入与定义即导出面。
+- 带 `py.typed` 的包，门面代发名写 `X as X`，新增公开名照此补齐，否则取用方的类型检查按未导出报错。
 
 - 接口包 `finshin_sdk/dto` 类型一律 `DTO` 后缀（如 `PrincipalDTO`、`MessageRefDTO`）。
 - 类型后缀分三类：类型定义 `XxxType`，定位与寻址 `XxxKey`，身份 `XxxId`。
