@@ -14,8 +14,6 @@
 
 升级前先看 [旧版迁移](#旧版迁移)，破坏性变更和要手动处理的文件都在那一节。
 
----
-
 ## 🚀 快速开始<a id="快速开始"></a>
 
 1. **下载**：取最新的 `FinshinImpact-vX.Y.Z.zip`。[国内镜像 1](https://gh-proxy.com/https://github.com/FinshinLabs/FinshinImpact/releases) ｜ [国内镜像 2](https://ghproxy.net/https://github.com/FinshinLabs/FinshinImpact/releases)。
@@ -27,19 +25,9 @@
 
 **注意**：升级会整树替换 `src\` 与 `assets\`，根目录下同名的 `main.py`、`pyproject.toml` 也会覆盖。`instances\`、自动装好的运行环境与自己建的文件不动。
 
----
-
 ## 📑 目录<a id="目录"></a>
 
-- [🚀 快速开始](#快速开始)
-- [✨ 功能特点](#功能特点)
-- [🛠️ 技术栈](#技术栈)
-- [📖 开发与维护](#开发与维护)
-- [⬆️ 旧版迁移](#旧版迁移)
-- [❗️ 温馨提示](#温馨提示)
-- [📄 许可证](#许可证)
-
----
+[🚀 快速开始](#快速开始) ｜ [✨ 功能特点](#功能特点) ｜ [🛠️ 技术栈](#技术栈) ｜ [📖 开发与维护](#开发与维护) ｜ [⬆️ 旧版迁移](#旧版迁移) ｜ [❗️ 温馨提示](#温馨提示) ｜ [📄 许可证](#许可证)
 
 ## ✨ 功能特点<a id="功能特点"></a>
 
@@ -50,10 +38,6 @@
 - **权限管理**：分为主人、管理员、成员三档，授予和撤销全局生效，可用功能按权限分。
 - **插件化**：随包插件必选，三方插件放进安装目录 `finshin\plugin\`，面板勾选启用，未启用即不响应，依赖自动安装，配置随面板管理。插件标题、说明、资源与帮助写在同目录 `_declaration.py`，外部插件名、依赖与接口包区间写在 `pyproject.toml`。
 
-[⤴️ 返回目录](#目录)
-
----
-
 ## 🛠️ 技术栈<a id="技术栈"></a>
 | 组件 | 版本/描述 |
 | :--- | :--- |
@@ -61,13 +45,7 @@
 | **桌面面板** | [`PySide6`](https://www.qt.io/qt-for-python)（管理面板与仪表盘日志） |
 | **存储** | [`SQLite`](https://www.sqlite.org/)（按实例分库，WAL 模式） |
 | **接口包** | 本体与插件、适配器共用的形状，独立仓 [`FinshinSDK`](https://github.com/FinshinLabs/FinshinSDK) |
-| **平台连接** | 见下方 |
-
-Telegram：[`FinshinAdapterTG`](https://github.com/FinshinLabs/FinshinAdapterTG)，基于 [`aiogram 3.x`](https://docs.aiogram.dev/) 长轮询。
-
-[⤴️ 返回目录](#目录)
-
----
+| **平台连接** | Telegram：[`FinshinAdapterTG`](https://github.com/FinshinLabs/FinshinAdapterTG)，基于 [`aiogram 3.x`](https://docs.aiogram.dev/) 长轮询 |
 
 ## 📖 开发与维护<a id="开发与维护"></a>
 
@@ -75,44 +53,23 @@ Telegram：[`FinshinAdapterTG`](https://github.com/FinshinLabs/FinshinAdapterTG)
 - 🧭 **仓库导航**：[写作规范](docs/writing-style.md)、[规范扫描器](docs/style-checker.md)、[测试](docs/testing.md)、[发布工作流](docs/release-workflow.md)、[打包教程](docs/packaging.md)、[`.gitmessage`](.gitmessage)、[工程经验](docs/lessons/README.md)。
 - 🧩 **插件写法**：见 [开发手册的插件声明](docs/development.md#插件声明)，配置字段表单源在接口包 [`FinshinSDK`](https://github.com/FinshinLabs/FinshinSDK)。
 
-[⤴️ 返回目录](#目录)
-
----
-
 ## ⬆️ 旧版迁移<a id="旧版迁移"></a>
+
+旧写法的配置段与 `plugins.toml` 的插件状态在启动时自动搬进新位置，搬之前留 `.bak`。下面只列要手动处理的事。
 
 ### v1.0.0-alpha.7.dev9
 
 - 接口包首启自动换到 0.3.0。到"环境维护"里的"管理平台组件"把 Telegram 适配器更新到 0.3.0，0.2.x 与这一版的接口件不兼容。
-- 自己写过外部插件的人才要动：同目录 `plugin.toml` 不再读取，标题、说明、资源与帮助搬进 `_declaration.py`，名字、依赖与 `finshin-sdk` 区间写进 `pyproject.toml`。
+- 自己写过外部插件的人才要动：同目录 `plugin.toml` 不再读取，标题、说明、资源与帮助搬进 `_declaration.py`，名字、依赖与 `finshin-sdk` 区间写进 `pyproject.toml`。逐项改法见 [从 dev4 及更早的写法改过来](docs/development.md#从-dev4-及更早的写法改过来)。
 
-### v1.0.0-alpha.7.dev8
+### v1.0.0-alpha.7.dev8 及更早
 
-- 配置文件改成按来源分块，旧文件里的裸段不再读入，面板按默认值显示，首次保存后旧段从文件里消失。
-- 到"环境维护"里的"管理平台组件"把 Telegram 适配器更新到 0.2.0 或更高：0.1.x 与这一版的接口件不兼容。
+- dev6：仓库搬到组织 `FinshinLabs`，旧包里的版本页地址已取不到：手动下新包覆盖解压即可，配置、记录、库与日志都在 `instances\`，不受影响。
+- dev5：解压件不再自带平台适配器，首次建实例要先在平台下拉右侧"管理平台组件"里在线装一只，装的过程保持联网。已有实例的配置、记录与库都不动。
+- dev4：自己写过插件或适配器的人才要动：入口写法、取用来源和动作名都换了。
+- dev1 与 dev2：没改动过人设正文的实例自动跟新版模板，升级后第一条消息清空上下文与 `records\` 记录，要留存先自行备份。
 
-### v1.0.0-alpha.7.dev6
-
-- 仓库搬到组织 `FinshinLabs`，旧包里的版本页地址已取不到：手动下新包覆盖解压即可，配置、记录、库与日志都在 `instances\`，不受影响。
-
-### v1.0.0-alpha.7.dev5
-
-- 解压件不再自带平台适配器，首次建实例要先在平台下拉右侧"管理平台组件"里在线装一只，装的过程保持联网。已有实例的配置、记录与库都不动。
-- 自己写过插件的人才要动：`plugin.toml` 里 `deps` 那一行搬到同目录 `pyproject.toml` 的 `[project].dependencies`，缺这份文件那份插件整份不认。逐项改法见 [从 dev4 及更早的写法改过来](docs/development.md#从-dev4-及更早的写法改过来)。
-
-### v1.0.0-alpha.7.dev4
-
-- 自己写过插件或适配器的人才要动：入口写法、取用来源和动作名都换了。逐项改法见 [从 dev4 及更早的写法改过来](docs/development.md#从-dev4-及更早的写法改过来)。
-- 什么都不用改，`plugin.toml` 与库、记录结构都没动。
-- 启动失败现在当场弹一句人话（平台没装、要的接口版本比本机新、引导段炸掉），不再只留一张走表的启动卡。
-
-### v1.0.0-alpha.7.dev1 与 dev2
-
-- 启动时不再弹"同步重建环境"，多余包留在盘上，要清就去选窗"环境维护"手动同步。
-- 插件目录放进项目根的 `finshin/plugin\` 即被认出来，与内置重名的那份不放行。插件清单里的 `core` 与 `order` 两个键不再读取，清单文件不用改。
-- 没改动过人设正文的实例自动跟新版模板，升级后第一条消息清空上下文与 `records\` 记录，要留存先自行备份。老库里的空列下次启动自动抹掉，抹之前整库备份到 `db\backups\`。
-
-### v1.0.0-alpha.5 与 alpha.6
+### v1.0.0-alpha.6 及更早
 
 - 实例目录分隔符统一成点号，`instances\tg-<id>` 要改成 `instances\tg.<id>`，不改名列不出该实例。
 - 库进 `db\`、记录进 `records\`、帮助图进 `help\`，程序不动也不删旧 `data\`。要留记录就把 `data\ai_records\` 的 `.md` 挪进 `records\`，之后自行删掉 `data\`。
@@ -135,14 +92,8 @@ Telegram：[`FinshinAdapterTG`](https://github.com/FinshinLabs/FinshinAdapterTG)
 - **接口包**：取不到时启动窗口会写明原因，退出重开即续装。
 - **代理**：Telegram 适配器的连接设置里，代理默认自动模式，填了地址优先用它，不通会自动尝试系统代理与直连。可强制仅配置代理、仅系统代理或仅直连，全不通时报错里给出可用的本机端口。
 
-[⤴️ 返回目录](#目录)
-
----
-
 ## 📄 许可证<a id="许可证"></a>
 
 MIT，详见 [`LICENSE`](LICENSE)。
-
----
 
 Made by **lym2006**
