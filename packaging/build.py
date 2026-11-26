@@ -21,6 +21,7 @@ from pack_spec import (
     APP_NAME,
     DIST,
     EXE_NAME,
+    PROJECT_MANIFEST_FILE,
     ROOT,
     SDK_RELEASE_URL,
     STAGE,
@@ -32,8 +33,6 @@ from pack_spec import (
     sdk_version,
     sdk_wheel_name,
 )
-
-from finshin_sdk import PROJECT_MANIFEST_FILE
 
 _PACKAGING_DIR = "packaging"
 

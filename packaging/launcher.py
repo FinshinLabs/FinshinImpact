@@ -19,6 +19,7 @@ from pack_spec import (
     AUMID_ANCHOR_VAR,
     PROXY_ENV_VARS,
     PackLayout,
+    attach_runtime_site,
     attach_source_path,
 )
 
@@ -83,7 +84,7 @@ def _launch(root: Path) -> None:
 def main() -> None:
     """启动主流程
 
-    - 依次：选择窗占用检查、换壳、装环境、迁移旧配置、检查升级、拉起主程序、回收进度窗口
+    - 依次：选择窗占用检查、换壳、装环境、接运行环境导入路径、迁移旧配置、检查升级、拉起主程序、回收进度窗口
     - 回收窗口后补删旧壳备份，旧壳退场即删，删不掉留到下次启动
     """
     if _already_running():
@@ -92,6 +93,7 @@ def main() -> None:
     attach_source_path(root)
     shell.apply_shell_update(root)
     runtime.ensure_runtime(root)
+    attach_runtime_site(root)
     _migrate_instances(root)
     if console.is_open():
         console.hold_console("以上为启动前的处理结果，按回车继续…")

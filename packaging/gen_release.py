@@ -13,8 +13,9 @@ from typing import Any
 
 import net_channel
 import pack_spec
+from pack_spec import PROJECT_MANIFEST_FILE
 
-from finshin_sdk import PROJECT_MANIFEST_FILE, SDK_DISTRIBUTION
+from finshin_sdk import SDK_DISTRIBUTION
 
 _TIMEOUT = 20.0  # 单次请求超时 20 秒
 _PER_PAGE = 100  # 列仓与列 release 的单页条数

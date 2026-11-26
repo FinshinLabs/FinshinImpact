@@ -12,7 +12,8 @@ from typing import Any
 
 import net_channel
 
-from finshin_sdk import PROJECT_MANIFEST_FILE
+# 启动器要在接口包装好之前读项目声明，文件名不能从接口包取
+PROJECT_MANIFEST_FILE = "pyproject.toml"
 
 # 仓库根与产物目录（_cache 存放重复构建可复用的原料）
 ROOT = Path(__file__).resolve().parent.parent
@@ -48,6 +49,7 @@ class PackLayout:
     """
 
     RUNTIME_DIR = "runtime"
+    SITE_PACKAGES = "Lib/site-packages"
     PAYLOAD_DIR = "payload"
     SDK_WHEEL_DIR = "_sdk"
     MAIN_SCRIPT = "main.py"
@@ -127,6 +129,17 @@ def attach_source_path(root: Path) -> None:
     source = str(root / "src")
     if source not in sys.path:
         sys.path.insert(0, source)
+
+
+def attach_runtime_site(root: Path) -> None:
+    """把装好的运行环境接到导入路径
+
+    - 冻结启动器自带的路径里没有 site-packages
+    - 迁移脚本要 import 接口包，装完才接得上
+    """
+    site = str(root / PackLayout.RUNTIME_DIR / PackLayout.SITE_PACKAGES)
+    if site not in sys.path:
+        sys.path.append(site)
 
 
 def _pyproject_data(root: Path) -> dict:

@@ -35,7 +35,7 @@ _WHEEL_SUFFIX = ".whl"
 _WHEEL_GLOB = f"*{_WHEEL_SUFFIX}"
 
 # 运行环境里已装件的落点与命名形态
-_SITE_PACKAGES = Path("Lib") / "site-packages"
+_SITE_PACKAGES = Path(PackLayout.SITE_PACKAGES)
 _DIST_INFO_GLOB = "*.dist-info"
 _DIST_INFO_SUFFIX = ".dist-info"
 

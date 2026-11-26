@@ -176,12 +176,15 @@ class TestNaming(unittest.TestCase):
         self.assertEqual(toolchain._PY_EXE.name, pack_spec.PackLayout.PYTHON_EXE)
 
     def test_declaration_name_comes_from_sdk(self) -> None:
-        """项目声明文件名各处直接引用接口包同一个名"""
+        """项目声明文件名各处与接口包同值
+
+        - 启动器装接口包之前就要读项目声明，打包规格自带一份同值串
+        """
         self.assertIs(PROJECT_MANIFEST_FILE, profile_env.PROJECT_MANIFEST_FILE)
         self.assertIs(PROJECT_MANIFEST_FILE, tool_settings.PROJECT_MANIFEST_FILE)
-        self.assertIs(PROJECT_MANIFEST_FILE, pack_spec.PROJECT_MANIFEST_FILE)
-        self.assertIs(PROJECT_MANIFEST_FILE, build.PROJECT_MANIFEST_FILE)
-        self.assertIs(PROJECT_MANIFEST_FILE, gen_release.PROJECT_MANIFEST_FILE)
+        self.assertEqual(PROJECT_MANIFEST_FILE, pack_spec.PROJECT_MANIFEST_FILE)
+        self.assertEqual(PROJECT_MANIFEST_FILE, build.PROJECT_MANIFEST_FILE)
+        self.assertEqual(PROJECT_MANIFEST_FILE, gen_release.PROJECT_MANIFEST_FILE)
         self.assertEqual(tool_settings._ROOT_DECLARATION.name, PROJECT_MANIFEST_FILE)
         self.assertEqual(tool_settings.DEVTOOLS_DECLARATION.name, PROJECT_MANIFEST_FILE)
 
@@ -200,6 +203,22 @@ class TestLauncherBuild(unittest.TestCase):
             path = (ROOT / "packaging" / f"{name}.py").resolve()
             self.assertTrue(path.is_file(), name)
             self.assertIn(path, listed, name)
+
+    def test_launcher_sources_do_not_import_sdk(self) -> None:
+        """启动器源码不在顶层导入接口包
+
+        - 接口包装好之前启动器就要跑，冻结包里的接口包没有安装信息
+        """
+        for path in build._launcher_sources():
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in tree.body:
+                if isinstance(node, ast.Import):
+                    modules = [alias.name for alias in node.names]
+                elif isinstance(node, ast.ImportFrom):
+                    modules = [node.module or ""]
+                else:
+                    continue
+                self.assertNotIn("finshin_sdk", modules, path.name)
 
 
 def _launcher_root_imports() -> set[str]:
