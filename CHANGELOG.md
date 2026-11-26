@@ -10,6 +10,8 @@
 
 - **跨平台**：QQ 平台实装。
 
+## [1.0.0-alpha.7.dev9] - 2026-11-26
+
 ### ⚠️ Breaking Changes
 
 - **配置与领域类型改从公开子模块导入**：`FieldErrors`、`SourceKind`、`section_name`、`source_identity`、`source_values` 不再从 `utils.config` 取用，配置与标识类型统一直连 `utils.config.models`／`utils.config.sources` 或 `finshin_sdk.domain.config`／`finshin_sdk.domain.ids`。
